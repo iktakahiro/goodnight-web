@@ -219,14 +219,14 @@ describe('POST /api/contact', () => {
     expect(external.calls).toHaveLength(0);
   });
 
-  test('accepts an origin from allowedOrigins', async () => {
-    const worker = createTestWorker({
-      options: { contact: { allowedOrigins: ['https://www.example.com'] } },
-    });
+  test('rejects another origin of the same site and sends no CORS headers', async () => {
+    const worker = createTestWorker();
     const response = await post(worker, validBody(), {
       headers: { origin: 'https://www.example.com' },
     });
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
+    expect(response.headers.get('access-control-allow-origin')).toBeNull();
+    expect(rows(worker)).toEqual([]);
   });
 
   test('rejects a body over 16 KB with 413 before parsing', async () => {

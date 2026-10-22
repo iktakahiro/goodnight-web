@@ -36,15 +36,9 @@ export const readBodyWithLimit = async (
 };
 
 /**
- * Returns whether the request's `Origin` header is the request's own origin
- * or one of `extraOrigins`. A missing `Origin` is rejected.
+ * Returns whether the request's `Origin` header is the request's own origin.
+ * A missing `Origin` is rejected. The APIs are same-origin only and send no
+ * CORS headers.
  */
-export const isAllowedOrigin = (
-  request: Request,
-  extraOrigins: readonly string[] = [],
-): boolean => {
-  const origin = request.headers.get('origin');
-  if (!origin) return false;
-  if (origin === new URL(request.url).origin) return true;
-  return extraOrigins.includes(origin);
-};
+export const isAllowedOrigin = (request: Request): boolean =>
+  request.headers.get('origin') === new URL(request.url).origin;

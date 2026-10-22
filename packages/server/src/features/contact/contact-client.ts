@@ -8,8 +8,6 @@ export const CONTACT_API_PATH = '/api/contact';
 
 /** Options shared by the contact client functions. */
 export interface ContactClientOptions {
-  /** Origin of the Worker. Defaults to the current page's origin. */
-  baseUrl?: string;
   /** Language for `network_error` messages. Defaults to `en`. */
   locale?: Locale;
   signal?: AbortSignal;
@@ -34,9 +32,6 @@ export type ContactSubmitResult =
       fields?: Record<string, string>;
     };
 
-const url = (path: string, baseUrl: string | undefined) =>
-  baseUrl ? new URL(path, baseUrl).toString() : path;
-
 const isApiErrorBody = (value: unknown): value is ApiErrorBody =>
   typeof value === 'object' &&
   value !== null &&
@@ -55,10 +50,10 @@ export const getContactConfig = async (
 ): Promise<ContactConfig | null> => {
   const doFetch = options.fetch ?? fetch;
   try {
-    const response = await doFetch(
-      url(`${CONTACT_API_PATH}/config`, options.baseUrl),
-      { signal: options.signal, headers: { accept: 'application/json' } },
-    );
+    const response = await doFetch(`${CONTACT_API_PATH}/config`, {
+      signal: options.signal,
+      headers: { accept: 'application/json' },
+    });
     if (!response.ok) return null;
     return (await response.json()) as ContactConfig;
   } catch {
@@ -83,7 +78,7 @@ export const submitContact = async (
   const doFetch = options.fetch ?? fetch;
   let response: Response;
   try {
-    response = await doFetch(url(CONTACT_API_PATH, options.baseUrl), {
+    response = await doFetch(CONTACT_API_PATH, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

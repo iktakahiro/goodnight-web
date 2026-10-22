@@ -92,7 +92,7 @@ export const contactRoutes = new Hono<HonoEnv>()
     if (!limiter) return apiError(c, 503, 'contact_unavailable');
 
     // 1. Origin, Content-Type, and size, before parsing anything.
-    if (!isAllowedOrigin(c.req.raw, options.contact.allowedOrigins)) {
+    if (!isAllowedOrigin(c.req.raw)) {
       return apiError(c, 403, 'forbidden_origin');
     }
     const contentType = c.req.header('content-type') ?? '';

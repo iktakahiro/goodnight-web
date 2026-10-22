@@ -19,12 +19,6 @@ export interface GoodnightWorkerOptions {
      */
     categories?: readonly string[];
     /**
-     * Extra origins allowed to post to the contact API, besides the Worker's
-     * own origin (for example `https://www.example.com` when the API runs on
-     * `example.com`).
-     */
-    allowedOrigins?: readonly string[];
-    /**
      * Hostnames accepted in the Turnstile siteverify result. Defaults to the
      * hostname of the request.
      */
@@ -37,7 +31,6 @@ export interface ResolvedOptions {
   locale: Locale;
   contact: {
     categories: readonly string[] | undefined;
-    allowedOrigins: readonly string[];
     turnstileHostnames: readonly string[] | undefined;
   };
 }
@@ -49,7 +42,6 @@ export const resolveOptions = (
   locale: options.locale ?? 'en',
   contact: {
     categories: options.contact?.categories,
-    allowedOrigins: options.contact?.allowedOrigins ?? [],
     turnstileHostnames: options.contact?.turnstileHostnames,
   },
 });
