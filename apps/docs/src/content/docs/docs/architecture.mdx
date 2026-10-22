@@ -13,17 +13,17 @@ description: One Worker with Static Assets and one D1 database serve the site, t
 
 ## The parts
 
-| Part                         | Role                                                                                                                                                                    |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker                       | One Worker per site. It serves the static pages and runs the API.                                                                                                       |
-| Static Assets                | The Astro build (`/`, `/blog/`, `/contact/`, and so on). Cloudflare serves these files without running Worker code.                                                     |
-| Hono app                     | Created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*` (and `/admin/*` if the admin UI needs it) reach it, through `run_worker_first`. |
-| D1                           | One SQLite database: inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                                           |
-| Turnstile                    | Cloudflare's bot check on the contact form. The Worker verifies each token on the server.                                                                               |
-| Rate Limiting binding        | A Workers binding that limits contact submissions per `ip_hash`. It works on the free plan.                                                                             |
-| Better Auth with passkeys    | Admin sign-in. Passkeys only; email and password sign-in is turned off.                                                                                                 |
-| Slack webhook (optional)     | A short "new inquiry" message, with no personal data.                                                                                                                   |
-| Cloudflare Access (optional) | An extra sign-in layer in front of `/admin/*` and `/api/admin/*`. Recommended, not required.                                                                            |
+| Part                         | Role                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker                       | One Worker per site. It serves the static pages and runs the API.                                                                                       |
+| Static Assets                | The Astro build (`/`, `/blog/`, `/contact/`, and so on). Cloudflare serves these files without running Worker code.                                     |
+| Hono app                     | Created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*`, `/admin`, and `/admin/*` reach it, through `run_worker_first`. |
+| D1                           | One SQLite database: inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                           |
+| Turnstile                    | Cloudflare's bot check on the contact form. The Worker verifies each token on the server.                                                               |
+| Rate Limiting binding        | A Workers binding that limits contact submissions per `ip_hash`. It works on the free plan.                                                             |
+| Better Auth with passkeys    | Admin sign-in. Passkeys only; email and password sign-in is turned off.                                                                                 |
+| Slack webhook (optional)     | A short "new inquiry" message, with no personal data.                                                                                                   |
+| Cloudflare Access (optional) | An extra sign-in layer in front of `/admin/*` and `/api/admin/*`. Recommended, not required.                                                            |
 
 Constraints that shape the design:
 
@@ -37,7 +37,7 @@ Constraints that shape the design:
 | -------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                        |
 | `POST /api/contact`              | The contact form | Checks, rate limits, and stores a submission.                                                                                                             |
-| `/api/setup`                     | The first admin  | Creates the first admin. Closes once an admin exists.                                                                                                     |
+| `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                             |
 | `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                            |
 | `/api/admin/*`                   | The admin screen | List (50 per page, with the unread count), detail, status change, delete, CSV export, and a status endpoint that reports whether Turnstile is configured. |
 | `/admin/*`                       | Admins           | The prebuilt admin UI (a React app). Every data request needs a session.                                                                                  |

@@ -11,7 +11,8 @@ description: Admins sign in with passkeys through Better Auth. Email and passwor
 
 - The admin screen and the admin API use [Better Auth](https://better-auth.com/) with its passkey plugin. Better Auth stores its users, sessions, and passkeys in the same D1 database.
 - Email and password sign-in is turned off. There is no development bypass, default account, or shared key.
-- The Better Auth instance is created for each request from that request's bindings, because Worker bindings are only available per request.
+- The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate. Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. A new set of bindings gets a new instance.
+- Better Auth does not record IP addresses in sessions, and passkey registration and sign-in require user verification (a PIN or biometrics).
 - Cloudflare Access can be added in front of the admin paths. Passkey sign-in is still required with Access.
 
 ## Why passkeys
@@ -26,7 +27,7 @@ description: Admins sign in with passkeys through Better Auth. Email and passwor
 - **Losing every passkey locks you out.** Register more than one passkey (for example a phone and a laptop) or add a second admin. The recovery procedure is still an open question.
 
 <Callout type='warn' title='Draft / not verified yet'>
-  A local test showed that Better Auth with the passkey plugin bundles for
-  Workers and issues passkey challenges with D1. A full registration and sign-in
-  in a browser has not been tested yet.
+  Passkey registration, sign-out, and sign-in passed in Chromium with a virtual
+  authenticator against `wrangler dev` and a local D1 database. CPU time on
+  Cloudflare itself has not been measured yet.
 </Callout>
