@@ -79,6 +79,38 @@ test easier.
 - Keep secrets in Worker secrets. Never return them to the browser or write
   them to D1.
 
+## Database
+
+D1 is accessed through Drizzle ORM only (see
+[docs/decisions/0005](docs/decisions/0005-drizzle-orm.md)).
+
+- Use the Drizzle query builder (`getDatabase(env.DB)`) for every query.
+  Never call D1's `prepare()` or reach the binding through `$client`. Raw SQL
+  goes only through Drizzle's `sql` template, which binds interpolated
+  values. Never use `sql.raw()`. `bun run check:sql` enforces this outside
+  test helpers.
+- Validate numbers from requests (page, limit) as bounded integers with zod
+  at the route, and pass them to `.limit()` and `.offset()`.
+- Schema change workflow: edit `packages/server/src/db/schema.ts`, run
+  `bun run db:generate` (drizzle-kit generate), read the generated SQL, and
+  commit it with the schema. `bun run db:check` fails when the schema and the
+  migrations differ.
+- Never edit, rename, or delete a migration that has been released. Fix
+  mistakes with a new migration.
+- Keep schema changes additive (new tables and columns). Sites apply
+  migrations before `wrangler deploy`, so the previous Worker version runs
+  against the new schema for a short time.
+- If the generated SQL rebuilds the `passkey` table, append the
+  `CREATE TRIGGER` statement from `0002_setup_closed_trigger.sql` to the new
+  file. If it rebuilds the `user` table, do not commit it: on D1 the rebuild
+  deletes every session and passkey. Change the schema so that it needs only
+  `ALTER TABLE ... ADD`.
+- Data and triggers that drizzle-kit does not model go in a custom migration
+  (`bunx drizzle-kit generate --custom --name <name>` in `packages/server`).
+- Better Auth tables come from the Better Auth CLI
+  (`packages/server/scripts/auth-schema.config.ts`). Regenerate that part of
+  `schema.ts` after a Better Auth upgrade instead of editing it by hand.
+
 ## Code organization
 
 - Organize code by feature, not by technical category. Keep code in its owning
@@ -102,6 +134,8 @@ test easier.
 ## Validation
 
 Run `bun run validate` and `bun run build` for every implementation change.
+`validate` runs lint, format, type checks, `check:sql`, `db:check`, and the
+tests.
 Run `bun run deploy:check` when a change touches a Worker, `wrangler.jsonc`, or
 D1 migrations.
 

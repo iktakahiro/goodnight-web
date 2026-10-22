@@ -23,6 +23,7 @@ import {
 } from './contact-schema.ts';
 import { SPAM_HOLD_THRESHOLD, scoreSubmission } from './spam-score.ts';
 import { verifyTurnstile } from './turnstile.ts';
+import { safeErrorMessage } from '../../shared/log-error.ts';
 
 /** Body of `GET /api/contact/config`, read by the contact form. */
 export interface ContactConfig {
@@ -52,10 +53,7 @@ const runInBackground = (
 ): void => {
   c.executionCtx.waitUntil(
     task().catch((error: unknown) => {
-      console.error(
-        `${label} failed:`,
-        error instanceof Error ? error.message : 'unknown error',
-      );
+      console.error(`${label} failed:`, safeErrorMessage(error));
     }),
   );
 };
@@ -152,7 +150,7 @@ export const contactRoutes = new Hono<HonoEnv>()
         await stored.catch((error: unknown) => {
           console.error(
             'contact: honeypot insert failed:',
-            error instanceof Error ? error.message : 'unknown error',
+            safeErrorMessage(error),
           );
         });
         runInBackground(c, 'prune', () => pruneIfDue(env.DB, now));
@@ -222,10 +220,7 @@ export const contactRoutes = new Hono<HonoEnv>()
         consentAt: now,
       });
     } catch (error) {
-      console.error(
-        'contact: insert failed:',
-        error instanceof Error ? error.message : 'unknown error',
-      );
+      console.error('contact: insert failed:', safeErrorMessage(error));
       return apiError(c, 500, 'server_error');
     }
 

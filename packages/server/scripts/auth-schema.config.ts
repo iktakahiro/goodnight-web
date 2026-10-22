@@ -1,19 +1,18 @@
-// Config for the Better Auth CLI only. It generates the SQL for the Better
-// Auth tables (docs/decisions/0002). An empty in-memory SQLite database makes
-// the CLI print the full schema; point it at a SQLite file with the existing
-// migrations applied to get only the difference after a Better Auth upgrade.
+// Config for the Better Auth CLI only. It generates the Drizzle table
+// definitions for the Better Auth tables, which are then kept in
+// src/db/schema.ts (docs/decisions/0005). The adapter is never connected, so
+// an empty object stands in for the Drizzle database.
 //
 // npx --yes auth@<better-auth version> generate \
-//   --config scripts/auth-schema.config.ts \
-//   --output migrations/NNNN_better_auth_<change>.sql --yes
+//   --config scripts/auth-schema.config.ts --output <tmp>/auth-schema.ts --yes
 import { passkey } from '@better-auth/passkey';
 import { betterAuth } from 'better-auth';
-import { DatabaseSync } from 'node:sqlite';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
 /** Better Auth options with the same plugins and tables as the Worker. */
 export const auth = betterAuth({
   baseURL: 'http://localhost:8787',
-  database: new DatabaseSync(':memory:'),
+  database: drizzleAdapter({}, { provider: 'sqlite' }),
   emailAndPassword: { enabled: false },
   plugins: [passkey()],
 });

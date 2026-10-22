@@ -49,6 +49,15 @@ button names and headings from it.
 See `docs/architecture.md` in the repository for the request flows and the
 security rules.
 
+## Database
+
+All tables (contact submissions, settings, and the Better Auth tables) are
+defined with Drizzle ORM in `src/db/schema.ts`. drizzle-kit generates the SQL
+migrations in `migrations/`, and the package ships those `.sql` files. A site
+applies them with `wrangler d1 migrations apply DB` (the starter's deploy
+script runs it with `--remote` before `wrangler deploy`). Do not run
+`wrangler d1 migrations create`: it would write into `node_modules`.
+
 ## Development
 
 The admin UI source is in `admin-ui/`: a Vite-built React SPA with Base UI,
@@ -64,7 +73,14 @@ committed. Run the
 build before `type-check` or `test` when you call them directly in this
 directory (Turborepo does it for you from the repository root).
 
+Schema changes: edit `src/db/schema.ts`, run `bun run db:generate`, read the
+generated SQL, and commit it. Never edit a released migration. The rules for
+table rebuilds and the setup trigger are in the repository's `AGENTS.md` and
+`docs/decisions/0005-drizzle-orm.md`.
+
 ```sh
+bun run db:generate  # drizzle-kit generate: new migration from src/db/schema.ts
+bun run db:check     # fails when src/db/schema.ts has changes without a migration
 bun run build        # builds admin-ui/ and writes the two .gen files
 bun run test         # unit and HTTP tests (in-memory D1 stand-in) and admin UI unit tests
 bun run test:e2e     # wrangler dev + the admin UI in Chromium with passkeys; needs `bunx playwright install chromium`

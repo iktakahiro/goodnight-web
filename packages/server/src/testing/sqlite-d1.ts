@@ -79,7 +79,7 @@ class Statement {
   }
 
   async raw() {
-    return this.execute().results.map((row) => Object.values(row));
+    return this.db.query(this.sql).values(...this.params);
   }
 
   runInTransaction() {

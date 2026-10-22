@@ -1,4 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { eq, lt, lte, sql } from 'drizzle-orm';
+import { getDatabase } from '../../db/database.ts';
+import { settings, submissions } from '../../db/schema.ts';
 
 /** Retention period when `settings.retention_days` is missing or invalid. */
 export const DEFAULT_RETENTION_DAYS = 180;
@@ -15,9 +18,12 @@ export type PruneResult =
 
 /** Reads `settings.retention_days`, clamped to 1–3650 days. */
 export const getRetentionDays = async (db: D1Database): Promise<number> => {
-  const value = await db
-    .prepare("SELECT value FROM settings WHERE key = 'retention_days'")
-    .first<string>('value');
+  const row = await getDatabase(db)
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, 'retention_days'))
+    .get();
+  const value = row?.value;
   const days = Number(value);
   if (!Number.isInteger(days) || days < 1) return DEFAULT_RETENTION_DAYS;
   return Math.min(days, 3650);
@@ -35,19 +41,22 @@ export const pruneIfDue = async (
   db: D1Database,
   now: number = Date.now(),
 ): Promise<PruneResult> => {
-  const claim = await db
-    .prepare(
-      `INSERT INTO settings (key, value) VALUES ('last_cleanup_at', ?1)
-      ON CONFLICT (key) DO UPDATE SET value = excluded.value
-      WHERE CAST(settings.value AS INTEGER) <= ?2`,
-    )
-    .bind(String(now), now - PRUNE_INTERVAL_MS)
-    .run();
+  const orm = getDatabase(db);
+  const claim = await orm
+    .insert(settings)
+    .values({ key: 'last_cleanup_at', value: String(now) })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: { value: sql`excluded.value` },
+      setWhere: lte(
+        sql`cast(${settings.value} as integer)`,
+        now - PRUNE_INTERVAL_MS,
+      ),
+    });
   if (claim.meta.changes === 0) return { ran: false };
   const retentionDays = await getRetentionDays(db);
-  const result = await db
-    .prepare('DELETE FROM submissions WHERE created_at < ?1')
-    .bind(now - retentionDays * DAY_MS)
-    .run();
+  const result = await orm
+    .delete(submissions)
+    .where(lt(submissions.createdAt, now - retentionDays * DAY_MS));
   return { ran: true, deleted: result.meta.changes, retentionDays };
 };

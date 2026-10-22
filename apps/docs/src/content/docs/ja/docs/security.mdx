@@ -38,6 +38,50 @@ description: 管理画面、最初の管理者の作成、問い合わせフォ�
 
 [問い合わせフォームの保護](/ja/docs/how-it-works/contact-protection/)を参照してください。
 
+## SQL インジェクション [#sql-injection]
+
+サーバーは、入力を SQL の文字列に入れません。
+
+- すべてのクエリで [Drizzle ORM](https://orm.drizzle.team/) のクエリビルダーを使います。管理画面の一覧の件数とオフセットも含めて、値はバインドされたパラメーターとして D1 に送ります。
+- URL から来る数値は、クエリに渡す前にルートで確認します。`page` は 1 から 100,000、`limit` は 1 から 100 で、数字だけで書かれている必要があります。`1; DROP TABLE submissions`、`-1`、`1e9`、`50 OFFSET 0` のような値には 400 を返します。
+- 生の SQL は Drizzle の `sql` テンプレートでだけ書けます。このテンプレートも値をバインドします。サーバーのコードが `sql.raw()` や D1 の `prepare()` を直接呼ぶと、CI のチェックが失敗します。
+- テストでは、一覧の API にインジェクション用の文字列を送って 400 になることを確かめます。また、データベースに送った文を記録して、入力がパラメーターにだけ現れることを確かめます。
+
+```ts
+// packages/server/src/features/admin-api/admin-query.ts
+const boundedInteger = (max: number) =>
+  z
+    .string()
+    .max(String(max).length)
+    .regex(/^[1-9][0-9]*$/)
+    .transform(Number)
+    .pipe(z.number().int().min(1).max(max));
+
+export const listQuerySchema = z.object({
+  status: statusParam,
+  page: boundedInteger(ADMIN_MAX_PAGE).default(1),
+  limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
+});
+
+// packages/server/src/features/submissions/submission-store.ts
+orm
+  .select()
+  .from(submissions)
+  .where(statusIs(status))
+  .orderBy(...NEWEST_FIRST)
+  .limit(limit)
+  .offset(offset);
+```
+
+```sql
+select "id", "created_at", ... from "submissions"
+where "submissions"."status" = ?
+order by "submissions"."created_at" desc, "submissions"."id" desc
+limit ? offset ?
+```
+
+SQL の文字列は、状態、ページ、件数が何であっても同じです。変わるのはパラメーターだけです。[データベースとマイグレーション](/ja/docs/database/)を参照してください。
+
 ## シークレット
 
 - シークレット（`SETUP_TOKEN`、`ADMIN_EMAILS`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET`、`TURNSTILE_SECRET`、`SLACK_WEBHOOK_URL`）はすべて Worker のシークレットに置きます。

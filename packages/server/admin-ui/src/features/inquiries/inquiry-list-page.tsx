@@ -9,10 +9,8 @@ import {
 } from '@tanstack/react-table';
 import { ChevronLeft, ChevronRight, Download, MoonStar } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
-import type {
-  ADMIN_PAGE_SIZE,
-  AdminSubmissionSummary,
-} from '../../../../src/features/admin-api/admin-routes.ts';
+import type { ADMIN_PAGE_SIZE } from '../../../../src/features/admin-api/admin-query.ts';
+import type { AdminSubmissionSummary } from '../../../../src/features/admin-api/admin-routes.ts';
 import { errorMessage } from '../../shared/api/error-message.ts';
 import { useAsync } from '../../shared/api/use-async.ts';
 import {

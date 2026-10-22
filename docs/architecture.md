@@ -48,15 +48,20 @@ is not yet. Design decisions are recorded in
   CPU, which is too much to repeat on every request on the free plan
   ([0001](decisions/0001-passkey-auth-on-workers.md)). Email and password
   sign-in is disabled; admins use passkeys. IP tracking is off, so the
-  `session.ipAddress` column stays empty. That also turns off Better Auth's
+  `session.ip_address` column stays empty. That also turns off Better Auth's
   own rate limiter, so the Worker limits the public sign-in endpoints
   (`passkey/generate-authenticate-options` and
   `passkey/verify-authentication`) itself, with the key `auth:<ip_hash>` on
   the Rate Limiting binding. Over the limit returns 429; without the binding
   or `IP_HASH_SECRET` they return 503.
-- **D1** stores submissions, settings, and the Better Auth tables. The
-  migrations ship inside `@goodnight-web/server`
-  ([0002](decisions/0002-migrations-from-package.md)).
+- **D1** stores submissions, settings, and the Better Auth tables. All of
+  them are defined in one Drizzle schema
+  (`packages/server/src/db/schema.ts`). Every query goes through the Drizzle
+  query builder; Better Auth uses its Drizzle adapter with the same schema.
+  drizzle-kit generates the SQL migrations from the schema, and they ship
+  inside `@goodnight-web/server`
+  ([0002](decisions/0002-migrations-from-package.md),
+  [0005](decisions/0005-drizzle-orm.md)). See "Database" below.
 
 ### Secrets and bindings
 
@@ -177,7 +182,7 @@ The browser then registers a passkey with the Better Auth passkey client.
 Setup closes when the first passkey is registered, so a person who left before
 registering one can run setup again. A trigger on the `passkey` table records
 `settings.setup_closed_at` in the same transaction, so setup stays closed even
-if every passkey is deleted later (migration `0003_setup_closed.sql`). `GET /api/setup` returns `{ configured, open }`.
+if every passkey is deleted later (migration `0002_setup_closed_trigger.sql`). `GET /api/setup` returns `{ configured, open }`.
 
 ### Admin API
 
@@ -186,15 +191,15 @@ in `ADMIN_EMAILS` and has at least one passkey. The session from setup alone
 only allows registering the first passkey. State-changing requests also need
 the Worker's own `Origin` (CSRF). There is no development bypass.
 
-| Route                                      | Result                                                                                                                                                       |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/admin/me`                        | the signed-in admin                                                                                                                                          |
-| `GET /api/admin/status`                    | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`, `categories` (`{ value, label }`) |
-| `GET /api/admin/submissions?status=&page=` | 50 per page, newest first, `total` and `unreadCount`; runs pruning                                                                                           |
-| `GET /api/admin/submissions/:id`           | one submission; a `new` one becomes `read`                                                                                                                   |
-| `PATCH /api/admin/submissions/:id`         | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                       |
-| `DELETE /api/admin/submissions/:id`        | deletes the row                                                                                                                                              |
-| `GET /api/admin/submissions.csv?status=`   | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                                                            |
+| Route                                             | Result                                                                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/admin/me`                               | the signed-in admin                                                                                                                                          |
+| `GET /api/admin/status`                           | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`, `categories` (`{ value, label }`) |
+| `GET /api/admin/submissions?status=&page=&limit=` | `limit` per page (1–100, default 50), newest first, `total` and `unreadCount`; runs pruning. Invalid `status`, `page`, or `limit` is 400                     |
+| `GET /api/admin/submissions/:id`                  | one submission; a `new` one becomes `read`                                                                                                                   |
+| `PATCH /api/admin/submissions/:id`                | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                       |
+| `DELETE /api/admin/submissions/:id`               | deletes the row                                                                                                                                              |
+| `GET /api/admin/submissions.csv?status=`          | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                                                            |
 
 `ip_hash` is never returned by the admin API.
 
@@ -273,7 +278,7 @@ The UI does not use TanStack Start; the Worker serves the static build.
   `type-check`, `test`, and `deploy:check` of the server package. The bundle
   is one JS file of about 260 kB gzip and one CSS file of about 8 kB gzip.
   With it, `deploy:check` reports the server's test Worker at about
-  3,490 KiB (750 KiB gzip).
+  2,990 KiB (680 KiB gzip).
 - **Serving.** `/admin` and paths without a file extension return
   `index.html` (`no-cache`); `/admin/assets/*` are immutable; ETags give
   304s. The SPA shell loads without a session, but every data request needs
@@ -287,6 +292,39 @@ Responses from `/api/*` and `/admin/*` get `X-Content-Type-Options`,
 `Permissions-Policy`, and HSTS on HTTPS. API responses get
 `default-src 'none'` and `Cache-Control: no-store`. Pages from Static Assets
 are not changed.
+
+## Database
+
+| Table                                                   | Contents                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `submissions`                                           | contact submissions; `status` is checked against the five statuses; `ip_hash`, never an IP |
+| `settings`                                              | `retention_days`, `last_cleanup_at`, `setup_closed_at`                                     |
+| `user`, `session`, `account`, `verification`, `passkey` | Better Auth, generated by the Better Auth CLI for the Drizzle adapter                      |
+
+- **Queries.** `getDatabase(env.DB)` (`src/db/database.ts`) returns the
+  Drizzle database. App code never calls D1's `prepare()`; raw SQL appears
+  only as Drizzle `sql` template fragments, which bind their values. The
+  admin list passes the validated `limit` and offset to `.limit()` and
+  `.offset()`, so they are bound too. `scripts/check-sql.ts` fails on
+  `sql.raw(`, `.prepare(`, and `$client` in `packages/server` outside test
+  helpers.
+- **Migrations.** `bun run db:generate` writes
+  `packages/server/migrations/NNNN_name.sql` and drizzle-kit's
+  `migrations/meta/`. Wrangler reads only the `.sql` files, sorted by name.
+  The default settings and the `passkey_closes_setup` trigger are custom
+  migrations, because drizzle-kit does not model data or triggers.
+  `bun run db:check` fails when the schema has changes without a migration.
+  The package ships the `.sql` files without `meta/`.
+- **Rebuilds.** For some changes drizzle-kit rebuilds a table. Rebuilding
+  `passkey` drops the trigger, and rebuilding `user` deletes every session
+  and passkey on D1, because D1 keeps foreign keys on. A test fails on
+  `DROP TABLE user`, and `AGENTS.md` has the rules
+  ([0005](decisions/0005-drizzle-orm.md)).
+- **Logs.** A failed Drizzle query carries its bound values in its message.
+  Errors are logged with `safeErrorMessage()` only. Better Auth's logger
+  logs redacted messages, and Better Auth rethrows endpoint errors to the
+  app's `onError` instead of logging them itself, so no submitted values or
+  tokens reach the logs ([0005](decisions/0005-drizzle-orm.md)).
 
 ## Package and starter
 
@@ -351,7 +389,9 @@ the Worker a token that can write to GitHub.
   for the starter and the docs site.
 - Oxlint and Oxfmt run once from the root.
 - CI runs install with a frozen lockfile, lint, format check, type check,
-  tests, build, and `deploy:check`. A separate `e2e` job builds and runs the
+  the SQL guard (`check:sql`), the migration check (`db:check`), tests,
+  build, and `deploy:check`. `bun run validate` runs the same checks except
+  build and `deploy:check`. A separate `e2e` job builds and runs the
   end-to-end tests of `packages/server` and `templates/starter` with
   Playwright Chromium, and uploads screenshots and traces when they fail.
 - Dependencies use exact versions and a 48-hour release-age gate
@@ -370,7 +410,12 @@ the Worker a token that can write to GitHub.
   Auth runs for real against the stand-in. The security rules in `AGENTS.md`
   have tests: fail-closed 503s, Origin and size checks, Turnstile hostname and
   action, rate limits, no raw IP in any table, no personal data in Slack,
-  setup closing, 401/403 on every admin route, and CSV escaping.
+  setup closing, 401/403 on every admin route, and CSV escaping. SQL
+  injection has tests at two levels: the admin list route rejects malicious
+  `status`, `page`, and `limit` values with 400, and
+  `submission-store.test.ts` records the statements sent to D1 and checks
+  that input appears only in the bound parameters. `src/db/migrations.test.ts`
+  checks the migration file names, the drizzle-kit journal, and the trigger.
 - `bun run test:e2e` in `packages/server` is the end-to-end test. It applies
   the migrations to a fresh local D1 (`.wrangler/e2e-state`), starts
   `wrangler dev` with `e2e/wrangler.jsonc` on port 8790 (`E2E_PORT` to

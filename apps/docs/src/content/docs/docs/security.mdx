@@ -39,6 +39,50 @@ The admin UI's page shell can load without a session, but every data request nee
 
 See [Contact form protection](/docs/how-it-works/contact-protection/).
 
+## SQL injection [#sql-injection]
+
+The server never puts input into SQL text.
+
+- Every query uses the [Drizzle ORM](https://orm.drizzle.team/) query builder. Values, including the page size and offset of the admin list, are sent to D1 as bound parameters.
+- Numbers from the URL are checked at the route before they reach a query. `page` must be 1 to 100,000 and `limit` 1 to 100, written with digits only. Values such as `1; DROP TABLE submissions`, `-1`, `1e9`, or `50 OFFSET 0` get a 400 response.
+- Raw SQL is allowed only through Drizzle's `sql` template, which also binds its values. A check in CI fails when the server code calls `sql.raw()` or D1's `prepare()` directly.
+- Tests send injection strings to the admin list and check the 400 responses, and record the statements sent to the database to check that input appears only in the parameters.
+
+```ts
+// packages/server/src/features/admin-api/admin-query.ts
+const boundedInteger = (max: number) =>
+  z
+    .string()
+    .max(String(max).length)
+    .regex(/^[1-9][0-9]*$/)
+    .transform(Number)
+    .pipe(z.number().int().min(1).max(max));
+
+export const listQuerySchema = z.object({
+  status: statusParam,
+  page: boundedInteger(ADMIN_MAX_PAGE).default(1),
+  limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
+});
+
+// packages/server/src/features/submissions/submission-store.ts
+orm
+  .select()
+  .from(submissions)
+  .where(statusIs(status))
+  .orderBy(...NEWEST_FIRST)
+  .limit(limit)
+  .offset(offset);
+```
+
+```sql
+select "id", "created_at", ... from "submissions"
+where "submissions"."status" = ?
+order by "submissions"."created_at" desc, "submissions"."id" desc
+limit ? offset ?
+```
+
+The SQL text is the same for every status, page, and page size; only the parameters change. See [Database and migrations](/docs/database/).
+
 ## Secrets
 
 - All secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`, `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL`) are Worker secrets.

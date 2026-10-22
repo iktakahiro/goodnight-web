@@ -19,7 +19,7 @@ export type {
   AdminSubmissionList,
   AdminSubmissionSummary,
 } from './features/admin-api/admin-routes.ts';
-export { ADMIN_PAGE_SIZE } from './features/admin-api/admin-routes.ts';
+export { ADMIN_PAGE_SIZE } from './features/admin-api/admin-query.ts';
 export type { SetupState } from './features/setup/setup-routes.ts';
 export {
   setupInputSchema,

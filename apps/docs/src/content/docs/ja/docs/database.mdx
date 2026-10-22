@@ -1,0 +1,81 @@
+---
+title: データベースとマイグレーション
+icon: Database
+description: D1 データベースのテーブル、クエリの書き方、マイグレーションが npm パッケージに入って deploy スクリプトで適用される流れ、スキーマの変更がサイトに届く流れをまとめます。
+---
+
+<Callout type='warn' title='下書き / 未検証'>
+  パッケージはまだ公開していません。ここに書いたマイグレーションとクエリは、手元で確認しています（`wrangler
+  d1 migrations apply --local`、テスト、`wrangler dev` に対する end-to-end
+  テスト）。Dependabot と Workers Builds を通じた更新の流れは M2
+  で予定しています。
+</Callout>
+
+## テーブル
+
+サイトごとに D1 データベースが 1 つあります。`@goodnight-web/server` は、すべてのテーブルを 1 つのスキーマファイル `packages/server/src/db/schema.ts` に [Drizzle ORM](https://orm.drizzle.team/) で定義しています。
+
+| テーブル                                                | 中身                                                                                                                                                 |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submissions`                                           | 問い合わせフォームの送信内容。名前、メールアドレス、本文、種別、状態、スパムスコア、`ip_hash`（IP アドレスの HMAC。IP アドレスそのものは入れません） |
+| `settings`                                              | `retention_days`、`last_cleanup_at`（[データの自動削除](/ja/docs/how-it-works/data-pruning/)用）、`setup_closed_at`                                  |
+| `user`、`session`、`account`、`verification`、`passkey` | Better Auth の管理者、セッション、パスキー                                                                                                           |
+
+時刻は Unix ミリ秒で保存します。Better Auth のテーブルは、Better Auth の CLI で Drizzle アダプター用に生成しています。そのため、Better Auth とサーバーのほかの部分は、同じスキーマと同じマイグレーションの履歴を使います。
+
+## クエリの書き方
+
+サーバーは、入力から SQL の文字列を組み立てません。すべてのクエリは Drizzle のクエリビルダーを通り、値はバインドされたパラメーターとして D1 に送られます。セキュリティモデルのページの [SQL インジェクション](/ja/docs/security/#sql-injection)を参照してください。
+
+## マイグレーションの配布と適用
+
+パッケージには、drizzle-kit が生成した SQL のマイグレーションが入っています。
+
+```txt
+node_modules/@goodnight-web/server/migrations/
+  0000_initial_schema.sql
+  0001_settings_defaults.sql
+  0002_setup_closed_trigger.sql
+```
+
+サイトの `wrangler.jsonc` では、D1 の binding がこのディレクトリを指します。
+
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "migrations_dir": "node_modules/@goodnight-web/server/migrations"
+  }
+]
+```
+
+deploy スクリプトは、新しいコードを公開する前にマイグレーションを適用します。
+
+```sh
+wrangler d1 migrations apply DB --remote && wrangler deploy
+```
+
+wrangler はファイルを名前順に並べ、適用したファイルをデータベースの `d1_migrations` テーブルに記録します。記録済みのファイルは飛ばすので、もう一度実行しても何も起きません。ファイルの途中で失敗すると D1 はそのファイルを取り消し、deploy は `wrangler deploy` の前で止まります。
+
+サイト側でマイグレーションを書く必要はありません。`wrangler d1 migrations create` は実行しないでください。`node_modules` の中にファイルを作ってしまいます。
+
+## スキーマの変更がサイトに届くまで
+
+1. goodnight-web がスキーマを変え、`0003_add_note.sql` のような新しいマイグレーションを生成して、`@goodnight-web/server` の新しいバージョンを公開します。公開したマイグレーションのファイルは、編集も名前の変更もしません。
+2. Dependabot が、あなたのリポジトリに `@goodnight-web/server` を更新するプルリクエストを作ります。[配布と更新](/ja/docs/distribution/)を参照してください。
+3. あなたがマージします。deploy スクリプトが `0003_add_note.sql` を適用してから、新しいコードを公開します。
+
+2 つのコマンドの間は、古いバージョンの Worker が新しいスキーマに対して動きます。goodnight-web はスキーマの変更を追加だけ（新しいテーブルと列）にとどめ、クエリは列名を指定しているので、その間も古いバージョンは動き続けます。
+
+プルリクエストのプレビュービルドは deploy スクリプトを実行しないので、新しいマイグレーションを適用していないデータベースを使います。新しいスキーマが必要な画面は、プレビューでは失敗することがあります。この点はまだ確認していません。
+
+## Time Travel でマイグレーションを取り消す
+
+D1 の Time Travel を使うと、データベース全体を過去の時点（分単位）に戻せます。Workers の無料プランでは 7 日前まで、有料プランでは 30 日前までです（[Cloudflare: Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)）。
+
+```sh
+wrangler d1 time-travel info DB --timestamp=2026-10-22T09:00:00Z
+wrangler d1 time-travel restore DB --timestamp=2026-10-22T09:00:00Z
+```
+
+復元すると、その時点より後の問い合わせとログインもすべて消えます。また、公開中のコードは変わりません。マイグレーションより前の時点に戻したときは、それに合う古いバージョンのサイトも deploy してください。そうしないと、次の deploy でマイグレーションがもう一度適用されます。

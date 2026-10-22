@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Compass,
+  Database,
   Layers,
   Package,
   Rocket,
@@ -12,6 +13,7 @@ import {
 const icons = {
   BookOpen,
   Compass,
+  Database,
   Layers,
   Package,
   Rocket,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { signInAsAdmin } from '../../testing/admin-session.ts';
+import { captureConsole } from '../../testing/console-capture.ts';
 import {
   createTestWorker,
   ORIGIN,
@@ -170,6 +171,73 @@ describe('admin API with an admin session', () => {
     expect((await get('/api/admin/submissions?page=0')).status).toBe(400);
   });
 
+  test('limit sets the page size within 1 to 100', async () => {
+    for (let i = 0; i < 12; i++) await seed(worker, `id-${i}`);
+    const page = await (
+      await get('/api/admin/submissions?limit=5&page=3')
+    ).json();
+    expect(page).toMatchObject({ page: 3, pageSize: 5, total: 12 });
+    expect(page.items).toHaveLength(2);
+    const max = await get('/api/admin/submissions?limit=100');
+    expect(max.status).toBe(200);
+  });
+
+  // Each value must be rejected at the route before it reaches a query.
+  const MALICIOUS_QUERIES: [string, string][] = [
+    ['status', "new' OR 1=1 --"],
+    ['status', 'new; DROP TABLE submissions'],
+    ['status', 'NEW'],
+    ['limit', '1; DROP TABLE submissions'],
+    ['limit', '-1'],
+    ['limit', '0'],
+    ['limit', '101'],
+    ['limit', '1e9'],
+    ['limit', '1e1'],
+    ['limit', '50 OFFSET 0'],
+    ['limit', '50 '],
+    ['limit', '10.5'],
+    ['limit', '10.0'],
+    ['limit', '0x10'],
+    ['limit', '010'],
+    ['limit', '+5'],
+    ['limit', 'NaN'],
+    ['limit', 'Infinity'],
+    ['limit', ''],
+    ['page', "1' OR '1'='1"],
+    ['page', '1; DROP TABLE submissions'],
+    ['page', '-1'],
+    ['page', '0'],
+    ['page', '1e9'],
+    ['page', '100001'],
+    ['page', '9007199254740993'],
+    ['page', '2 OFFSET 0'],
+    ['page', '1.5'],
+    ['page', ' 1'],
+    ['page', 'abc'],
+    ['page', ''],
+  ];
+
+  test.each(MALICIOUS_QUERIES)(
+    'GET /submissions?%s=%p returns 400',
+    async (key, value) => {
+      await seed(worker, 'abc');
+      const query = new URLSearchParams({ [key]: value });
+      const response = await get(`/api/admin/submissions?${query}`);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error.code).toBe('invalid_input');
+      const rows = worker.sqlite
+        .query('SELECT COUNT(*) AS n FROM submissions')
+        .get() as { n: number };
+      expect(rows.n).toBe(1);
+    },
+  );
+
+  test('GET /submissions.csv rejects a malicious status with 400', async () => {
+    const query = new URLSearchParams({ status: "new' OR 1=1 --" });
+    const response = await get(`/api/admin/submissions.csv?${query}`);
+    expect(response.status).toBe(400);
+  });
+
   test('the detail view marks a new submission as read', async () => {
     await seed(worker, 'abc');
     const detail = await (await get('/api/admin/submissions/abc')).json();
@@ -313,5 +381,66 @@ describe('admin API with an admin session', () => {
     expect(list.items.map((s: { id: string }) => s.id)).toContain('recent');
     expect((await get('/api/admin/submissions/old')).status).toBe(404);
     expect((await get('/api/admin/submissions/recent')).status).toBe(200);
+  });
+});
+
+describe('admin API database errors', () => {
+  const request = async (
+    worker: TestWorker,
+    cookie: string,
+    method: string,
+    path: string,
+  ) => {
+    const logs = captureConsole();
+    try {
+      const response = await worker.fetch(path, {
+        method,
+        headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+        body:
+          method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+      });
+      return { response, logged: logs.text() };
+    } finally {
+      logs.restore();
+    }
+  };
+
+  test('a failed query answers 500 and logs no bound values', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    await seed(worker, 'sub-7f3a9c', { name: 'Hanako' });
+    worker.sqlite.exec('DROP TABLE submissions');
+    const { response, logged } = await request(
+      worker,
+      cookie,
+      'PATCH',
+      '/api/admin/submissions/sub-7f3a9c',
+    );
+    expect(response.status).toBe(500);
+    expect((await response.json()).error.code).toBe('server_error');
+    expect(logged).toContain('no such table');
+    expect(logged).not.toContain('sub-7f3a9c');
+    expect(logged).not.toContain('params');
+  });
+
+  test('a failed session lookup logs no session token', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    const { token } = worker.sqlite
+      .query('SELECT token FROM session')
+      .get() as {
+      token: string;
+    };
+    worker.sqlite.exec('DROP TABLE session');
+    const { response, logged } = await request(
+      worker,
+      cookie,
+      'GET',
+      '/api/admin/me',
+    );
+    expect(response.status).toBe(500);
+    expect(logged).toContain('no such table');
+    expect(logged).not.toContain(token);
+    expect(logged).not.toContain('params');
   });
 });

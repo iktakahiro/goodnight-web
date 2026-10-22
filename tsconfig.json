@@ -5,5 +5,9 @@
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["*.config.ts", "templates/starter/.github/scripts/*"]
+  "include": [
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "templates/starter/.github/scripts/*"
+  ]
 }

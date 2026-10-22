@@ -467,10 +467,10 @@ const main = async () => {
     const remaining = await query('SELECT COUNT(*) AS n FROM submissions');
     check('the row is deleted', remaining[0]?.n === 0, remaining);
 
-    const sessions = await query('SELECT ipAddress FROM session');
+    const sessions = await query('SELECT ip_address FROM session');
     check(
       'sessions store no IP address',
-      sessions.every((s) => !s.ipAddress),
+      sessions.every((s) => !s.ip_address),
       sessions,
     );
     check(
