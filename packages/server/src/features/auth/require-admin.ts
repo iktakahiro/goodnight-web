@@ -1,12 +1,10 @@
-import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import { createMiddleware } from 'hono/factory';
-import { getDatabase } from '../../db/database.ts';
-import { passkey } from '../../db/schema.ts';
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
 import { isAllowedOrigin } from '../../shared/request.ts';
 import { isAdminEmail } from './admin-emails.ts';
 import { getAuth, isAuthConfigured } from './auth.ts';
+import { checkPasskeySession } from './passkey-session.ts';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -39,16 +37,9 @@ export const requireAdmin = createMiddleware<HonoEnv>(async (c, next) => {
   if (!isAdminEmail(c.env.ADMIN_EMAILS, user.email)) {
     return apiError(c, 403, 'forbidden');
   }
-  const first = await getDatabase(c.env.DB)
-    .select({ createdAt: passkey.createdAt })
-    .from(passkey)
-    .where(and(eq(passkey.userId, user.id), isNotNull(passkey.createdAt)))
-    .orderBy(asc(passkey.createdAt))
-    .get();
-  if (!first?.createdAt) return apiError(c, 403, 'passkey_required');
-  if (session.createdAt.getTime() < first.createdAt.getTime()) {
-    return apiError(c, 401, 'unauthorized');
-  }
+  const state = await checkPasskeySession(c.env.DB, user.id, session.createdAt);
+  if (state === 'no_passkey') return apiError(c, 403, 'passkey_required');
+  if (state === 'too_old') return apiError(c, 401, 'unauthorized');
   c.set('admin', { userId: user.id, email: user.email, name: user.name });
   await next();
 });

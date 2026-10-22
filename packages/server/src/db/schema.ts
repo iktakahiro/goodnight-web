@@ -67,8 +67,9 @@ export const submissions = sqliteTable(
 
 /**
  * Site settings as key-value text. Keys in use: `retention_days`,
- * `last_cleanup_at` (unix ms), and `setup_closed_at` (unix ms, written by the
- * `passkey_closes_setup` trigger in migrations/0002).
+ * `last_cleanup_at` (unix ms), and `setup_closed_at` (unix ms, claimed by the
+ * first passkey registration and also written by the `passkey_closes_setup`
+ * trigger in migrations/0002).
  */
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
