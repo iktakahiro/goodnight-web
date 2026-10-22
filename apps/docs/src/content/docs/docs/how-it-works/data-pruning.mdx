@@ -1,27 +1,31 @@
 ---
 title: Deleting old inquiries without Cron
-description: Inquiries older than the retention period (180 days by default) are deleted during normal requests, at most once an hour, with no scheduled job.
+description: How inquiries older than the retention period (180 days by default) are deleted with no scheduled job.
 ---
+
+Inquiries are deleted once they are older than the retention period, 180 days by default. There is no scheduled job: the cleanup runs during normal requests, at most once an hour.
 
 ## What it does
 
-- Each inquiry is kept for a retention period, 180 days by default.
-- After a new inquiry is saved, the Worker checks `settings.last_cleanup_at` inside `ctx.waitUntil`. If the last cleanup was more than an hour ago, it deletes inquiries older than the retention period and updates `last_cleanup_at`.
-- Opening the inquiry list in the admin screen runs the same cleanup, so old inquiries are deleted even when no new ones arrive.
-- An index on `created_at` keeps the delete fast.
-- The same cleanup deletes expired rows in Better Auth's `verification` table. Each passkey sign-in attempt writes a challenge there; a used challenge is deleted at once, but an abandoned one would stay forever. Challenges expire after a few minutes and sign-in is rate-limited, so the table stays small without an index.
-- Admins can also delete an inquiry by hand and export inquiries as CSV. The export reads 200 rows per query and streams them, so it works the same for a large table.
+- **Cleanup runs after a new inquiry.** After an inquiry is saved, the Worker checks `settings.last_cleanup_at` inside `ctx.waitUntil`. If the last cleanup was more than an hour ago, it deletes inquiries older than the retention period and updates `last_cleanup_at`.
+- **Cleanup also runs from the admin screen.** Opening the inquiry list runs the same cleanup, so old inquiries are deleted even when no new ones arrive.
+- **The delete is fast.** There is an index on `created_at`.
+- **Expired challenges are deleted too.** Each passkey sign-in attempt writes a challenge to Better Auth's `verification` table. A used challenge is deleted at once, but an abandoned one would stay forever, so the same cleanup deletes expired rows. Challenges expire after a few minutes and sign-in is rate-limited, so the table stays small without an index.
+
+Admins can also delete an inquiry by hand and export inquiries as CSV. The export reads 200 rows per query and streams them, so it works the same for a large table.
 
 ## In the code
 
-The contact API starts the cleanup after it has its reply ready. `runInBackground()` hands the task to `ctx.waitUntil` and logs a failure without changing the reply:
+The contact API starts the cleanup after it has its reply ready. `runInBackground()` hands the task to `ctx.waitUntil`. A failure is logged and does not change the reply:
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
 runInBackground(c, 'prune', () => pruneIfDue(env.DB, now));
 return c.json({ ok: true });
 ```
 
-`pruneIfDue()` first claims the run with one conditional upsert of `last_cleanup_at`. The update happens only if the stored time is an hour old or more, so when two requests arrive together, only one of them prunes. The retention period comes from `settings.retention_days` (1 to 3,650 days; 180 when it is missing or invalid):
+`pruneIfDue()` first claims the run with one conditional upsert of `last_cleanup_at`. The value is replaced only if the stored time is an hour old or more, so when two requests arrive together, only one of them prunes.
+
+The retention period comes from `settings.retention_days`. It can be 1 to 3,650 days, and is 180 when it is missing or invalid.
 
 ```ts title="packages/server/src/features/retention/prune.ts"
 const orm = getDatabase(db);
@@ -48,7 +52,9 @@ const verifications = await orm
 
 ## Why it is built this way
 
-goodnight-web uses no Cron Triggers, so that one Worker and one database are all there is to set up and understand. Old data only needs to be removed eventually, not at an exact time, so doing it during requests that already happen is enough. The once-an-hour limit keeps the extra work small.
+goodnight-web uses no Cron Triggers, so that one Worker and one database are all there is to set up and understand.
+
+Old data does not need to go at an exact time, only eventually. Requests that already happen are enough for that, and the once-an-hour limit keeps the extra work small.
 
 The cleanup runs after the reply, so it never slows down or breaks a contact submission.
 

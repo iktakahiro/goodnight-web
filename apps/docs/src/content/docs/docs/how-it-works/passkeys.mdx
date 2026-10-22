@@ -1,22 +1,40 @@
 ---
 title: Passkey sign-in
-description: Admins sign in with passkeys through Better Auth. Email and password sign-in is turned off. This page explains why.
+description: How admins sign in with passkeys through Better Auth, and why there are no passwords.
 ---
+
+Admins sign in at `/admin/login` with a passkey, through Better Auth. There is no email and password sign-in. This page explains how it works and why.
+
+<AdminScreen
+  name='sign-in'
+  alt='The admin sign-in screen with the Sign in with a passkey button.'
+  caption='There is no password field. Only people who registered a passkey on this site can sign in.'
+/>
+
+## Before you start
+
+- **A passkey belongs to one domain.** Register passkeys after you add your own domain. A passkey registered on a `workers.dev` address does not work on your domain.
+- **Use a passkey that syncs.** The admin screen has no page to add a second passkey yet. When your browser asks where to save the passkey during setup, pick a provider that syncs it across your devices, such as iCloud Keychain, Google Password Manager, or a password manager app. Then losing one device does not lock you out.
+- **Losing the passkey everywhere locks you out.** There is no procedure yet to get the admin back, and setup does not open again (see [First admin setup](/docs/how-it-works/first-admin/)).
+- **A second admin cannot be added.** Once setup has closed, a user without a passkey cannot register one.
 
 ## What it does
 
-- The admin screen and the admin API use [Better Auth](https://better-auth.com/) with its passkey plugin. Better Auth stores its users, sessions, and passkeys in the same D1 database.
-- Email and password sign-in is turned off. There is no development bypass, default account, or shared key.
-- The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate. Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. A new set of bindings gets a new instance.
-- Better Auth does not record IP addresses in sessions, and passkey registration and sign-in require user verification (a PIN or biometrics).
-- Sign-in requests are rate-limited per hashed IP address with the same Rate Limiting binding as the contact form. Without that binding or `IP_HASH_SECRET`, sign-in is turned off.
-- Sign-in, setup, the admin screen, and the admin API work only over `https://` (plain HTTP is allowed on `localhost` for `wrangler dev`). A `GET` over `http://` is redirected to `https://`; other requests get 403.
-- Cloudflare Access can be added in front of `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. Passkey sign-in is still required with Access. See [Security model](/docs/security/#cloudflare-access).
-- The admin API accepts only a session created at or after your first passkey: a passkey sign-in, or the registration of the first passkey. See [First admin setup](/docs/how-it-works/first-admin/#sessions).
+- **Better Auth with the passkey plugin.** The admin screen and the admin API use [Better Auth](https://better-auth.com/) with its passkey plugin. Users, sessions, and passkeys are stored in the same D1 database.
+- **No other way in.** Email and password sign-in is turned off. There is no development bypass, default account, or shared key.
+- **User verification is required.** Passkey registration and sign-in require user verification (a PIN or biometrics).
+- **No IP addresses.** Better Auth does not record IP addresses in sessions.
+- **Sign-in is rate-limited.** Requests are counted per hashed IP address with the same Rate Limiting binding as the contact form. Without that binding or `IP_HASH_SECRET`, sign-in is turned off.
+- **`https://` only.** This covers sign-in, setup, the admin screen, and the admin API. Plain HTTP is allowed on `localhost` for `wrangler dev`. See [Security model](/docs/security/#https).
+- **Cloudflare Access can sit in front.** It covers `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. Passkey sign-in is still required with Access. See [Security model](/docs/security/#cloudflare-access).
+- **No sessions from before the passkey.** The admin API accepts only a session created at or after your first passkey: one from a passkey sign-in, or from registering the first passkey. See [First admin setup](/docs/how-it-works/first-admin/#sessions).
+- **The instance is reused.** The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate. Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. A new set of bindings gets a new instance.
 
 ## In the code
 
-Better Auth is configured with `emailAndPassword: { enabled: false }` and IP tracking turned off (`advanced.ipAddress.disableIpTracking`). The passkey plugin takes its relying party ID from the request's hostname and requires user verification. The plugin itself does not enforce it, so the registration hook checks it again:
+Better Auth is configured with `emailAndPassword: { enabled: false }` and IP tracking turned off (`advanced.ipAddress.disableIpTracking`).
+
+The passkey plugin gets the request's hostname as its relying party ID and is set to require user verification. The plugin does not enforce user verification when it verifies a registration, so the registration hook checks it:
 
 ```ts title="packages/server/src/features/auth/auth.ts"
 passkey({
@@ -67,10 +85,5 @@ export const getAuth = (env: GoodnightEnv, origin: string): GoodnightAuth => {
 ## Why passkeys
 
 - **No password to steal or reuse.** A passkey is bound to your domain, so a phishing site on another domain cannot use it.
-- **CPU limits on the free plan.** A Worker on the free plan gets about 10 ms of CPU time per request. Password hashing (scrypt) is designed to be slow, and Better Auth's password hashing has been reported to exceed that limit on Workers ([better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)). Passkey sign-in checks a signature, which is fast.
+- **It fits the free plan's CPU limit.** A Worker on the free plan gets about 10 ms of CPU time per request. Password hashing (scrypt) is designed to be slow, and Better Auth's password hashing has been reported to exceed that limit on Workers ([better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)). Passkey sign-in only checks a signature, which is fast.
 - **Nothing extra to run.** Passkeys need no email service and no SMS provider.
-
-## What to know
-
-- **A passkey belongs to one domain.** Register passkeys after you add your own domain. A passkey registered on a `workers.dev` address does not work on your domain.
-- **Losing every passkey locks you out.** Register more than one passkey (for example a phone and a laptop). A second admin cannot be added after setup has closed: a user without a passkey cannot register one then. The recovery procedure is still an open question.

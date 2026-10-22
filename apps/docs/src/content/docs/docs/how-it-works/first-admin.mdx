@@ -1,20 +1,51 @@
 ---
 title: First admin setup
-description: The first admin can be created only with the SETUP_TOKEN secret and an address in ADMIN_EMAILS. Setup closes once the first passkey is registered.
+description: How you create the first admin with SETUP_TOKEN and ADMIN_EMAILS, and how setup closes after that.
 ---
 
-## What it does
+Right after a deploy, the site has no admin. This page shows how you create the first one, and how goodnight-web stops a stranger from getting there first.
 
-Right after a deploy, the site has no admin. The setup endpoint `/api/setup` creates the first one, and it accepts a request only if:
+## The setup screen
+
+Opening `/admin/` on a site without an admin shows the setup screen at `/admin/setup`.
+
+<AdminScreen
+  name='setup'
+  alt='The first-admin setup screen with the setup token and an email address filled in.'
+  caption='Step 1. Enter the SETUP_TOKEN value and an address from ADMIN_EMAILS.'
+/>
+
+Setup has three steps:
+
+1. **Check the setup token.** Enter the value of `SETUP_TOKEN`, an address from `ADMIN_EMAILS`, and optionally your name, then select **Continue**. If the check passes, you are signed in and move on to step 2. A wrong token, an address that is not allowed, and a closed setup each get their own message.
+2. **Register a passkey.** Select **Register a passkey**. Your browser, phone, or password manager creates the passkey and asks for your fingerprint, face, or PIN. The screen shows the domain the passkey belongs to.
+3. **Done.** Setup is closed and you are signed in. Select **Open inquiries** to go to the admin screen. Next time, sign in at `/admin/login` with the passkey.
+
+When you are done, delete the `SETUP_TOKEN` secret. It is not needed again.
+
+If you leave after step 1, opening `/admin/setup` again continues at step 2. Leaving before you register a passkey does not lock you out.
+
+## What setup accepts
+
+The setup endpoint `/api/setup` creates the first admin. It accepts a request only if:
 
 - the request comes from the site itself (the `Origin` header is checked),
 - the request uses `https://` (plain HTTP is allowed only on `localhost`),
 - the request includes the correct `SETUP_TOKEN` (compared in constant time), and
 - the email address is in `ADMIN_EMAILS` (upper and lower case do not matter).
 
-Setup attempts are also rate-limited, and setup is turned off when the rate limit cannot run (the Rate Limiting binding or `IP_HASH_SECRET` is missing). `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters; with a shorter value, setup stays off and the setup screen names the setting. The new admin is signed in and then registers a passkey. Once the first passkey is registered, the setup endpoint closes and stays closed, even if every passkey is deleted later. Until then, setup can run again, so a person who left before registering a passkey is not locked out.
+Setup is also off in these cases:
 
-Setup counts as closed when `settings.setup_closed_at` exists or any passkey exists. The first passkey registration writes `setup_closed_at` itself (see [Sessions](#sessions)), and a database trigger writes it as well whenever a passkey row is inserted, so the mark stays even if every passkey is deleted later:
+- **The rate limit cannot run.** Setup attempts are rate-limited. Without the Rate Limiting binding or `IP_HASH_SECRET`, setup is turned off.
+- **A setting is missing or a secret is too short.** `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. When a required setting is missing or too short, the setup screen names it.
+
+## How setup closes
+
+Once the first passkey is registered, setup is closed and the setup endpoint stops working. It stays closed even if every passkey is deleted later.
+
+Setup counts as closed when `settings.setup_closed_at` exists or any passkey exists. The first passkey registration writes `setup_closed_at` itself (see [Sessions](#sessions)).
+
+A database trigger also writes `setup_closed_at` whenever a row is inserted into `passkey`, so `setup_closed_at` stays even if every passkey is deleted:
 
 ```sql title="packages/server/migrations/0002_setup_closed_trigger.sql"
 CREATE TRIGGER `passkey_closes_setup` AFTER INSERT ON `passkey`
@@ -24,20 +55,21 @@ BEGIN
 END;
 ```
 
-The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session from setup alone is only good for registering the first passkey.
+The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session from setup is good only for registering the first passkey.
 
 ## Sessions [#sessions]
 
 Someone else who had the token earlier could have run setup with the same address and kept the session. These rules make sure such a session never becomes an admin session:
 
-- Running setup again for an address that already has a user deletes that user's earlier sessions.
-- Registering the first passkey first claims setup: one database statement writes `setup_closed_at` only if it is not there yet. If two first passkeys are registered at the same time, only one claim succeeds; the other registration gets 403. Then every session in the database is deleted. Until then, the only sessions are the ones setup created. The setup screen registers the passkey with `createSession`, so you get a new session, created after the passkey, and stay signed in.
-- If the passkey cannot be saved after the claim, the claim is removed again, so you can run setup again. The removal only matches that claim and only while no passkey exists.
-- Setup checks again that it is still open after it creates its session. If a passkey registration claimed setup in the meantime, setup deletes that session and answers 403.
-- Once setup is closed, a user without a passkey cannot register one.
-- The admin API rejects (401) a session created before the user's first passkey. Registering another passkey needs such a session too, so an old setup session cannot add a passkey either.
+- **Running setup again clears old sessions.** When setup runs again for an address that already has a user, that user's earlier sessions are deleted.
+- **Only one first passkey wins.** Before the passkey is saved, the registration claims setup: one database statement writes `setup_closed_at` only if it is not there yet. If two first passkeys are registered at the same time, only one claim succeeds. The other registration gets 403.
+- **The claim deletes every session.** At this point, the only sessions are the ones setup created. The setup screen registers the passkey with `createSession`, so you get a new session, created after the passkey, and stay signed in.
+- **A failed save undoes the claim.** If the passkey cannot be saved after the claim, the claim is removed, so you can run setup again. The removal matches only that claim, and only while no passkey exists.
+- **Setup checks again at the end.** After setup creates its session, it checks that setup is still open. If a passkey registration claimed setup in the meantime, setup deletes that session and answers 403.
+- **No passkey registration after setup closes.** Once setup is closed, a user without a passkey cannot register one.
+- **Old sessions do not work.** The admin API rejects (401) a session created before the user's first passkey. Registering another passkey also needs a session from at or after the first passkey, so an old setup session cannot add one.
 
-Just before the first passkey is saved, the passkey registration hook does this:
+Just before the first passkey is saved, the passkey registration hook stops if setup is closed, claims setup, and deletes every session:
 
 ```ts title="packages/server/src/features/setup/first-passkey.ts"
 if (await isSetupClosed(db)) {
@@ -49,7 +81,7 @@ claims.set(request, claim);
 await getDatabase(db).delete(sessionTable);
 ```
 
-The claim is one `INSERT ... ON CONFLICT DO NOTHING` statement. Only the registration that writes the row wins:
+The claim is one `INSERT ... ON CONFLICT DO NOTHING` statement. Only the registration that writes the row goes on:
 
 ```ts title="packages/server/src/features/setup/setup-state.ts"
 export const claimSetup = async (db: D1Database): Promise<string | null> => {
@@ -78,18 +110,10 @@ return sessionCreatedAt.getTime() < first.createdAt.getTime()
   : 'ok';
 ```
 
-## The setup screen
-
-Opening `/admin/` on a site without an admin shows the setup screen at `/admin/setup`. It has three steps:
-
-1. **Setup token.** Enter the `SETUP_TOKEN`, an address from `ADMIN_EMAILS`, and optionally your name. A wrong token, an address that is not allowed, and a closed setup each get their own message.
-2. **Passkey.** Select **Register a passkey**. Your browser, phone, or password manager creates the passkey and asks for your fingerprint, face, or PIN. The screen shows the domain the passkey belongs to.
-3. **Done.** Setup is now closed, and the admin screen opens. Next time, sign in at `/admin/login` with the passkey. Delete the `SETUP_TOKEN` secret now; it is not needed again.
-
-If you leave after step 1, opening `/admin/setup` again continues at step 2.
-
 ## Why it is built this way
 
-A newly deployed site is public on the internet before its owner has signed in. If the first visitor to the setup page became the admin, a stranger who found the site first could take it over. Requiring both a secret that only the owner knows and an allowed address closes that gap. Closing setup afterwards means that a leaked `SETUP_TOKEN` cannot create more admins later.
+A newly deployed site is public on the internet before its owner has signed in. If the first visitor to the setup page became the admin, a stranger who found the site first could take it over.
+
+So setup requires both a secret that only the owner knows and an allowed address. Setup closes afterwards, so a leaked `SETUP_TOKEN` cannot create more admins later.
 
 If Cloudflare Access protects `/admin/*`, `/api/setup`, and `/api/auth/*`, only people who pass Access can reach setup at all. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token on `/api/setup` itself. See [Security model](/docs/security/#cloudflare-access).

@@ -1,26 +1,21 @@
 ---
 title: Slack notifications
-description: An optional Slack message tells you that a new inquiry arrived. It is sent after the reply and contains no personal data and no message text.
+description: An optional Slack message about each new inquiry, sent after the reply and free of personal data.
 ---
+
+Set the Worker secret `SLACK_WEBHOOK_URL` to a Slack incoming webhook URL, and a short Slack message tells you when a new inquiry arrives. The message is sent after the visitor gets their reply, and it contains no personal data and no inquiry contents.
 
 ## What it does
 
-- If `SLACK_WEBHOOK_URL` is set, the Worker posts to that Slack incoming webhook after it has saved an inquiry that is not suspected spam. Only an `https://hooks.slack.com/...` address is called; any other URL is ignored.
-- The message contains only the count ("1 new inquiry"), the time the inquiry was received, and a link to the admin screen. It contains no email address and no form field values, not even the answer of a select field. This does not change when admins add fields to the form.
-- The time is a Slack date token, so Slack shows it in each reader's own time zone.
-- When the post succeeds, the Worker records `notified_at`. There is no retry.
-- Suspected spam (a filled honeypot or a spam score of 3 or more) does not trigger a notification. It is saved and listed under **Suspected spam** in the admin screen. See [Contact form protection](/docs/how-it-works/contact-protection/).
+- **Only Slack is called.** After the Worker saves an inquiry that is not suspected spam, it posts to the webhook. Only an `https://hooks.slack.com/...` address is called; any other URL is ignored.
+- **The message has three parts.** The count ("1 new inquiry"), the time the inquiry was received, and a link to the admin screen. It contains no email address, no form field values, and not even the answer of a dropdown field. This does not change when admins add fields to the form.
+- **The time is shown in each reader's time zone.** The time is sent as a Slack date token, so Slack shows it in each reader's own time zone.
+- **Success is recorded; there is no retry.** When the post succeeds, the Worker records `notified_at`. A failed post is not sent again.
+- **Suspected spam is not notified.** That is a submission with a filled honeypot or a spam score of 3 or more. It is saved and listed under **Suspected spam** in the admin screen. See [Contact form protection](/docs/how-it-works/contact-protection/).
 
-## Why it is built this way
+## In the code
 
-- **The reply does not wait for Slack.** The post runs in `ctx.waitUntil` after the inquiry is saved and the visitor has their reply. A Slack outage cannot lose an inquiry or show the visitor an error.
-- **No personal data leaves Cloudflare.** Slack is a separate service. Sending only a count, a time, and a link means that inquiry contents stay in your D1 database. Admins decide what the form asks, so the server cannot know which answers are safe to send; it sends none.
-- **No Queues and no retry.** The admin screen always shows the unread count in its header, so a missed notification does not mean a missed inquiry.
-- **The webhook URL is a secret.** Anyone with the URL can post to your channel, so it is kept as a Worker secret and never shown in the admin screen.
-
-## The code
-
-The contact API starts the notification only for an inquiry that is not suspected spam, after the row is saved:
+After the row is saved, the contact API starts the notification only for an inquiry that is not suspected spam:
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
 // 7. After the response: notification (never for suspected spam) and
@@ -67,3 +62,11 @@ export const buildSlackPayload = ({
   };
 };
 ```
+
+## Why it is built this way
+
+- **The reply does not wait for Slack.** The post runs in `ctx.waitUntil` after the inquiry is saved and the visitor has their reply. A Slack outage cannot lose an inquiry or show the visitor an error.
+- **No personal data leaves Cloudflare.** Slack is a separate service. Sending only a count, a time, and a link means that inquiry contents stay in your D1 database.
+- **No answers are sent at all.** Admins decide what the form asks, so the server cannot know which answers are safe to send.
+- **No Queues and no retry.** The admin screen always shows the unread count in its header, so a missed notification does not mean a missed inquiry.
+- **The webhook URL is a secret.** Anyone with the URL can post to your channel, so it is kept as a Worker secret and never shown in the admin screen.

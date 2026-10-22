@@ -1,35 +1,81 @@
 ---
 title: Privacy notes
-description: Where inquiries are stored, how long deleted data can still be restored, what the privacy policy template covers, and what goodnight-web does to limit personal data.
+description: What an inquiry stores, where it is stored, when it is gone, and what the privacy policy template says.
 ---
+
+This page lists what goodnight-web stores for each inquiry, where it is stored, and when it is gone. Use it when you adapt the privacy policy template to your company.
 
 <Callout type='warn'>
   This page is not legal advice. Have a professional review your privacy policy
   before you publish your site.
 </Callout>
 
+## Adapt the template
+
+The starter has the template in Japanese and English:
+
+- `src/content/pages/ja/privacy.md`
+- `src/content/pages/en/privacy.md`
+
+It uses the sample company's details, including the representative's name and the contact desk for requests to disclose, correct, or delete personal information.
+
+1. Replace the company details and the contact desk with your own.
+2. If you add a field that collects another kind of personal data, update the "Information we collect" section ([The fields visitors fill in](#fields)).
+3. If you change the retention period, update the days in "Retention and deletion". On the Workers paid plan, change the 7 days until deletion takes full effect to 30 ([Deleted data](#deleted-data)).
+4. Have a professional review the policy.
+5. Remove the note at the top of the page.
+
 ## What is stored
 
-A contact submission stores what the visitor typed, the time they agreed to the privacy policy, the page they sent it from, the user agent, the country that Cloudflare reports, and an `ip_hash`. The raw IP address is not stored. See [No raw IP addresses](/docs/how-it-works/ip-hashing/).
+Each contact submission stores:
 
-What the visitor types depends on the form. The email address is always collected. The other fields are defined by your admins in the admin screen (the first version asks for name, company, phone number, category, and message). See [Customizing the contact form](/docs/contact-form/). When you add a field that collects another kind of personal data, update the list of collected items in your privacy policy too.
+- what the visitor typed
+- the time they agreed to the privacy policy
+- the page they sent it from
+- the user agent (browser and OS information)
+- the country that Cloudflare reports
+- a hash of the IP address (`ip_hash`)
+
+The raw IP address is not stored. See [No raw IP addresses](/docs/how-it-works/ip-hashing/).
+
+### The fields visitors fill in [#fields]
+
+The email address is always collected. Your admins choose the other fields in the admin screen. The first version asks for name, company, phone number, category, and message ([Customizing the contact form](/docs/contact-form/)).
+
+When you add a field that collects another kind of personal data, also update the "Information we collect" section of your privacy policy.
+
+### Retention
 
 Inquiries are deleted after the retention period, 180 days by default. See [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/).
 
 ## Data is stored outside Japan
 
-D1 lets you restrict where data is stored only to the EU, FedRAMP, or the US. You cannot pin a database to Japan ([Cloudflare: D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/)). The privacy policy template therefore says that data may be stored on servers in other countries (such as the United States), names the storage provider, and says that the company has checked the privacy rules of those countries. Japan's Act on the Protection of Personal Information asks a business that handles personal data abroad to understand that environment. A comment in the template points to the country surveys published by the Personal Information Protection Commission, for when you describe those rules in detail.
+D1 lets you restrict where data is stored only to the EU, FedRAMP, or the US. You cannot pin a database to Japan ([Cloudflare: D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/)).
 
-## Deleted data can be restored for a while
+Japan's Act on the Protection of Personal Information asks a business that handles personal data abroad to understand the personal information rules of that country. So the template says:
 
-D1 Time Travel can restore a database to an earlier point in time: up to 7 days back on the Workers free plan and up to 30 days on the paid plan ([Cloudflare: Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)). A deleted inquiry is therefore fully gone only after that period. The template says that deletion takes effect fully after up to 7 days on the free plan; change it to 30 if you use the paid plan.
+- that data may be stored on servers in other countries, such as the United States
+- who the storage provider is
+- that the company has checked the privacy rules of those countries
+
+A comment in the template points to the country surveys published by the Personal Information Protection Commission, for when you describe those rules in detail.
+
+## Deleted data can be restored for a while [#deleted-data]
+
+You delete inquiries one at a time with **Delete** in the detail. A dialog asks you to confirm first.
+
+<AdminScreen
+  name='inquiry-delete'
+  alt='The Delete this inquiry? dialog with Cancel and Delete buttons.'
+  caption='The dialog says this cannot be undone, but for a while D1 Time Travel can still restore the whole database.'
+/>
+
+D1 Time Travel can restore a database to an earlier point in time: up to 7 days back on the Workers free plan, and up to 30 days on the paid plan ([Cloudflare: Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)).
+
+So a deleted inquiry is fully gone only after that period. The template follows the free plan and says that deletion takes full effect after up to 7 days. Change it to 30 if you use the paid plan.
 
 ## Third parties
 
-- **Turnstile.** The contact form uses Cloudflare Turnstile. The template mentions it.
-- **Fonts.** No web fonts are loaded. The starter site, the admin screen, and this documentation site use the fonts already installed on the visitor's device (a system font stack), so no font service receives your visitors' requests. See [Styles and fonts](/docs/architecture/#styles-and-fonts).
-- **Slack.** If you turn on Slack notifications, the message contains only the count, the time the inquiry was received, and a link. No personal data and no form field values are sent to Slack, whatever fields the form has.
-
-## The template
-
-The starter has the template in Japanese and English: `src/content/pages/ja/privacy.md` and `src/content/pages/en/privacy.md`. It uses the sample company's details, including the representative's name and the contact desk for requests to disclose, correct, or delete personal information. Replace them with your own, and remove the note at the top of the page after a professional has reviewed it.
+- **Turnstile:** the contact form uses Cloudflare Turnstile. The template says so.
+- **Fonts:** no web fonts are loaded. The starter site, the admin screen, and this documentation site use the fonts already installed on the visitor's device (a system font stack). No font service receives your visitors' requests. See [Styles and fonts](/docs/architecture/#styles-and-fonts).
+- **Slack:** if you turn on Slack notifications, a message contains only the count, the time the inquiry was received, and a link. No personal data and no form field values are sent to Slack, whatever fields the form has.

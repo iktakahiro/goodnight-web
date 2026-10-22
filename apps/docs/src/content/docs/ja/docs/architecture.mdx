@@ -1,8 +1,10 @@
 ---
 title: 構成
 icon: Layers
-description: Static Assets 付きの Worker 1 つと D1 データベース 1 つで、サイト、問い合わせ API、管理画面を動かします。このページでは部品を一覧にし、問い合わせ 1 件の流れを追います。
+description: Worker 1 つと D1 1 つで動く部品の一覧と、問い合わせ 1 件の処理の流れです。
 ---
+
+このページでは、goodnight-web を構成する部品と、問い合わせ 1 件が保存されるまでの流れがわかります。サイト、問い合わせ API、管理画面は、Static Assets 付きの Worker 1 つと D1 データベース 1 つで動きます。
 
 <ArchitectureDiagram locale='ja' />
 
@@ -11,53 +13,65 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 | 部品                      | 役割                                                                                                                                                                                                                          |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Worker                    | サイトごとに 1 つ。静的なページを配信し、API を動かします。                                                                                                                                                                   |
-| Static Assets             | Astro のビルド結果（`/`、`/blog/`、`/contact/` など）。Cloudflare が Worker のコードを動かさずに配信します。                                                                                                                  |
-| Hono アプリ               | `@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけがここに届きます。                                                                      |
-| D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを入れます。マイグレーションは npm パッケージに入っています。                                                                                             |
-| Turnstile                 | 問い合わせフォームのボット対策（Cloudflare 製）。Worker がトークンをサーバー側で検証します。                                                                                                                                  |
-| Rate Limiting binding     | `ip_hash` ごとに、問い合わせの送信、セットアップ、パスキーでのログインの回数を制限する Workers の binding。無料プランで使えます。                                                                                             |
-| Better Auth とパスキー    | 管理者のログイン。パスキーだけを使い、メールとパスワードでのログインは無効にします。                                                                                                                                          |
-| 管理画面                  | React と TanStack Router、Form、Table で作り、Vite でビルドしたアプリ。ビルド済みで `@goodnight-web/server` に入っていて、Worker が配信します。                                                                               |
-| Slack Webhook（任意）     | 「新しい問い合わせ」の短い通知。個人情報は含めません。                                                                                                                                                                        |
+| Static Assets             | Astro のビルド結果（`/`、`/blog/`、`/contact/` など）。Worker のコードを動かさずに、Cloudflare が配信します。                                                                                                                 |
+| Hono アプリ               | `@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけが届きます。                                                                            |
+| D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを保存します。マイグレーションは npm パッケージに入っています。                                                                                           |
+| Turnstile                 | Cloudflare のボット対策。問い合わせフォームで使い、Worker がトークンをサーバー側で検証します。                                                                                                                                |
+| Rate Limiting binding     | Workers の binding。問い合わせの送信、セットアップ、パスキーでのログインの回数を `ip_hash` ごとに制限します。無料プランで使えます。                                                                                           |
+| Better Auth とパスキー    | 管理者のログイン。パスキーだけを使います。メールとパスワードでのログインは無効です。                                                                                                                                          |
+| 管理画面                  | React、TanStack Router・Form・Table で作り、Vite でビルドしたアプリ。ビルド済みの状態で `@goodnight-web/server` に入っていて、Worker が配信します。                                                                           |
+| Slack Webhook（任意）     | 新しい問い合わせを短く知らせます。個人情報は含めません。                                                                                                                                                                      |
 | Cloudflare Access（任意） | `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すると、Worker も Access のトークンを確認します。 |
 
-設計を決めている制約:
+設計は次の制約で決まっています。
 
 - Worker 1 つと D1 データベース 1 つ。Queues、Cron Triggers、KV は使いません。
 - 必須の外部サービスは Cloudflare と GitHub だけです。
-- フェイルクローズにします。設定やシークレットが足りないときは、それを必要とする機能を止めます。
+- フェイルクローズ。設定やシークレットが足りないときは、それを使う機能を止めます。
 
 ## ルート
 
-| パス                             | 使う人             | 内容                                                                                                                                                                                                                              |
-| -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`、`/blog/*`、`/contact/` など | 訪問者             | 静的なページ。Worker のコードは動きません。                                                                                                                                                                                       |
-| `GET /api/contact/form`          | 問い合わせページ   | 現在のフォームの項目と、フォームが使えるかどうか。公開の読み取り専用です。                                                                                                                                                        |
-| `POST /api/contact`              | 問い合わせフォーム | 確認、回数制限をして、送信内容を保存します。                                                                                                                                                                                      |
-| `/api/setup`                     | 最初の管理者       | 最初の管理者を作ります。最初のパスキーが登録されると使えなくなります。                                                                                                                                                            |
-| `/api/auth/*`                    | 管理者             | Better Auth。パスキーの登録とログイン。                                                                                                                                                                                           |
-| `/api/admin/*`                   | 管理画面           | 一覧（50 件ずつ、受信日時の順。未読件数とスパムの疑いの件数、メールアドレスの検索付き）、詳細、未読・既読とスパムの疑いの変更、削除、CSV の書き出し、フォームの編集とそのバージョン、Turnstile が設定済みかを返すステータス API。 |
-| `/admin/*`                       | 管理者             | ビルド済みの管理画面（React アプリ）。データの取得には必ずセッションが必要です。                                                                                                                                                  |
+| パス                             | 使う人             | 内容                                                                                                                                                                        |
+| -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`、`/blog/*`、`/contact/` など | 訪問者             | 静的なページ。Worker のコードは動きません。                                                                                                                                 |
+| `GET /api/contact/form`          | 問い合わせページ   | 現在のフォームの項目と、フォームが使えるかどうかを返します。公開で、読み取り専用です。                                                                                      |
+| `POST /api/contact`              | 問い合わせフォーム | 送信内容を確認し、回数を制限して、保存します。                                                                                                                              |
+| `/api/setup`                     | 最初の管理者       | 最初の管理者を作ります。最初のパスキーを登録すると閉じます。                                                                                                                |
+| `/api/auth/*`                    | 管理者             | Better Auth。パスキーの登録とログインです。                                                                                                                                 |
+| `/api/admin/*`                   | 管理画面           | 一覧、詳細、未読・既読とスパムの疑いの切り替え、削除、CSV の書き出し、フォームの編集とバージョン、問い合わせフォームに足りない設定と Slack 通知の有無を返すステータス API。 |
+| `/admin/*`                       | 管理者             | ビルド済みの管理画面（React アプリ）。データを取るたびにセッションが必要です。                                                                                              |
+
+管理画面の問い合わせ一覧は 1 ページ 50 件で、受信日時の順に並びます。一覧の API は未読の件数とスパムの疑いの件数も返し、メールアドレスで検索できます。
 
 ## 問い合わせ 1 件の流れ
 
-`POST /api/contact` は次の順に処理します。
+`POST /api/contact` は、次の順に処理します。
 
-1. **Origin とサイズ。** サイト自身のオリジンからのリクエストで、`Content-Type` が想定どおりで、小さい（32 KB まで）ことを確認します。それ以外は本文を読む前に拒否します。
-2. **honeypot。** フォームには人には見えない欄（`gnw_hp_x`）があります。Worker は、ここが埋まっているかを記録して先へ進みます。honeypot が埋まっていても応答は変わらず、手順 5 でスパムの疑いの印を付けるだけです。
+1. **Origin とサイズ。** サイト自身のオリジンからのリクエストか、`Content-Type` が想定どおりか、32 KB 以下かを確認します。満たさなければ、本文を読む前に拒否します。
+2. **honeypot。** フォームには、人には見えない欄 `gnw_hp_x` があります。Worker は、この欄が埋まっているかを記録して先へ進みます。埋まっていても応答は変わりません。手順 5 でスパムの疑いの印が付くだけです。
 3. **Turnstile。** Worker がトークンを Turnstile の siteverify に送り、`success`、`hostname`、`action` を確認します。失敗したら 400 を返し、何も保存しません。
-4. **回数制限。** Rate Limiting binding が `ip_hash` ごとにリクエストを数えます。上限を超えたら 429 を返します。
-5. **入力の検証とスパムスコア。** zod でメールアドレスと同意を確認します。フォームの項目は、ブラウザから送られたものではなく、D1 にある現在のフォームの定義から組み立てた zod のスキーマで確認し、知らない項目や、リクエストの本文にある知らないキーは拒否します。訪問者のページが古いバージョンのフォームだった場合は 409 `form_outdated` を返します。簡単なルールでスパムスコアを加点します。スコアが 3 以上か honeypot が埋まっていれば、スパムの疑いの印を付けます。その場合も、状態 `unread`（未読）で保存します。
-6. **保存してから応答。** D1 に行を INSERT します。INSERT が成功してから、訪問者に 200 を返します。この後の処理が応答を変えることはありません。
-7. **応答の後、`ctx.waitUntil` の中で:**
-   - スパムの疑いがなく、Slack Webhook が設定されていれば、「新しい問い合わせ 1 件・受信日時・管理画面の URL」を送り、`notified_at` を記録します。
+4. **回数制限。** Rate Limiting binding が、`ip_hash` ごとにリクエストを数えます。上限を超えたら 429 を返します。
+5. **入力の検証とスパムスコア。**
+   - zod でメールアドレスと同意を確認します。
+   - フォームの項目は、D1 にある現在のフォームの定義から作った zod のスキーマで確認します。ブラウザから送られた定義は使いません。知らない項目や、本文の知らないキーは拒否します。
+   - 訪問者が古いバージョンのフォームを開いていたら、409 `form_outdated` を返します。
+   - 簡単なルールでスパムスコアを足します。スコアが 3 以上か、honeypot が埋まっていれば、スパムの疑いの印を付けます。印が付いても、状態 `unread`（未読）で保存します。
+6. **保存してから応答。** D1 に行を INSERT し、成功してから訪問者に 200 を返します。これより後の処理で、応答が変わることはありません。
+7. **応答の後（`ctx.waitUntil` の中）。**
+   - スパムの疑いがなく、Slack Webhook が設定されていれば、新しい問い合わせが 1 件あること、受信日時、管理画面の URL を送り、`notified_at` を記録します。
    - 前回の削除から 1 時間以上たっていれば、保持期間（既定は 180 日）を過ぎた問い合わせと、期限切れのパスキーのチャレンジを削除します。
 
-問い合わせ API はフェイルクローズです。`TURNSTILE_SECRET` か `TURNSTILE_SITE_KEY` が設定されていない、`IP_HASH_SECRET` がないか 32 文字より短い、または Rate Limiting binding がない場合、この API は 503 を返し、フォームには「まだ利用できません」と表示します。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
+問い合わせ API はフェイルクローズです。次のどれかに当てはまると、API は 503 を返し、フォームには「お問い合わせフォームは準備中です」と表示します。
+
+- `TURNSTILE_SECRET` か `TURNSTILE_SITE_KEY` が設定されていない。
+- `IP_HASH_SECRET` がないか、32 文字より短い。
+- Rate Limiting binding がない。
+
+設定は[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
 
 ## コードでは
 
-サイトの Worker は 3 行です。サイトの既定の言語を、`@goodnight-web/server` のファクトリーに渡します。
+サイトの Worker は 3 行です。サイトの既定の言語を、`@goodnight-web/server` のファクトリーに渡すだけです。
 
 ```ts title="templates/starter/src/worker.ts"
 import { createGoodnightWorker } from '@goodnight-web/server';
@@ -66,7 +80,7 @@ import { siteConfig } from '../site.config';
 export default createGoodnightWorker({ locale: siteConfig.defaultLocale });
 ```
 
-`wrangler.jsonc` は、API と管理画面のパスだけを Worker に送ります。それ以外のパスは、Worker のコードを動かさずに Static Assets が返します。
+`wrangler.jsonc` では、API と管理画面のパスだけを Worker に送ります。ほかのパスは、Worker のコードを動かさずに Static Assets が返します。
 
 ```jsonc title="templates/starter/wrangler.jsonc"
 "assets": {
@@ -79,7 +93,7 @@ export default createGoodnightWorker({ locale: siteConfig.defaultLocale });
 },
 ```
 
-ファクトリーは Hono アプリを 1 つ作ります。最初にセキュリティヘッダー、HTTPS、Cloudflare Access のミドルウェアが動き、続いて機能ごとのルートをマウントします。どのルートにも一致しないリクエストは `ASSETS` binding に渡ります。
+ファクトリーは Hono アプリを 1 つ作ります。最初にセキュリティヘッダー、HTTPS、Cloudflare Access のミドルウェアが動き、続いて機能ごとのルートが動きます。どのルートにも一致しないリクエストは、`ASSETS` binding に渡ります。
 
 ```ts title="packages/server/src/app.ts"
 app.use('*', securityHeaders);
@@ -98,7 +112,7 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 );
 ```
 
-機能（問い合わせ、セットアップ、認証、管理 API、管理画面）は、`packages/server/src/features/` の下に機能ごとのフォルダーを持っています。
+問い合わせ、セットアップ、認証、管理 API、管理画面のコードは、`packages/server/src/features/` の下で、機能ごとのフォルダーに分かれています。
 
 ## シークレットと binding
 
@@ -112,20 +126,24 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 | `ADMIN_EMAILS`         | シークレットまたは変数 | 管理者になれるメールアドレス                                                                          |
 | `BETTER_AUTH_SECRET`   | シークレット           | Better Auth の署名用。32 文字以上。                                                                   |
 | `IP_HASH_SECRET`       | シークレット           | `HMAC-SHA256(ip, IP_HASH_SECRET)` の鍵。32 文字以上。                                                 |
-| `TURNSTILE_SECRET`     | シークレット           | Turnstile の siteverify。ないと問い合わせ API は止まります。                                          |
+| `TURNSTILE_SECRET`     | シークレット           | Turnstile の siteverify 用。ないと問い合わせ API は止まります。                                       |
 | `SLACK_WEBHOOK_URL`    | シークレット（任意）   | 新しい問い合わせの通知                                                                                |
 | `ACCESS_AUD`           | 変数（任意）           | Cloudflare Access アプリケーションの AUD タグ。`ACCESS_TEAM_DOMAIN` と一緒に設定します。              |
 | `ACCESS_TEAM_DOMAIN`   | 変数（任意）           | Cloudflare Access のチームドメイン。たとえば `your-team.cloudflareaccess.com`。                       |
 
-32 文字より短いシークレットは設定されていないものとみなし、それを使う機能を止めます。シークレットは Worker の中にとどめます。ブラウザに返すことも、D1 に書くこともありません。
+32 文字より短いシークレットは、ないものとして扱い、それを使う機能を止めます。シークレットは Worker の中だけで使います。ブラウザに返すことも、D1 に書くこともありません。
 
-`/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` は `https://` でだけ動きます（`localhost` を除きます）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
+`/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` は、`https://` でだけ動きます（`localhost` を除く）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
 
 ## スタイルとフォント [#styles-and-fonts]
 
-Web フォントはどこでも読み込みません。サイトでも、管理画面でも、このドキュメントサイトでもです。それぞれがシステムフォントの並びを CSS のトークンとして 1 か所で決めているので、文字は訪問者の端末にすでにあるフォント（たとえば macOS と iOS ではヒラギノ、Windows ではメイリオや游ゴシック）で表示されます。フォントのファイルも、フォントの配信サービスも使わず、Content Security Policy にフォント用のホストもありません。
+Web フォントは、サイト、管理画面、このドキュメントサイトのどこでも読み込みません。文字は、訪問者の端末にあるフォントで表示されます。たとえば macOS と iOS ではヒラギノ、Windows ではメイリオや游ゴシックです。
 
-スターターは独自のデザイントークン（CSS 変数）を持ちます。テーマの 3 色は `site.config.ts`（`theme.primary`、`theme.background`、`theme.foreground`）から取り、CSS 変数として `<html>` に設定します。ほかの色合いはこの 3 色から混ぜて作るので、3 つの値を変えればサイト全体の色が変わります。
+どれも、システムフォントの並びを CSS のトークンとして 1 か所で決めています。フォントのファイルも配信サービスも使わないので、Content Security Policy にフォント用のホストはありません。
+
+starter は、独自のデザイントークン（CSS 変数）を持ちます。テーマの 3 色は `site.config.ts` の `theme.primary`、`theme.background`、`theme.foreground` から取り、CSS 変数として `<html>` に設定します。
+
+ほかの色合いは、この 3 色を混ぜて作ります。3 つの値を変えれば、サイト全体の色が変わります。
 
 ```css title="templates/starter/src/styles/global.css"
 :root {
@@ -145,9 +163,9 @@ Web フォントはどこでも読み込みません。サイトでも、管理�
   --color-foreground: var(--site-foreground);
 ```
 
-管理画面は `@goodnight-web/server` の中に、ライトとダークのモードを含む独自のデザイントークンを持っているので、サイトの色を変えても管理画面の色は変わりません。
+管理画面は、ライトとダークのモードを含む独自のトークンを `@goodnight-web/server` の中に持っています。サイトの色を変えても、管理画面の色は変わりません。
 
 ## 関連ページ
 
-- [しくみの詳細](/ja/docs/how-it-works/)では、設計の判断を 1 つずつ説明しています。
-- [配布と更新のしくみ](/ja/docs/distribution/)では、どのファイルを自分で持つかを説明しています。
+- [しくみの詳細](/ja/docs/how-it-works/): 設計の判断を 1 つずつ説明しています。
+- [配布と更新のしくみ](/ja/docs/distribution/): どのファイルを自分で持つかを説明しています。

@@ -1,45 +1,33 @@
 ---
 title: Set up Turnstile
-description: Create a Turnstile widget and give goodnight-web its site key and secret key. The contact form refuses submissions until both are set.
+description: Create a Turnstile widget and set its two keys so that the contact form starts accepting submissions.
 ---
 
-Turnstile is Cloudflare's check that a visitor is a person and not a bot. goodnight-web needs it for the contact form. It is free.
+Follow this page to create a Turnstile widget and set its site key and secret key. Once both are set, the contact form starts accepting submissions.
 
-## Why the form is off until you do this
-
-goodnight-web fails closed. Without Turnstile, the contact API would accept anything that a bot sends, so it refuses instead:
-
-- `POST /api/contact` returns 503.
-- The contact page says that the form is not available yet.
-- The admin screen shows a notice that the contact form is not accepting submissions, with a link to this page.
-
-Visitors see this notice instead of a form that seems to work but does not. Once both keys are set, the form starts working with no other change.
+Turnstile is Cloudflare's free check that a visitor is a person and not a bot. The goodnight-web contact form needs it.
 
 ## Create the widget
 
 1. In the Cloudflare dashboard, open **Turnstile** and select **Add widget**.
 2. **Widget name:** anything that helps you recognize it, for example your company name.
-3. **Hostnames:** your site's domain, for example `example.com`. If you also use the `workers.dev` address while testing, add it too, and remove it when you turn that address off.
+3. **Hostnames:** your site's domain, for example `example.com`. If you also use the `workers.dev` address while testing, add it too. Remove it when you turn that address off.
 4. **Widget mode:** **Managed** is a good default. Most visitors see only a short check; some are asked to click.
 5. Select **Create**.
 
 Cloudflare then shows two values ([Cloudflare: create a widget in the dashboard](https://developers.cloudflare.com/turnstile/get-started/widget-management/dashboard/)):
 
-- **Site key.** Public. The contact page uses it to show the widget.
-- **Secret key.** Private. The Worker uses it to verify each submission with Turnstile siteverify.
+- **Site key:** public. The contact page uses it to show the widget.
+- **Secret key:** private. The Worker uses it to verify each submission with Turnstile siteverify.
 
-## Put the keys in place
+## Set the keys
 
 | Key        | Where it goes                            | Public?                                                  |
 | ---------- | ---------------------------------------- | -------------------------------------------------------- |
-| Secret key | The Worker secret `TURNSTILE_SECRET`     | No. Never commit it or put it in a page.                 |
 | Site key   | The Worker variable `TURNSTILE_SITE_KEY` | Yes. The contact page reads it from `/api/contact/form`. |
+| Secret key | The Worker secret `TURNSTILE_SECRET`     | No. Never commit it or put it in a page.                 |
 
-To set the secret, open the Worker in the Cloudflare dashboard and add `TURNSTILE_SECRET` under variables and secrets. From a terminal in your project, this does the same:
-
-```sh
-npx wrangler secret put TURNSTILE_SECRET
-```
+### Site key
 
 In the starter, the site key goes in `wrangler.jsonc`. Commit the change; the next deploy picks it up:
 
@@ -49,21 +37,51 @@ In the starter, the site key goes in `wrangler.jsonc`. Commit the change; the ne
 },
 ```
 
-Set it only there. The contact page does not contain the key; it reads the key from the Worker. A value that you set only in the dashboard is replaced by the value in `wrangler.jsonc` on the next deploy, because `wrangler deploy` uploads the variables from the file.
+Set it only there. The contact page does not contain the key; it reads the key from the Worker.
+
+A value that you set only in the dashboard is replaced by the value in `wrangler.jsonc` on the next deploy, because `wrangler deploy` uploads the variables from the file.
+
+### Secret key
+
+Open the Worker in the Cloudflare dashboard and add `TURNSTILE_SECRET` under variables and secrets. From a terminal in your project folder, this command does the same:
+
+```sh
+npx wrangler secret put TURNSTILE_SECRET
+```
+
+## Before the keys are set
+
+goodnight-web fails closed: it turns a feature off until its required settings are in place. Without Turnstile, the contact API would accept anything a bot sends, so it refuses submissions instead.
+
+| Where               | Before you set up Turnstile                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `POST /api/contact` | Returns 503.                                                                             |
+| The contact page    | Shows "The contact form is not available yet".                                           |
+| The admin screen    | Shows the notice "The contact form is not accepting messages", with a link to this page. |
+
+<AdminScreen
+  name='turnstile-notice'
+  alt='The admin notice: The contact form is not accepting messages, with a link to the Turnstile setup page.'
+  caption='Until TURNSTILE_SITE_KEY and TURNSTILE_SECRET are set, the admin screen shows this notice.'
+/>
+
+Visitors see the "not available yet" message instead of a form that seems to work but does not. Once both keys are set, the form starts working with no other change.
 
 ## What the Worker checks
 
-For each submission, the Worker sends the token from the form to siteverify and accepts it only if:
+For each submission, the Worker sends the token from the form to siteverify. It accepts the submission only if all of these hold:
 
-- `success` is true,
-- `hostname` is your site's hostname (the hostname the request came to, or one of the hostnames in the `contact.turnstileHostnames` option of `createGoodnightWorker()`), and
+- `success` is true.
+- `hostname` is your site's hostname: the hostname the request came to, or one of the hostnames in the `contact.turnstileHostnames` option of `createGoodnightWorker()`.
 - `action` is the action that the contact form sets.
 
-A token is valid for 300 seconds and can be verified only once ([Cloudflare: server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)). If the check fails, the reply is 400 and nothing is saved. [Contact form protection](/docs/how-it-works/contact-protection/) describes the other checks.
+A token is valid for 300 seconds and can be verified only once ([Cloudflare: server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)). If the check fails, the reply is 400 and nothing is saved.
+
+[Contact form protection](/docs/how-it-works/contact-protection/) describes the other checks.
 
 ## Local development
 
-For `wrangler dev`, use Cloudflare's test keys instead of real ones ([Cloudflare: testing](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)). With this pair, the widget always passes and siteverify accepts every token:
+To check how the form looks under `wrangler dev`, use Cloudflare's test keys instead of real ones ([Cloudflare: testing](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)). With this pair, the widget always passes and siteverify accepts every token. The Worker's own checks still reject the submission, as the next section explains. The test keys are:
 
 ```txt
 site key:   1x00000000000000000000AA
@@ -71,6 +89,8 @@ secret key: 1x0000000000000000000000000000000AA
 ```
 
 Do not use test keys on the live site; they let every request through.
+
+### Test keys get rejected
 
 With the test secret key, siteverify answers with `hostname` set to `example.com` and no `action` (checked on 2026-10-22):
 
@@ -82,4 +102,15 @@ With the test secret key, siteverify answers with `hostname` set to `example.com
 }
 ```
 
-The Worker checks both fields, so it rejects a submission made with the test keys, and the form says that the check failed. This is on purpose: the production check does not change for local development. The starter's end-to-end test (`npm run test:e2e`) checks that this rejection happens. It then runs `e2e/worker.ts`, a test-only Worker that sets `hostname` and `action` to the expected values in answers marked `result_with_testing_key`, and submits the form through to D1. Never deploy that file.
+The Worker checks both fields, so it rejects a submission made with the test keys. The form says that the check failed.
+
+This is on purpose. The production check does not get weaker for local development.
+
+### The starter's end-to-end test
+
+The starter's end-to-end test (`npm run test:e2e`) checks two things, in order:
+
+1. A submission made with the test keys is rejected, as described above.
+2. With `e2e/worker.ts`, a test-only Worker, a submission goes through the form and is saved to D1. This Worker sets `hostname` and `action` to the expected values, but only in siteverify answers marked `result_with_testing_key`.
+
+Never deploy `e2e/worker.ts`.
