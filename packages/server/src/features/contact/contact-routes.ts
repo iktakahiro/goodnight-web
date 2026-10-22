@@ -14,7 +14,6 @@ import { insertSubmission } from '../submissions/submission-store.ts';
 import type { SubmissionStatus } from '../submissions/submission-status.ts';
 import { getContactAvailability } from './contact-availability.ts';
 import {
-  CONTACT_FIELD_LIMITS,
   CONTACT_HONEYPOT_FIELD,
   CONTACT_MAX_BODY_BYTES,
   CONTACT_TURNSTILE_ACTION,
@@ -121,40 +120,14 @@ export const contactRoutes = new Hono<HonoEnv>()
     };
     const origin = new URL(c.req.url).origin;
 
-    // 2. Honeypot: store as held and pretend success. Still rate-limited, so a
-    //    bot cannot fill the database; over the limit nothing is stored.
+    // 2. Honeypot: pretend success and store nothing. Turnstile has not run
+    //    yet, so a stored row would let a bot write to D1 without passing it.
+    //    The request still counts against the rate limit, so the same
+    //    address cannot follow up with real submissions at full speed.
     const honeypot = input[CONTACT_HONEYPOT_FIELD];
     if (typeof honeypot === 'string' && honeypot.trim() !== '') {
-      const { success } = await limiter.limit({ key: ipHash });
-      if (success) {
-        const stored = insertSubmission(env.DB, {
-          id: ulid(now),
-          createdAt: now,
-          name: text(input.name, CONTACT_FIELD_LIMITS.name) ?? '',
-          email: text(input.email, CONTACT_FIELD_LIMITS.email) ?? '',
-          company: text(input.company, CONTACT_FIELD_LIMITS.company),
-          phone: text(input.phone, CONTACT_FIELD_LIMITS.phone),
-          category: text(input.category, CONTACT_FIELD_LIMITS.category),
-          body:
-            typeof input.message === 'string'
-              ? input.message.slice(0, CONTACT_FIELD_LIMITS.message)
-              : '',
-          status: 'held',
-          spamScore: SPAM_HOLD_THRESHOLD,
-          spamReasons: ['honeypot'],
-          ...meta,
-          pagePath: text(input.pagePath, CONTACT_FIELD_LIMITS.pagePath),
-          consentAt: input.consent === true ? now : 0,
-        });
-        // A failed write is logged, but the bot still sees success.
-        await stored.catch((error: unknown) => {
-          console.error(
-            'contact: honeypot insert failed:',
-            safeErrorMessage(error),
-          );
-        });
-        runInBackground(c, 'prune', () => pruneIfDue(env.DB, now));
-      }
+      await limiter.limit({ key: ipHash });
+      console.info('contact: honeypot filled; nothing stored');
       return c.json({ ok: true });
     }
 

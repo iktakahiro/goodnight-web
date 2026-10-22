@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { getDatabase } from '../../db/database.ts';
 import { submissions } from '../../db/schema.ts';
 import type { SubmissionStatus } from './submission-status.ts';
@@ -183,19 +183,48 @@ export const deleteSubmission = async (
   return result.meta.changes > 0;
 };
 
+/** Rows per query in {@link submissionBatches}. */
+export const EXPORT_BATCH_SIZE = 200;
+
 /**
- * Returns every submission, newest first, for the CSV export.
+ * Yields every submission, newest first, in batches of at most `batchSize`
+ * rows, for the CSV export. Each batch is one query that continues after the
+ * last row of the previous batch (keyset pagination on `created_at`, `id`),
+ * so memory use and the size of each D1 result stay bounded however large
+ * the table is.
  *
  * @param status - Only this status, or every status when `undefined`.
  */
-export const allSubmissions = async (
+export async function* submissionBatches(
   db: D1Database,
   status: SubmissionStatus | undefined,
-): Promise<Submission[]> => {
-  const rows = await getDatabase(db)
-    .select()
-    .from(submissions)
-    .where(statusIs(status))
-    .orderBy(...NEWEST_FIRST);
-  return rows.map(fromRow);
-};
+  batchSize: number = EXPORT_BATCH_SIZE,
+): AsyncGenerator<Submission[]> {
+  const orm = getDatabase(db);
+  let after: { createdAt: number; id: string } | null = null;
+  for (;;) {
+    const rows = await orm
+      .select()
+      .from(submissions)
+      .where(
+        and(
+          statusIs(status),
+          after
+            ? or(
+                lt(submissions.createdAt, after.createdAt),
+                and(
+                  eq(submissions.createdAt, after.createdAt),
+                  lt(submissions.id, after.id),
+                ),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(...NEWEST_FIRST)
+      .limit(batchSize);
+    if (rows.length > 0) yield rows.map(fromRow);
+    const last = rows.at(-1);
+    if (!last || rows.length < batchSize) return;
+    after = { createdAt: last.createdAt, id: last.id };
+  }
+}

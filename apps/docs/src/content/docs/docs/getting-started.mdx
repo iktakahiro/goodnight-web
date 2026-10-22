@@ -44,16 +44,16 @@ If the repository was created as public, make it private in GitHub: **Settings >
 
 The Deploy form asks for these values. You can also set them later in the Cloudflare dashboard, in the Worker's settings under variables and secrets.
 
-| Name                 | What to enter                                                                     |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `SETUP_TOKEN`        | A long random string. You need it once, to create the first admin.                |
-| `ADMIN_EMAILS`       | The email addresses that may become admins, separated by commas.                  |
-| `BETTER_AUTH_SECRET` | A long random string. Better Auth uses it to sign sessions.                       |
-| `IP_HASH_SECRET`     | A long random string. Used to hash IP addresses so that raw IPs are never stored. |
-| `TURNSTILE_SECRET`   | The Turnstile secret key. You can leave it empty now and add it in the next step. |
-| `SLACK_WEBHOOK_URL`  | Optional. A Slack incoming webhook URL for new-inquiry notifications.             |
+| Name                 | What to enter                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `SETUP_TOKEN`        | A random string of 32 characters or more. You need it once, to create the first admin. Delete it after setup. |
+| `ADMIN_EMAILS`       | The email addresses that may become admins, separated by commas.                                              |
+| `BETTER_AUTH_SECRET` | A random string of 32 characters or more. Better Auth uses it to sign sessions.                               |
+| `IP_HASH_SECRET`     | A random string of 32 characters or more. Used to hash IP addresses so that raw IPs are never stored.         |
+| `TURNSTILE_SECRET`   | The Turnstile secret key. You can leave it empty now and add it in the next step.                             |
+| `SLACK_WEBHOOK_URL`  | Optional. A Slack incoming webhook URL for new-inquiry notifications.                                         |
 
-One way to make a random string on your computer:
+A shorter value turns its features off, the same as a missing one. One way to make a random string of 44 characters on your computer:
 
 ```sh
 openssl rand -base64 32
@@ -95,7 +95,7 @@ If you already registered a passkey on another address, you will need to registe
 
 ### Create the first admin
 
-Open `/admin/` on your domain. The setup screen asks for the `SETUP_TOKEN` and an email address from `ADMIN_EMAILS`. Then your browser or password manager creates a passkey. After the first admin exists, setup closes. [First admin setup](/docs/how-it-works/first-admin/) explains the rules.
+Open `https://<your domain>/admin/`. The admin screen works only over `https://`. The setup screen asks for the `SETUP_TOKEN` and an email address from `ADMIN_EMAILS`. Then your browser or password manager creates a passkey. After the first passkey is registered, setup closes; delete the `SETUP_TOKEN` secret then. [First admin setup](/docs/how-it-works/first-admin/) explains the rules.
 
 </Step>
 
@@ -103,7 +103,11 @@ Open `/admin/` on your domain. The setup screen asks for the `SETUP_TOKEN` and a
 
 ### Optional: put Cloudflare Access in front of the admin screen
 
-Cloudflare Access adds a second sign-in in front of `/admin/*` and `/api/admin/*`, for example with a one-time code sent by email. It is free for up to 50 users. It is recommended but not required: the admin screen always requires a passkey sign-in, with or without Access.
+Cloudflare Access adds a second sign-in, for example with a one-time code sent by email. It is free for up to 50 users. It is recommended but not required: the admin screen always requires a passkey sign-in, with or without Access.
+
+Put the Access application on `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. Keep `/api/contact` public, because visitors send the contact form there.
+
+To have the Worker check the Access token as well, set two more variables: `ACCESS_AUD` (the application's **Application Audience (AUD) Tag**) and `ACCESS_TEAM_DOMAIN` (for example `your-team.cloudflareaccess.com`). Set both or neither; with only one, the admin paths answer 503. See [Security model](/docs/security/#cloudflare-access). These steps have not been tried with a real Access application yet.
 
 </Step>
 

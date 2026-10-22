@@ -24,12 +24,17 @@ const en = {
   'error.forbidden': 'Your account cannot use the admin screen.',
   'error.passkey_required': 'Register a passkey to continue.',
   'error.auth_unavailable':
-    'Sign-in is not configured. Set BETTER_AUTH_SECRET for this site.',
+    'Sign-in is not configured. Set BETTER_AUTH_SECRET (at least 32 characters) for this site.',
   'error.setup_unavailable':
-    'Setup is not configured. Set SETUP_TOKEN and ADMIN_EMAILS for this site.',
+    'Setup is not configured. Set SETUP_TOKEN (at least 32 characters) and ADMIN_EMAILS for this site.',
   'error.setup_closed': 'Setup is already complete.',
   'error.invalid_setup_token': 'The setup token is not correct.',
   'error.email_not_allowed': 'This email address is not in ADMIN_EMAILS.',
+  'error.https_required': 'Open this page with https:// and try again.',
+  'error.access_denied':
+    'Cloudflare Access did not let this request through. Sign in to Cloudflare Access and try again.',
+  'error.access_unavailable':
+    'Cloudflare Access cannot be checked right now. Set both ACCESS_AUD and ACCESS_TEAM_DOMAIN, or neither, and try again.',
 
   // Contact form fields (validation messages shown next to a field).
   'field.name': 'Name',
@@ -107,13 +112,19 @@ const ja: MessageCatalog = {
   'error.forbidden': 'このアカウントでは管理画面を使えません。',
   'error.passkey_required': 'パスキーを登録してください。',
   'error.auth_unavailable':
-    'ログインに必要な設定がありません。このサイトに BETTER_AUTH_SECRET を設定してください。',
+    'ログインに必要な設定がありません。このサイトに BETTER_AUTH_SECRET（32 文字以上）を設定してください。',
   'error.setup_unavailable':
-    'セットアップに必要な設定がありません。このサイトに SETUP_TOKEN と ADMIN_EMAILS を設定してください。',
+    'セットアップに必要な設定がありません。このサイトに SETUP_TOKEN（32 文字以上）と ADMIN_EMAILS を設定してください。',
   'error.setup_closed': 'セットアップは完了しています。',
   'error.invalid_setup_token': 'セットアップトークンが正しくありません。',
   'error.email_not_allowed':
     'このメールアドレスは ADMIN_EMAILS に含まれていません。',
+  'error.https_required':
+    'https:// で始まるアドレスでこのページを開いて、もう一度お試しください。',
+  'error.access_denied':
+    'Cloudflare Access がこのリクエストを通しませんでした。Cloudflare Access でログインしてから、もう一度お試しください。',
+  'error.access_unavailable':
+    'Cloudflare Access を確認できません。ACCESS_AUD と ACCESS_TEAM_DOMAIN は両方設定するか、両方とも設定しないでください。そのうえで、もう一度お試しください。',
 
   'field.name': 'お名前',
   'field.email': 'メールアドレス',

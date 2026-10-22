@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { signInAsAdmin } from '../../testing/admin-session.ts';
+import { runSetup, signInAsAdmin } from '../../testing/admin-session.ts';
+import {
+  CookieJar,
+  SoftAuthenticator,
+} from '../../testing/soft-authenticator.ts';
 import { captureConsole } from '../../testing/console-capture.ts';
 import {
   createTestWorker,
   ORIGIN,
   type TestWorker,
 } from '../../testing/test-worker.ts';
-import { insertSubmission } from '../submissions/submission-store.ts';
+import {
+  EXPORT_BATCH_SIZE,
+  insertSubmission,
+} from '../submissions/submission-store.ts';
 import type { SubmissionStatus } from '../submissions/submission-status.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -99,6 +106,74 @@ describe('admin API without a valid admin session', () => {
     });
     expect(response.status).toBe(403);
     expect((await response.json()).error.code).toBe('forbidden');
+  });
+
+  test.each(ENDPOINTS)(
+    '%s %s returns 403 on the next request after the address is removed from ADMIN_EMAILS',
+    async (method, path) => {
+      const worker = createTestWorker();
+      await seed(worker, 'abc');
+      const cookie = await signInAsAdmin(worker);
+      const call = () =>
+        worker.fetch(path, {
+          method,
+          headers: {
+            cookie,
+            origin: ORIGIN,
+            'content-type': 'application/json',
+          },
+          body:
+            method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+        });
+      expect(
+        (await worker.fetch('/api/admin/me', { headers: { cookie } })).status,
+      ).toBe(200);
+      worker.env.ADMIN_EMAILS = 'second@example.com';
+      const response = await call();
+      expect(response.status).toBe(403);
+      expect((await response.json()).error.code).toBe('forbidden');
+      expect(
+        worker.sqlite
+          .query("SELECT status FROM submissions WHERE id = 'abc'")
+          .get(),
+      ).toEqual({ status: 'new' });
+    },
+  );
+
+  test('a removed address gets no admin access from a new passkey sign-in', async () => {
+    const worker = createTestWorker();
+    const jar = new CookieJar(await runSetup(worker));
+    const authenticator = new SoftAuthenticator();
+    await authenticator.register(worker, jar, { createSession: true });
+    worker.env.ADMIN_EMAILS = 'second@example.com';
+    const signedIn = new CookieJar();
+    expect((await authenticator.signIn(worker, signedIn)).status).toBe(200);
+    const response = await worker.fetch('/api/admin/me', {
+      headers: { cookie: signedIn.header() },
+    });
+    expect(response.status).toBe(403);
+    // The documented clean-up (docs security page) deletes the user's
+    // sessions, passkeys, and accounts, then the user, so adding the address
+    // back later does not revive them.
+    const email = "(SELECT id FROM user WHERE email = 'admin@example.com')";
+    worker.sqlite.exec(`DELETE FROM session WHERE user_id IN ${email}`);
+    worker.sqlite.exec(`DELETE FROM passkey WHERE user_id IN ${email}`);
+    worker.sqlite.exec(`DELETE FROM account WHERE user_id IN ${email}`);
+    worker.sqlite.exec("DELETE FROM user WHERE email = 'admin@example.com'");
+    expect(
+      worker.sqlite.query('SELECT COUNT(*) AS n FROM session').get(),
+    ).toEqual({ n: 0 });
+    expect(
+      worker.sqlite.query('SELECT COUNT(*) AS n FROM passkey').get(),
+    ).toEqual({ n: 0 });
+    worker.env.ADMIN_EMAILS = 'admin@example.com';
+    expect(
+      (
+        await worker.fetch('/api/admin/me', {
+          headers: { cookie: signedIn.header() },
+        })
+      ).status,
+    ).toBe(401);
   });
 
   test('fails closed with 503 without BETTER_AUTH_SECRET', async () => {
@@ -320,6 +395,26 @@ describe('admin API with an admin session', () => {
     expect(text).not.toContain('"hash"');
   });
 
+  test('streams a CSV export larger than one batch', async () => {
+    const total = EXPORT_BATCH_SIZE * 2 + 5;
+    for (let i = 0; i < total; i++) {
+      await seed(worker, `id${String(i).padStart(4, '0')}`, {
+        createdAt: 1_700_000_000_000 + Math.floor(i / 3),
+        body: i === 0 ? ' =cmd|"/c calc"!A1' : 'Hello',
+      });
+    }
+    const response = await get('/api/admin/submissions.csv');
+    expect(response.status).toBe(200);
+    expect(response.body).toBeInstanceOf(ReadableStream);
+    const text = await response.text();
+    const lines = text.split('\r\n').filter((line) => line !== '');
+    expect(lines).toHaveLength(total + 1);
+    const ids = lines.slice(1).map((line) => line.slice(1, 7));
+    expect(new Set(ids).size).toBe(total);
+    expect(ids[0]).toBe(`id${String(total - 1).padStart(4, '0')}`);
+    expect(text).toContain(`"' =cmd|""/c calc""!A1"`);
+  });
+
   test('GET /status reports configuration without secret values', async () => {
     await seed(worker, 'abc');
     const status = await (await get('/api/admin/status')).json();
@@ -327,6 +422,7 @@ describe('admin API with an admin session', () => {
       turnstileConfigured: true,
       contactAvailable: true,
       contactMissing: [],
+      contactTooShort: [],
       slackConfigured: false,
       retentionDays: 180,
       unreadCount: 1,
@@ -336,6 +432,17 @@ describe('admin API with an admin session', () => {
     for (const value of Object.values(worker.env)) {
       if (typeof value === 'string') expect(text).not.toContain(value);
     }
+  });
+
+  test('GET /status reports an IP_HASH_SECRET that is too short', async () => {
+    worker.env.IP_HASH_SECRET = 'short-secret';
+    const status = await (await get('/api/admin/status')).json();
+    expect(status).toMatchObject({
+      contactAvailable: false,
+      contactMissing: ['IP_HASH_SECRET'],
+      contactTooShort: ['IP_HASH_SECRET'],
+    });
+    expect(JSON.stringify(status)).not.toContain('short-secret');
   });
 
   test('GET /status reports a missing Turnstile setup', async () => {

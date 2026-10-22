@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
+import { MIN_SECRET_LENGTH } from '../../shared/secret-length.ts';
 import { signInAsAdmin } from '../../testing/admin-session.ts';
 import { captureConsole } from '../../testing/console-capture.ts';
 import {
@@ -33,11 +34,13 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: true,
       open: true,
+      problems: [],
     });
     const unconfigured = createTestWorker({ env: { SETUP_TOKEN: undefined } });
     expect(await (await unconfigured.fetch('/api/setup')).json()).toEqual({
       configured: false,
       open: false,
+      problems: [{ name: 'SETUP_TOKEN', issue: 'missing' }],
     });
   });
 
@@ -103,6 +106,7 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: true,
       open: false,
+      problems: [],
     });
   });
 
@@ -134,6 +138,7 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: true,
       open: false,
+      problems: [],
     });
     const response = await setup(worker, {
       token: SECRETS.SETUP_TOKEN,
@@ -211,6 +216,7 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: false,
       open: false,
+      problems: [{ name, issue: 'missing' }],
     });
     const response = await setup(worker, {
       token: SECRETS.SETUP_TOKEN,
@@ -220,5 +226,55 @@ describe('/api/setup', () => {
     expect((await response.json()).error.code).toBe(code);
     expect(userCount(worker)).toBe(0);
     expect(worker.rateLimitKeys).toEqual([]);
+  });
+
+  test.each([
+    ['SETUP_TOKEN', 'setup_unavailable'],
+    ['IP_HASH_SECRET', 'setup_unavailable'],
+    ['BETTER_AUTH_SECRET', 'auth_unavailable'],
+  ])(
+    'fails closed with 503 when %s is shorter than 32 characters',
+    async (name, code) => {
+      const short = 'x'.repeat(MIN_SECRET_LENGTH - 1);
+      const worker = createTestWorker({ env: { [name]: short } });
+      expect(await (await worker.fetch('/api/setup')).json()).toEqual({
+        configured: false,
+        open: false,
+        problems: [{ name, issue: 'too_short' }],
+      });
+      const response = await setup(worker, {
+        token: name === 'SETUP_TOKEN' ? short : SECRETS.SETUP_TOKEN,
+        email: 'admin@example.com',
+      });
+      expect(response.status).toBe(503);
+      expect((await response.json()).error.code).toBe(code);
+      expect(userCount(worker)).toBe(0);
+    },
+  );
+
+  test('accepts secrets of exactly 32 characters', async () => {
+    const token = 't'.repeat(MIN_SECRET_LENGTH);
+    const worker = createTestWorker({
+      env: {
+        SETUP_TOKEN: token,
+        IP_HASH_SECRET: 'i'.repeat(MIN_SECRET_LENGTH),
+      },
+    });
+    const response = await setup(worker, {
+      token,
+      email: 'admin@example.com',
+    });
+    expect(response.status).toBe(200);
+  });
+
+  test('lists no problems once setup is closed', async () => {
+    const worker = createTestWorker();
+    await signInAsAdmin(worker);
+    worker.env.SETUP_TOKEN = undefined;
+    expect(await (await worker.fetch('/api/setup')).json()).toEqual({
+      configured: false,
+      open: false,
+      problems: [],
+    });
   });
 });

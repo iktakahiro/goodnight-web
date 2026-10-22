@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import { adminRoutes } from './features/admin-api/admin-routes.ts';
 import { serveAdminFile } from './features/admin-ui/serve-admin-file.ts';
 import { authRoutes } from './features/auth/auth-routes.ts';
+import { requireAccess } from './features/cloudflare-access/require-access.ts';
 import { contactRoutes } from './features/contact/contact-routes.ts';
+import { requireHttps } from './features/https-only/require-https.ts';
 import { securityHeaders } from './features/security-headers/security-headers.ts';
 import { setupRoutes } from './features/setup/setup-routes.ts';
 import type { HonoEnv } from './hono-env.ts';
@@ -34,6 +36,10 @@ import { safeErrorMessage } from './shared/log-error.ts';
  * - `GET|POST /api/auth/*` (Better Auth)
  * - `/api/admin/*` (admin session with a passkey required)
  * - `GET /admin`, `GET /admin/*` (admin UI)
+ *
+ * The admin UI, the admin API, setup, and Better Auth require HTTPS (plain
+ * HTTP is allowed on `localhost`), and a valid Cloudflare Access token when
+ * `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` are set.
  */
 export const createGoodnightWorker = (options: GoodnightWorkerOptions = {}) => {
   const resolved = resolveOptions(options);
@@ -43,6 +49,11 @@ export const createGoodnightWorker = (options: GoodnightWorkerOptions = {}) => {
     await next();
   });
   app.use('*', securityHeaders);
+  // The admin UI, admin API, setup, and Better Auth: HTTPS only (except on
+  // localhost), then Cloudflare Access when ACCESS_AUD and
+  // ACCESS_TEAM_DOMAIN are set.
+  app.use('*', requireHttps);
+  app.use('*', requireAccess);
   app.route('/api/contact', contactRoutes);
   app.route('/api/setup', setupRoutes);
   app.route('/api/auth', authRoutes);

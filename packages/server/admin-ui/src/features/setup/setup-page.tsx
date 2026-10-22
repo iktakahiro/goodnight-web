@@ -12,6 +12,8 @@ import {
   setupInputSchema,
   type SetupInput,
 } from '../../../../src/features/setup/setup-schema.ts';
+import type { SetupProblem } from '../../../../src/features/setup/setup-state.ts';
+import { MIN_SECRET_LENGTH } from '../../../../src/shared/secret-length.ts';
 import { ApiError, apiFetch } from '../../shared/api/api-client.ts';
 import { errorMessage } from '../../shared/api/error-message.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
@@ -41,7 +43,7 @@ import { PageLoading } from '../layout/page-states.tsx';
 
 type Step =
   | { name: 'loading' }
-  | { name: 'unavailable' }
+  | { name: 'unavailable'; problems: SetupProblem[] }
   | { name: 'closed'; signedIn: boolean }
   | { name: 'token' }
   | { name: 'passkey' }
@@ -257,8 +259,12 @@ const PasskeyStep = ({ onDone }: { onDone: () => void }) => {
   const register = async () => {
     setBusy(true);
     setFailed(false);
+    // Registering the first passkey deletes every session, including the
+    // one from step 1. createSession signs the admin in with a new session
+    // created after the passkey.
     const result = await authClient.passkey.addPasskey({
       name: 'goodnight-web',
+      createSession: true,
     });
     setBusy(false);
     if (result?.error) {
@@ -315,7 +321,8 @@ export const SetupPage = () => {
       ),
     ]).then(([state, session]) => {
       if (!active) return;
-      if (!state || !state.configured) setStep({ name: 'unavailable' });
+      if (!state || !state.configured)
+        setStep({ name: 'unavailable', problems: state?.problems ?? [] });
       else if (!state.open)
         setStep({ name: 'closed', signedIn: session === 'signed-in' });
       else if (session === 'needs-passkey') setStep({ name: 'passkey' });
@@ -354,7 +361,24 @@ export const SetupPage = () => {
               {closed ? t('setup.closedLead') : t('error.setup_unavailable')}
             </CardDescription>
           </CardHeader>
-          <CardContent className='flex justify-center'>
+          <CardContent className='flex flex-col items-center gap-4'>
+            {step.name === 'unavailable' && step.problems.length > 0 ? (
+              <ul
+                data-testid='setup-problems'
+                className='flex list-disc flex-col gap-1 pl-5 text-[0.95rem]'
+              >
+                {step.problems.map((problem) => (
+                  <li key={problem.name}>
+                    {problem.issue === 'too_short'
+                      ? t('setup.problemTooShort', {
+                          name: problem.name,
+                          min: MIN_SECRET_LENGTH,
+                        })
+                      : t('setup.problemMissing', { name: problem.name })}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {closed ? (
               <Link
                 to={step.signedIn ? '/' : '/login'}
