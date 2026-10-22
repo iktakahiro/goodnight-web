@@ -40,7 +40,7 @@ is not yet. Design decisions are recorded in
   `/api/*`, `/admin`, and `/admin/*` reach Hono (`run_worker_first`). The
   bare `/admin` must be listed: `/admin/*` does not match it.
 - **Hono** routes the API. `createGoodnightWorker(options)` takes options
-  from the site (locale, contact categories, Turnstile hostnames) and reads bindings and secrets from `env` on every request.
+  from the site (locale, Turnstile hostnames) and reads bindings and secrets from `env` on every request.
   Requests it does not handle go to the `ASSETS` binding.
 - **Better Auth** is built from the env bindings and cached per isolate,
   keyed by the `env` object and the request origin. A new `env` object (new
@@ -91,10 +91,15 @@ together; with only one, the admin areas answer 503.
 
 ## Contact flow
 
-The contact form first calls `GET /api/contact/config`. It returns
+The contact form first calls `GET /api/contact/form`. It returns
 `available`, the public Turnstile site key, the Turnstile action
-(`contact`), the honeypot field name (`website`), and the allowed categories.
-When `available` is `false`, the form shows that it is not available yet.
+(`contact`), the honeypot field name (`website`), the fixed email field, and
+the current form definition: `version` and the fields in order (id, type,
+labels, placeholder, hint, required, resolved `maxLength`, options). It is
+public, read-only, and cached for 30 seconds (`Cache-Control: public,
+max-age=30`; every other API response is `no-store`). When `available` is
+`false`, the form shows that it is not available yet. The starter renders the
+fields in the browser, so a form edit needs no build or deploy.
 
 `POST /api/contact` runs these steps in order
 (`packages/server/src/features/contact/contact-routes.ts`):
@@ -103,7 +108,7 @@ When `available` is `false`, the form shows that it is not available yet.
    `CONTACT_RATE_LIMITER` binding is missing, return 503
    (`contact_unavailable`) without reading the body.
 1. Check that `Origin` is the Worker's own origin, that `Content-Type` is
-   JSON, and that the body is at most 16 KB. The size is checked against
+   JSON, and that the body is at most 32 KB. The size is checked against
    `Content-Length` and again while reading, so a chunked body cannot bypass
    it. Errors: 403, 415, 413, then 400 for bad JSON. The form is served by the
    same Worker, so the API is same-origin only and sends no CORS headers.
@@ -118,19 +123,25 @@ When `available` is `false`, the form shows that it is not available yet.
    failure return 400 (`turnstile_failed`) and save nothing.
 4. Apply the Rate Limiting binding with `ip_hash` as the key. Over the limit
    returns 429.
-5. Validate the input with the zod schema exported from
-   `@goodnight-web/server/contact` (control characters removed, lengths
-   checked, `consent` must be `true`). A category outside the values of
-   `options.contact.categories` is rejected; labels are only for the admin
-   UI. Then compute the spam score; a
-   score of 3 or more sets the status to `held`.
-6. Insert the row into D1, then return 200. If the insert fails, return 500.
+5. Validate the fixed parts with `contactRequestSchema` from
+   `@goodnight-web/server/contact` (email, `consent` must be `true`,
+   metadata). Read the current form version from D1; if the request's
+   `formVersion` is another version, return 409 (`form_outdated`). Validate
+   `fields` with the zod schema built from that stored definition
+   (`buildFieldValuesSchema()`, cached per isolate and version): only the
+   current field ids are accepted (unknown keys, including `__proto__`, are
+   400), with required fields, lengths, formats, and option values checked
+   and text cleaned. The stored values must be at most 16 KB as JSON (413).
+   The definition sent to the browser is never used for validation. Then
+   compute the spam score; a score of 3 or more sets the status to `held`.
+6. Insert the row into D1 (`email`, `fields` keyed by field id,
+   `form_version`, `locale`, and the operational columns), then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:
    - if the status is `new` and `SLACK_WEBHOOK_URL` is a Slack webhook URL,
-     post "1 new inquiry, category, admin URL" to Slack and set
-     `notified_at`. The category is shown only when it is one of the
-     configured categories, so free text from a visitor never reaches Slack.
+     post "1 new inquiry", the received time (a Slack date token), and the
+     admin URL to Slack and set `notified_at`. No field value is sent, not
+     even a select answer, so nothing the visitor typed reaches Slack.
      There is no retry; the unread count in the admin UI covers missed
      notifications.
    - prune old rows (see below).
@@ -143,16 +154,43 @@ message is Japanese or English depending on `Accept-Language`. The browser
 helper `submitContact()` in `@goodnight-web/server/client` returns these as
 typed results instead of throwing.
 
+### Form definition
+
+The contact form fields are data, not code
+([0008](decisions/0008-contact-form-definition-in-d1.md)). Admins edit them
+in the admin UI; each save is a new row in `form_definitions`
+(`src/features/contact-form/`):
+
+- `form-definition.ts`: the types, limits, and the zod meta-schema
+  (`formUpdateSchema`). Field ids match `^f_[a-z0-9]{1,32}$` and are
+  generated by the server (`newFieldId()`); option values are generated too.
+- `form-edit.ts`: `applyFormEdit()` turns the editor's fields into the next
+  definition. A new field gets a fresh id; an existing id must be on the form
+  or archived; a type can change only within its value shape
+  (`valueShape()`); removed fields move to `archived` with `lastVersion`.
+  `restoreFormVersion()` copies an older version's fields.
+- `form-store.ts`: reads and writes versions. Parsed versions are cached per
+  isolate and D1 binding, which is safe because rows never change.
+  `getCurrentForm()` reads only the highest version number when that version
+  is cached.
+- `form-values-schema.ts`: `buildFieldValuesSchema()` builds the zod schema
+  for `fields` from a definition. It checks own keys on the parsed JSON first
+  (so `__proto__` is refused), then each value.
+
+The admin list filter on a select or radio option uses
+`json_extract(fields, ?) = ?`, with the JSON path built from a field id that
+the route looked up in the current definition; both are bound parameters.
+
 ### Spam score
 
 `scoreSubmission()` in `spam-score.ts`. The rules only hold a submission for
 review; nothing is thrown away.
 
-| Rule           | Points       | Condition                                            |
-| -------------- | ------------ | ---------------------------------------------------- |
-| `links:N`      | N, at most 3 | links (`http://`, `https://`, `www.`) in the message |
-| `link_in_name` | 3            | a link in the name or company                        |
-| `too_fast`     | 3            | sent less than 3 seconds after the form was shown    |
+| Rule            | Points       | Condition                                                                    |
+| --------------- | ------------ | ---------------------------------------------------------------------------- |
+| `links:N`       | N, at most 3 | links (`http://`, `https://`, `www.`) in `textarea` fields                   |
+| `link_in_field` | 3            | a link in a one-line `text` field (such as a name); `url` fields are skipped |
+| `too_fast`      | 3            | sent less than 3 seconds after the form was shown                            |
 
 A filled honeypot field is not scored: the submission is not stored at all
 (step 2 above).
@@ -217,15 +255,19 @@ passkey (otherwise 401). The session from setup alone only allows registering
 the first passkey. State-changing requests also need
 the Worker's own `Origin` (CSRF). There is no development bypass.
 
-| Route                                             | Result                                                                                                                                                                                            |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/admin/me`                               | the signed-in admin                                                                                                                                                                               |
-| `GET /api/admin/status`                           | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`, `categories` (`{ value, label }`)                   |
-| `GET /api/admin/submissions?status=&page=&limit=` | `limit` per page (1–100, default 50), newest first, `total` and `unreadCount`; runs pruning. Invalid `status`, `page`, or `limit` is 400                                                          |
-| `GET /api/admin/submissions/:id`                  | one submission; a `new` one becomes `read`                                                                                                                                                        |
-| `PATCH /api/admin/submissions/:id`                | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                                                            |
-| `DELETE /api/admin/submissions/:id`               | deletes the row                                                                                                                                                                                   |
-| `GET /api/admin/submissions.csv?status=`          | CSV with a UTF-8 BOM, streamed in batches of 200 rows (keyset on `created_at`, `id`); a cell whose first non-whitespace character is `= + - @`, or that starts with tab or CR, gets a leading `'` |
+| Route                                                                               | Result                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/admin/me`                                                                 | the signed-in admin                                                                                                                                                                                                                                                                                                                                                                                               |
+| `GET /api/admin/status`                                                             | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`                                                                                                                                                                                                                                                                      |
+| `GET /api/admin/submissions?status=&version=&field=&value=&sort=&dir=&page=&limit=` | `limit` per page (1–100, default 50); sorted by `received_at` (default), `email`, or `status`, `desc` by default; `columns` (the current form's fields), `total`, and `unreadCount`; field values of the current form, long text cut to 120 characters; runs pruning. `field` + `value` filter on a select or radio option of the current form. Invalid or unknown parameters are 400; there is no keyword search |
+| `GET /api/admin/submissions/:id`                                                    | one submission with `entries`: its values labeled by its own form version, each marked whether it is on the current form; a `new` one becomes `read`                                                                                                                                                                                                                                                              |
+| `PATCH /api/admin/submissions/:id`                                                  | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                                                                                                                                                                                                                                                                            |
+| `DELETE /api/admin/submissions/:id`                                                 | deletes the row                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `GET /api/admin/submissions.csv?status=&version=&field=&value=&lang=`               | CSV with a UTF-8 BOM, streamed in batches of 200 rows (keyset on `created_at`, `id`); fixed columns, then one column per field id the form ever had (archived headers end with ` (vN)`); a cell whose first non-whitespace character is `= + - @`, or that starts with tab or CR, gets a leading `'`                                                                                                              |
+| `GET /api/admin/form`                                                               | `{ current, history }`: the current version with its definition, and the newest 50 versions                                                                                                                                                                                                                                                                                                                       |
+| `PUT /api/admin/form`                                                               | `{ baseVersion, fields }`: validated with `formUpdateSchema`, saved as version `baseVersion + 1`. 409 `form_conflict` when `baseVersion` is not current; 400 for an unknown field id, a type change to another value shape, or an unknown option value. A save without changes adds no version                                                                                                                    |
+| `GET /api/admin/form/versions/:version`                                             | one version with its definition                                                                                                                                                                                                                                                                                                                                                                                   |
+| `POST /api/admin/form/versions/:version/restore`                                    | `{ baseVersion }`: saves that version's fields as a new version                                                                                                                                                                                                                                                                                                                                                   |
 
 `ip_hash` is never returned by the admin API.
 
@@ -257,18 +299,22 @@ The UI uses three TanStack libraries, all in the browser only:
   shown; the UI maps each error to `field.required`, `field.invalid`, or
   `field.too_long` in the UI's language.
 - **TanStack Table** (headless) for the inquiry list. Pagination and sorting
-  are manual: the API returns one page of 50, sorted by received date, newest
-  first. The API has no other order, so the sort is fixed. The rows keep
-  their list design (one link per inquiry) instead of a `<table>`.
+  are manual: the API returns one page of 50, sorted by a fixed column
+  (received time, email, or status). The columns are the fixed ones plus the
+  fields of the current form version; `showInList` sets the default
+  visibility, and the admin's own choice is kept in `localStorage`.
+- **TanStack Form** also drives the form editor, validated with
+  `formFieldInputSchema` from `@goodnight-web/server/contact`.
 
 The UI does not use TanStack Start; the Worker serves the static build.
 
-| Path                    | Screen                                                                                                                                  |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                                            |
-| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                                          |
-| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), 50 per page, newest first, CSV export; `?status=&page=` keep the state |
-| `/admin/inquiries/<id>` | Detail: message, contact details, status change, reply by email, delete with a confirmation dialog                                      |
+| Path                    | Screen                                                                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                                                                                                          |
+| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                                                                                                        |
+| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), version and option filters, sortable fixed columns, column visibility, 50 per page, CSV export; the search parameters keep the state |
+| `/admin/inquiries/<id>` | Detail: the fields with the labels of the inquiry's own form version (fields not on the current form are marked archived), status change, reply by email, delete with a confirmation dialog           |
+| `/admin/form`           | Form editor: add, remove (archive), reorder, and edit fields and options; the email row is locked; live preview in ja/en; save as a new version; history with restore                                 |
 
 - **Session.** Before the list or detail screen loads, a route guard (the
   router's `beforeLoad`) calls `GET /api/admin/me` and remembers the admin
@@ -350,11 +396,12 @@ are not changed.
 
 ## Database
 
-| Table                                                   | Contents                                                                                                                                                   |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `submissions`                                           | contact submissions; `status` is checked against the five statuses; `ip_hash`, never an IP                                                                 |
-| `settings`                                              | `retention_days`, `last_cleanup_at`, `setup_closed_at`                                                                                                     |
-| `user`, `session`, `account`, `verification`, `passkey` | Better Auth, generated by the Better Auth CLI for the Drizzle adapter (`bun run auth:schema <file>` in `packages/server`, the pinned `auth` devDependency) |
+| Table                                                   | Contents                                                                                                                                                              |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submissions`                                           | contact submissions: `email`, `fields` (JSON keyed by field id), `form_version`, `locale`; `status` is checked against the five statuses; `ip_hash`, never an IP      |
+| `form_definitions`                                      | contact form versions: `version` (primary key), `definition` (JSON), `created_at`, `created_by`, `restored_from`; append-only (triggers refuse `UPDATE` and `DELETE`) |
+| `settings`                                              | `retention_days`, `last_cleanup_at`, `setup_closed_at`                                                                                                                |
+| `user`, `session`, `account`, `verification`, `passkey` | Better Auth, generated by the Better Auth CLI for the Drizzle adapter (`bun run auth:schema <file>` in `packages/server`, the pinned `auth` devDependency)            |
 
 - **Queries.** `getDatabase(env.DB)` (`src/db/database.ts`) returns the
   Drizzle database. App code never calls D1's `prepare()`; raw SQL appears
@@ -366,14 +413,19 @@ are not changed.
 - **Migrations.** `bun run db:generate` writes
   `packages/server/migrations/NNNN_name.sql` and drizzle-kit's
   `migrations/meta/`. Wrangler reads only the `.sql` files, sorted by name.
-  The default settings and the `passkey_closes_setup` trigger are custom
-  migrations, because drizzle-kit does not model data or triggers.
+  The default settings, the `passkey_closes_setup` trigger, and the form
+  definition seed with its append-only triggers (`0004`) are custom
+  migrations, because drizzle-kit does not model data or triggers. `0004`
+  also copies the old `name`, `company`, `phone`, `category`, and `body`
+  columns into `submissions.fields`; `0005` drops them (before the first
+  release, so no deployed Worker writes them).
   `bun run db:check` fails when the schema has changes without a migration.
   The package ships the `.sql` files without `meta/`.
 - **Rebuilds.** For some changes drizzle-kit rebuilds a table. Rebuilding
   `passkey` drops the trigger, and rebuilding `user` deletes every session
   and passkey on D1, because D1 keeps foreign keys on. A test fails on
-  `DROP TABLE user`, and `AGENTS.md` has the rules
+  `DROP TABLE user`, and `AGENTS.md` has the rules. Rebuilding
+  `form_definitions` drops its two triggers, which must be created again
   ([0005](decisions/0005-drizzle-orm.md)).
 - **Logs.** A failed Drizzle query carries its bound values in its message.
   Errors are logged with `safeErrorMessage()` only. Better Auth's logger
@@ -392,13 +444,13 @@ for the admin UI ([0004](decisions/0004-admin-ui-delivery.md)).
 
 Entry points (`exports` in `packages/server/package.json`):
 
-| Import                           | Contents                                                               |
-| -------------------------------- | ---------------------------------------------------------------------- |
-| `@goodnight-web/server`          | `createGoodnightWorker`, env and option types, admin API types         |
-| `@goodnight-web/server/contact`  | zod schemas, field limits, Turnstile action, honeypot name, spam rules |
-| `@goodnight-web/server/client`   | `getContactConfig()` and `submitContact()` for the browser (no zod)    |
-| `@goodnight-web/server/messages` | ja/en message catalogs, `translate()`, `pickLocale()`                  |
-| `migrations/`                    | D1 migrations, read through `migrations_dir`                           |
+| Import                           | Contents                                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `@goodnight-web/server`          | `createGoodnightWorker`, env and option types, admin API types                                                                         |
+| `@goodnight-web/server/contact`  | the request schema, form definition types, limits and schemas, `buildFieldValuesSchema()`, Turnstile action, honeypot name, spam rules |
+| `@goodnight-web/server/client`   | `getContactForm()` and `submitContact()` for the browser (no zod)                                                                      |
+| `@goodnight-web/server/messages` | ja/en message catalogs, `translate()`, `pickLocale()`                                                                                  |
+| `migrations/`                    | D1 migrations, read through `migrations_dir`                                                                                           |
 
 **`templates/starter`** is the part users own: Astro pages, Markdown content in
 Content Collections (ja and en), `site.config.ts`, styles, a `src/worker.ts`
@@ -410,8 +462,9 @@ workflow that fails while the repository is public. See
 [starter.md](starter.md).
 
 In this repository the starter depends on `@goodnight-web/server` through
-`workspace:*`. Its contact form uses `getContactConfig()` and
-`submitContact()` and gets the Turnstile site key from the config API. When the starter is copied out for users (planned for M2), that
+`workspace:*`. Its contact form uses `getContactForm()` and
+`submitContact()`: it renders the fields of the current form definition and
+gets the Turnstile site key from the same response. When the starter is copied out for users (planned for M2), that
 dependency is replaced with the published exact version.
 
 ## How updates reach users
@@ -495,7 +548,7 @@ the Worker a token that can write to GitHub.
   `wrangler dev` with Cloudflare's Turnstile test keys: pages, the
   not-available state and 503, a form submission saved to D1, then the admin
   UI in a real browser: setup, passkey registration, sign-out, passkey
-  sign-in, the inquiry in the list with its category label, the detail, and a
+  sign-in, the inquiry in the list, the detail, and a
   status change. See [starter.md](starter.md#end-to-end-test).
 - `deploy:check` for the server package runs `wrangler deploy --dry-run` on
   the e2e Worker to check that the package bundles for Workers.

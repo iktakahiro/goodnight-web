@@ -3,20 +3,43 @@ title: Slack notifications
 description: An optional Slack message tells you that a new inquiry arrived. It is sent after the reply and contains no personal data and no message text.
 ---
 
-<Callout type='info'>
-  Code excerpts will be added once the server package lands.
-</Callout>
-
 ## What it does
 
 - If `SLACK_WEBHOOK_URL` is set, the Worker posts to that Slack incoming webhook after it has saved an inquiry with status `new`.
-- The message contains only the count ("1 new inquiry"), the category, and a link to the admin screen. It contains no name, email address, phone number, or message text.
+- The message contains only the count ("1 new inquiry"), the time the inquiry was received, and a link to the admin screen. It contains no email address and no form field values, not even the answer of a select field. This does not change when admins add fields to the form.
+- The time is a Slack date token, so Slack shows it in each reader's own time zone.
 - When the post succeeds, the Worker records `notified_at`. There is no retry.
 - Held submissions and spam do not trigger a notification.
 
 ## Why it is built this way
 
 - **The reply does not wait for Slack.** The post runs in `ctx.waitUntil` after the inquiry is saved and the visitor has their reply. A Slack outage cannot lose an inquiry or show the visitor an error.
-- **No personal data leaves Cloudflare.** Slack is a separate service. Sending only a count and a link means that inquiry contents stay in your D1 database.
+- **No personal data leaves Cloudflare.** Slack is a separate service. Sending only a count, a time, and a link means that inquiry contents stay in your D1 database. Admins decide what the form asks, so the server cannot know which answers are safe to send; it sends none.
 - **No Queues and no retry.** The admin screen always shows the unread count in its header, so a missed notification does not mean a missed inquiry.
 - **The webhook URL is a secret.** Anyone with the URL can post to your channel, so it is kept as a Worker secret and never shown in the admin screen.
+
+## The code
+
+```ts title="packages/server/src/features/notify/slack.ts"
+export const buildSlackPayload = ({
+  locale,
+  receivedAt,
+  adminUrl,
+}: {
+  locale: Locale;
+  receivedAt: number;
+  adminUrl: string;
+}): SlackPayload => {
+  const seconds = Math.floor(receivedAt / 1000);
+  const fallback = new Date(receivedAt).toISOString().replace(/\.\d+Z$/, 'Z');
+  return {
+    text: [
+      translate(locale, 'notify.newInquiry'),
+      translate(locale, 'notify.receivedAt', {
+        time: `<!date^${seconds}^{date_short_pretty} {time}|${fallback}>`,
+      }),
+      `<${adminUrl}|${translate(locale, 'notify.open')}>`,
+    ].join('\n'),
+  };
+};
+```

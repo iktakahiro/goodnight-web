@@ -18,3 +18,4 @@ record; supersede it with a new one and link both ways.
 | [0005](0005-drizzle-orm.md)                      | Drizzle ORM for D1 access and migrations                  | accepted |
 | [0006](0006-admin-sessions-and-setup-closure.md) | Admin sessions and setup closure                          | accepted |
 | [0007](0007-honeypot-not-stored.md)              | Honeypot submissions are not stored                       | accepted |
+| [0008](0008-contact-form-definition-in-d1.md)    | Contact form definition in D1 with immutable field ids    | accepted |
