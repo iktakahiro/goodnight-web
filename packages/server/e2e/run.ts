@@ -267,6 +267,27 @@ const main = async () => {
         .getByRole('heading', { name: ui('en', 'admin.setup.title') })
         .waitFor();
     });
+    await step('the favicons and the touch icon are served', async () => {
+      for (const [path, type, magic] of [
+        ['/admin/favicon.svg', 'image/svg+xml', [0x3c, 0x73, 0x76, 0x67]],
+        ['/admin/favicon.ico', 'image/x-icon', [0, 0, 1, 0]],
+        ['/admin/apple-touch-icon.png', 'image/png', [0x89, 0x50, 0x4e, 0x47]],
+      ] as const) {
+        const response = await page.request.get(`${base}${path}`);
+        const head = [...(await response.body()).subarray(0, 4)];
+        check(
+          `${path} is served as ${type}`,
+          response.status() === 200 &&
+            response.headers()['content-type'] === type &&
+            magic.every((byte, i) => head[i] === byte),
+          {
+            status: response.status(),
+            type: response.headers()['content-type'],
+            head,
+          },
+        );
+      }
+    });
     const submitSetup = async (token: string, email: string) => {
       await page.getByLabel(ui('en', 'admin.setup.token')).fill(token);
       await page.getByLabel(ui('en', 'admin.setup.email')).fill(email);

@@ -20,7 +20,16 @@ const CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-const files: Record<string, { type: string; etag: string; body: string }> = {};
+// Binary files (the favicon and the touch icon) are embedded as base64.
+const BINARY_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+};
+
+const files: Record<
+  string,
+  { type: string; etag: string; body: string; encoding?: 'base64' }
+> = {};
 
 const walk = async (dir: string): Promise<void> => {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -31,17 +40,18 @@ const walk = async (dir: string): Promise<void> => {
       await walk(path);
       continue;
     }
-    const type = CONTENT_TYPES[extname(path)];
+    const extension = extname(path);
+    const binaryType = BINARY_TYPES[extension];
+    const type = CONTENT_TYPES[extension] ?? binaryType;
     if (!type) {
-      throw new Error(`Unsupported admin file type (text files only): ${path}`);
+      throw new Error(`Unsupported admin file type: ${path}`);
     }
-    const body = await readFile(path, 'utf8');
-    const etag = `"${createHash('sha256').update(body).digest('base64url').slice(0, 22)}"`;
-    files[`/admin/${relative(sourceDir, path).split('\\').join('/')}`] = {
-      type,
-      etag,
-      body,
-    };
+    const bytes = await readFile(path);
+    const etag = `"${createHash('sha256').update(bytes).digest('base64url').slice(0, 22)}"`;
+    const key = `/admin/${relative(sourceDir, path).split('\\').join('/')}`;
+    files[key] = binaryType
+      ? { type, etag, body: bytes.toString('base64'), encoding: 'base64' }
+      : { type, etag, body: bytes.toString('utf8') };
   }
 };
 

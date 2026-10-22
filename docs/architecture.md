@@ -408,6 +408,11 @@ The UI does not use TanStack Start; the Worker serves the static build.
   in `admin-ui/src/shared/theme/color-scheme.ts`; a unit test runs the
   script against them, and the end-to-end test checks the class when
   `#root` is parsed.
+- **Logo.** The header and the sign-in screen draw the goodnight web logo
+  as inline SVG from `features/layout/logo-shapes.gen.ts`, which
+  `brand/scripts/build.ts` generates from the same geometry as the files in
+  `brand/`. The `logo-*` tokens color it in each mode. The favicons and the
+  touch icon in `admin-ui/public` are copies of the files in `brand/`.
 - **CSP.** Every admin response gets the admin CSP
   (`default-src 'self'; script-src 'self'; style-src 'self'; ...`). The
   build has no inline scripts or styles. Base UI's one inline `<style>`
@@ -417,11 +422,13 @@ The UI does not use TanStack Start; the Worker serves the static build.
 - **Build.** `bun run build` in `packages/server` runs `vite build` into
   `admin-ui/dist` and then `scripts/build-admin-module.ts`, which writes
   `src/features/admin-ui/admin-files.gen.ts` (path, content type, ETag,
-  body). The generated file is not committed. Turborepo builds it before
+  body). Text files are embedded as strings; `favicon.ico` and
+  `apple-touch-icon.png` are embedded as base64 and served as bytes. The
+  generated file is not committed. Turborepo builds it before
   `type-check`, `test`, and `deploy:check` of the server package. The bundle
-  is one JS file of about 260 kB gzip and one CSS file of about 8 kB gzip.
+  is one JS file of about 285 kB gzip and one CSS file of about 9 kB gzip.
   With it, `deploy:check` reports the server's test Worker at about
-  2,990 KiB (680 KiB gzip).
+  3,170 KiB (740 KiB gzip).
 - **Serving.** `/admin` and paths without a file extension return
   `index.html` (`no-cache`); `/admin/assets/*` are immutable; ETags give
   304s. The SPA shell loads without a session, but every data request needs

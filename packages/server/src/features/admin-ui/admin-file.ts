@@ -4,5 +4,8 @@ export interface AdminFile {
   type: string;
   /** Strong ETag derived from the content. */
   etag: string;
+  /** The file content: text, or base64 when `encoding` is `base64`. */
   body: string;
+  /** `base64` for binary files such as PNG and ICO images. */
+  encoding?: 'base64';
 }

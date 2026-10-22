@@ -52,9 +52,13 @@
   --color-info-soft: #f3ecfe;
   --color-info-border: #d7c3f4;
   --color-info-foreground: #5d309c;
-  --color-logo-tile: #eee5fa;
-  --color-logo-moon: #743bc4;
-  --color-logo-star: #a87de3;
+  /* The logo (features/layout/logo-mark.tsx), as in brand/: moon and cat,
+     pillow, the eyes and toes, and the two wordmark words. */
+  --color-logo-mark: #743bc4;
+  --color-logo-pillow: #e4d8fb;
+  --color-logo-eyes: #e4d8fb;
+  --color-logo-wordmark: #341065;
+  --color-logo-accent: #743bc4;
   --color-glow: #ffffff;
   --color-selection: #e0cff7;
   /* Opaque table backgrounds, so sticky columns hide what scrolls below. */
@@ -116,9 +120,11 @@
     --color-info-soft: #36256a;
     --color-info-border: #6049a7;
     --color-info-foreground: #ddd1ff;
-    --color-logo-tile: #35275d;
-    --color-logo-moon: #d1c2ff;
-    --color-logo-star: #a38ce8;
+    --color-logo-mark: #ffffff;
+    --color-logo-pillow: #bfabfc;
+    --color-logo-eyes: #111113;
+    --color-logo-wordmark: #ffffff;
+    --color-logo-accent: #bfabfc;
     --color-glow: #19191c;
     --color-selection: #513b91;
     --color-table-header: #1f1f22;
