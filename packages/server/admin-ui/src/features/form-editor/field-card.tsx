@@ -1,4 +1,9 @@
-import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2, X } from 'lucide-react';
+import ArrowDown from '@gravity-ui/icons/ArrowDown';
+import ArrowUp from '@gravity-ui/icons/ArrowUp';
+import ChevronDown from '@gravity-ui/icons/ChevronDown';
+import Plus from '@gravity-ui/icons/Plus';
+import TrashBin from '@gravity-ui/icons/TrashBin';
+import Xmark from '@gravity-ui/icons/Xmark';
 import { useId, type ReactNode } from 'react';
 import {
   isChoiceFieldType,
@@ -260,7 +265,7 @@ const OptionsEditor = ({
                     )
                   }
                 >
-                  <X aria-hidden='true' />
+                  <Xmark aria-hidden='true' />
                 </IconButton>
               </div>
             </li>
@@ -559,7 +564,7 @@ export const FieldCard = ({
               aria-label={t('form.removeLabel', { label: title })}
               onClick={onRemove}
             >
-              <Trash2 aria-hidden='true' />
+              <TrashBin aria-hidden='true' />
               {t('form.remove')}
             </Button>
           </div>

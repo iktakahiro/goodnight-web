@@ -1,4 +1,4 @@
-import { ChevronsUpDown } from 'lucide-react';
+import ChevronsExpandVertical from '@gravity-ui/icons/ChevronsExpandVertical';
 import type { ReactNode } from 'react';
 import {
   localizedText,
@@ -112,7 +112,7 @@ const PreviewInput = ({
           <span className='text-muted-foreground'>
             {placeholder || strings['form.previewSelect']}
           </span>
-          <ChevronsUpDown
+          <ChevronsExpandVertical
             aria-hidden='true'
             className='size-4 text-muted-foreground'
           />

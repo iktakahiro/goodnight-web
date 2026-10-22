@@ -21,7 +21,19 @@ updates:
       interval: weekly
     cooldown:
       default-days: 2
+    # Dependabot puts an update in the first group that matches, so this
+    # group must stay above minor-and-patch.
     groups:
+      # apps/docs pins lucide-react, and fumadocs-ui depends on lucide-react
+      # (^1.50.0), which fumadocs-core also takes as a peer. If they move in
+      # separate PRs, fumadocs-ui can keep a nested lucide-react of another
+      # version. The isolated linker then installs two fumadocs-core
+      # instances, and apps/docs fails to type-check with a TranslationsAPI
+      # error in src/routes/__root.tsx (#9, fixed in #20). Two instances
+      # would also split the fumadocs-core React contexts at runtime.
+      # Update them together so the lockfile keeps one of each.
+      fumadocs:
+        patterns: ['fumadocs-*', 'lucide-react']
       minor-and-patch:
         update-types: [minor, patch]
     commit-message:

@@ -1,4 +1,6 @@
-import { BellOff, ExternalLink, TriangleAlert } from 'lucide-react';
+import ArrowUpRightFromSquare from '@gravity-ui/icons/ArrowUpRightFromSquare';
+import BellSlash from '@gravity-ui/icons/BellSlash';
+import TriangleExclamation from '@gravity-ui/icons/TriangleExclamation';
 import { useState } from 'react';
 import { MIN_SECRET_LENGTH } from '../../../../src/shared/secret-length.ts';
 import { useAdminSession } from '../auth/admin-session.tsx';
@@ -39,7 +41,7 @@ export const SetupNotices = ({
         <Notice
           tone='warning'
           data-testid='turnstile-notice'
-          icon={<TriangleAlert aria-hidden='true' />}
+          icon={<TriangleExclamation aria-hidden='true' />}
           title={t('notice.turnstileTitle')}
         >
           <p>{t('notice.turnstileBody')}</p>
@@ -51,7 +53,7 @@ export const SetupNotices = ({
               className='inline-flex items-center gap-1 rounded-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring'
             >
               {t('admin.turnstileNoticeLink')}
-              <ExternalLink aria-hidden='true' className='size-3.5' />
+              <ArrowUpRightFromSquare aria-hidden='true' className='size-3.5' />
             </a>
           </p>
         </Notice>
@@ -59,7 +61,7 @@ export const SetupNotices = ({
       {showContact ? (
         <Notice
           tone='warning'
-          icon={<TriangleAlert aria-hidden='true' />}
+          icon={<TriangleExclamation aria-hidden='true' />}
           title={t('notice.contactTitle')}
         >
           <p>{t('notice.contactBody', { names: otherMissing.join(', ') })}</p>
@@ -78,7 +80,7 @@ export const SetupNotices = ({
           tone='info'
           data-testid='slack-notice'
           className='items-center py-3 sm:py-3'
-          icon={<BellOff aria-hidden='true' />}
+          icon={<BellSlash aria-hidden='true' />}
         >
           <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
             <p>{t('notice.slack')}</p>

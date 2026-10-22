@@ -1,4 +1,6 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import Display from '@gravity-ui/icons/Display';
+import Moon from '@gravity-ui/icons/Moon';
+import Sun from '@gravity-ui/icons/Sun';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import {
   THEME_PREFERENCES,
@@ -15,7 +17,7 @@ import {
   MenuTrigger,
 } from '../../shared/ui/menu.tsx';
 
-const ICON = { system: Monitor, light: Sun, dark: Moon } as const;
+const ICON = { system: Display, light: Sun, dark: Moon } as const;
 
 /**
  * Header menu that switches between the system setting, light, and dark.

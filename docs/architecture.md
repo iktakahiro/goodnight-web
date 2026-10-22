@@ -313,8 +313,16 @@ the address is added back. The docs site's security page gives the
 The admin UI is a React SPA in `packages/server/admin-ui/`, built with Vite,
 Base UI, shadcn-style components (the component source is copied into
 `admin-ui/src/shared/ui/` and adapted to Base UI, as shadcn does), Tailwind
-v4, and lucide icons. It ships prebuilt inside `@goodnight-web/server` and is
-served by the Worker ([0004](decisions/0004-admin-ui-delivery.md)).
+v4, and Gravity UI icons (`@gravity-ui/icons`, MIT). It ships prebuilt inside
+`@goodnight-web/server` and is served by the Worker
+([0004](decisions/0004-admin-ui-delivery.md)).
+
+Each icon is imported from its own module (`@gravity-ui/icons/<Name>`), so
+the bundle contains only the icons in use. The icons are 16 px SVGs filled
+with `currentColor`: their size comes from Tailwind classes and their color
+from the theme tokens, in light and dark mode. Gravity icons do not add
+`aria-hidden` by themselves, so every decorative icon sets
+`aria-hidden='true'`.
 
 The UI uses three TanStack libraries, all in the browser only:
 

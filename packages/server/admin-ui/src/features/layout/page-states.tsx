@@ -1,5 +1,7 @@
+import CircleExclamation from '@gravity-ui/icons/CircleExclamation';
+import Compass from '@gravity-ui/icons/Compass';
+import PersonXmark from '@gravity-ui/icons/PersonXmark';
 import { Link } from '@tanstack/react-router';
-import { CircleAlert, Compass, ShieldX } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { Button, buttonVariants } from '../../shared/ui/button.tsx';
@@ -61,7 +63,7 @@ export const PageError = ({
   return (
     <MessageCard
       role='alert'
-      icon={<CircleAlert aria-hidden='true' />}
+      icon={<CircleExclamation aria-hidden='true' />}
       title={t('app.errorTitle')}
       action={
         onRetry ? (
@@ -81,7 +83,7 @@ export const ForbiddenPage = ({ onSignOut }: { onSignOut: () => void }) => {
   const { t } = useI18n();
   return (
     <MessageCard
-      icon={<ShieldX aria-hidden='true' />}
+      icon={<PersonXmark aria-hidden='true' />}
       title={t('forbidden.title')}
       action={
         <Button variant='outline' onClick={onSignOut}>

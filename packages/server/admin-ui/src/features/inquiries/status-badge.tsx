@@ -1,4 +1,6 @@
-import { Circle, CircleDot, ShieldAlert } from 'lucide-react';
+import Circle from '@gravity-ui/icons/Circle';
+import CirclesConcentric from '@gravity-ui/icons/CirclesConcentric';
+import ShieldExclamation from '@gravity-ui/icons/ShieldExclamation';
 import type { SubmissionStatus } from '../../../../src/features/submissions/submission-status.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { Badge } from '../../shared/ui/badge.tsx';
@@ -9,7 +11,7 @@ const TONE = {
 } as const satisfies Record<SubmissionStatus, string>;
 
 const ICON = {
-  unread: CircleDot,
+  unread: CirclesConcentric,
   read: Circle,
 } as const satisfies Record<SubmissionStatus, unknown>;
 
@@ -30,7 +32,7 @@ export const SuspectedSpamBadge = () => {
   const { t } = useI18n();
   return (
     <Badge tone='amber' data-testid='suspected-spam-badge'>
-      <ShieldAlert aria-hidden='true' />
+      <ShieldExclamation aria-hidden='true' />
       {t('spam.badge')}
     </Badge>
   );

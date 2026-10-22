@@ -1,5 +1,5 @@
 import { Menu as BaseMenu } from '@base-ui/react/menu';
-import { Check } from 'lucide-react';
+import Check from '@gravity-ui/icons/Check';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from './cn.ts';
 

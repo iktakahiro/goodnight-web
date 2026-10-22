@@ -1,3 +1,16 @@
+import ArrowDown from '@gravity-ui/icons/ArrowDown';
+import ArrowDownToLine from '@gravity-ui/icons/ArrowDownToLine';
+import ArrowUp from '@gravity-ui/icons/ArrowUp';
+import ChevronLeft from '@gravity-ui/icons/ChevronLeft';
+import ChevronRight from '@gravity-ui/icons/ChevronRight';
+import Envelope from '@gravity-ui/icons/Envelope';
+import EnvelopeOpen from '@gravity-ui/icons/EnvelopeOpen';
+import FunnelXmark from '@gravity-ui/icons/FunnelXmark';
+import LayoutColumns3 from '@gravity-ui/icons/LayoutColumns3';
+import Magnifier from '@gravity-ui/icons/Magnifier';
+import Moon from '@gravity-ui/icons/Moon';
+import ShieldExclamation from '@gravity-ui/icons/ShieldExclamation';
+import Xmark from '@gravity-ui/icons/Xmark';
 import { Link, getRouteApi, useNavigate } from '@tanstack/react-router';
 import {
   columnVisibilityFeature,
@@ -11,21 +24,6 @@ import {
   type SortingState,
   type Updater,
 } from '@tanstack/react-table';
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronLeft,
-  ChevronRight,
-  Columns3,
-  Download,
-  FilterX,
-  Mail,
-  MailOpen,
-  MoonStar,
-  Search,
-  ShieldAlert,
-  X,
-} from 'lucide-react';
 import {
   useEffect,
   useMemo,
@@ -217,7 +215,7 @@ const EmailSearch = ({
       className='flex min-w-0 items-center gap-2'
     >
       <div className='relative min-w-0 flex-1 sm:w-72 sm:flex-none'>
-        <Search
+        <Magnifier
           aria-hidden='true'
           className='pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
         />
@@ -246,7 +244,7 @@ const EmailSearch = ({
           onClick={() => onSearch(undefined)}
           aria-label={t('list.search.clear')}
         >
-          <X aria-hidden='true' />
+          <Xmark aria-hidden='true' />
         </Button>
       ) : null}
     </form>
@@ -266,7 +264,7 @@ const ReadToggle = ({
   const [busy, setBusy] = useState(false);
   const unread = item.status === 'unread';
   const label = unread ? t('list.markRead') : t('list.markUnread');
-  const Icon = unread ? MailOpen : Mail;
+  const Icon = unread ? EnvelopeOpen : Envelope;
   const toggle = async () => {
     setBusy(true);
     try {
@@ -549,7 +547,7 @@ export const InquiryListPage = () => {
           title={t('list.exportHint')}
           className={buttonVariants({ variant: 'outline', size: 'sm' })}
         >
-          <Download aria-hidden='true' />
+          <ArrowDownToLine aria-hidden='true' />
           {t('admin.export')}
         </a>
       </div>
@@ -575,7 +573,10 @@ export const InquiryListPage = () => {
                 return (
                   <TabsTab key={view} value={view} data-view={view}>
                     {view === 'spam' ? (
-                      <ShieldAlert aria-hidden='true' className='size-4' />
+                      <ShieldExclamation
+                        aria-hidden='true'
+                        className='size-4'
+                      />
                     ) : null}
                     {t(`list.view.${view}`)}
                     {count !== undefined && count > 0 ? (
@@ -609,7 +610,7 @@ export const InquiryListPage = () => {
           {query.view === 'spam' ? (
             <Notice
               tone='warning'
-              icon={<ShieldAlert aria-hidden='true' />}
+              icon={<ShieldExclamation aria-hidden='true' />}
               data-testid='spam-view-hint'
             >
               <p>{t('list.spamViewHint')}</p>
@@ -619,7 +620,10 @@ export const InquiryListPage = () => {
               data-testid='spam-hint'
               className='flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-muted/70 px-4 py-2.5 text-[0.8125rem] leading-relaxed text-muted-foreground'
             >
-              <ShieldAlert aria-hidden='true' className='size-4 shrink-0' />
+              <ShieldExclamation
+                aria-hidden='true'
+                className='size-4 shrink-0'
+              />
               <span>{t('list.spamHint')}</span>
               <Link
                 to='/'
@@ -706,7 +710,7 @@ export const InquiryListPage = () => {
                 onClick={() => setPendingField(null)}
                 className={buttonVariants({ variant: 'ghost', size: 'sm' })}
               >
-                <FilterX aria-hidden='true' />
+                <FunnelXmark aria-hidden='true' />
                 {t('list.clearFilters')}
               </Link>
             ) : null}
@@ -720,7 +724,7 @@ export const InquiryListPage = () => {
                     'ml-auto',
                   )}
                 >
-                  <Columns3 aria-hidden='true' />
+                  <LayoutColumns3 aria-hidden='true' />
                   {t('list.columns')}
                 </MenuTrigger>
                 <MenuContent className='max-h-80 overflow-y-auto'>
@@ -760,7 +764,7 @@ export const InquiryListPage = () => {
               ) : rows.length === 0 ? (
                 <div className='flex flex-col items-center gap-3 px-6 py-16 text-center'>
                   <div className='flex size-16 items-center justify-center rounded-full bg-accent text-primary'>
-                    <MoonStar aria-hidden='true' className='size-7' />
+                    <Moon aria-hidden='true' className='size-7' />
                   </div>
                   <p className='font-semibold'>
                     {filtered || query.page !== 1
