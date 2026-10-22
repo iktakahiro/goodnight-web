@@ -13,6 +13,7 @@ description: Admins sign in with passkeys through Better Auth. Email and passwor
 - Email and password sign-in is turned off. There is no development bypass, default account, or shared key.
 - The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate. Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. A new set of bindings gets a new instance.
 - Better Auth does not record IP addresses in sessions, and passkey registration and sign-in require user verification (a PIN or biometrics).
+- Sign-in requests are rate-limited per hashed IP address with the same Rate Limiting binding as the contact form. Without that binding or `IP_HASH_SECRET`, sign-in is turned off.
 - Cloudflare Access can be added in front of the admin paths. Passkey sign-in is still required with Access.
 
 ## Why passkeys
