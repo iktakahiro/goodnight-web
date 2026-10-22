@@ -4,7 +4,9 @@
 //
 // Needs Playwright's Chromium (`bunx playwright install chromium`). Uses port
 // 8790 (override with E2E_PORT) and a fresh state directory under
-// .wrangler/e2e-state, so it does not touch other local databases.
+// .wrangler/e2e-state, so it does not touch other local databases. Set
+// E2E_DEBUG_DIR to save a screenshot of each failed step and a Playwright
+// trace (trace.zip, open it with `bunx playwright show-trace`).
 //
 // Covers: contact POST -> row in D1; then the real admin UI: first-admin
 // setup with empty, wrong, and right input -> passkey registration (CDP
@@ -13,6 +15,7 @@
 // change -> Slack-style deep link while signed out -> language switch ->
 // delete with confirmation. Also checks the API rules the UI relies on, and
 // that the UI runs under the admin CSP without violations.
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Page } from 'playwright';
 import {
@@ -25,11 +28,14 @@ import {
   queryDatabase,
   startDevServer,
   testVars,
+  ui,
 } from './support.ts';
+import { e2eCategories } from './categories.ts';
 
 const stateDir = join(packageDir, '.wrangler/e2e-state');
 const port = Number(process.env.E2E_PORT ?? '8790');
 const query = (sql: string) => queryDatabase(stateDir, sql);
+const debugDir = process.env.E2E_DEBUG_DIR;
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -48,8 +54,8 @@ const step = async (name: string, action: () => Promise<unknown>) => {
     check(name, true);
   } catch (error) {
     check(name, false, error instanceof Error ? error.message : String(error));
-    if (process.env.E2E_DEBUG_DIR && currentPage) {
-      const file = join(process.env.E2E_DEBUG_DIR, `${failures}.png`);
+    if (debugDir && currentPage) {
+      const file = join(debugDir, `${failures}.png`);
       await currentPage.screenshot({ path: file, fullPage: true });
       console.log(`  url: ${currentPage.url()} screenshot: ${file}`);
     }
@@ -92,10 +98,12 @@ const gnw = <K extends keyof Gnw>(
     [name, args] as const,
   ) as Promise<Awaited<ReturnType<Gnw[K]>>>;
 
+const [sales] = e2eCategories;
+
 const contactBody = (token: string, name: string) => ({
   name,
   email: 'visitor@example.org',
-  category: 'sales',
+  category: sales.value,
   message: 'Hello from the end-to-end test.\nSecond line.',
   consent: true,
   turnstileToken: token,
@@ -116,9 +124,13 @@ const main = async () => {
 
   const server = await startDevServer({ port, stateDir, vars: testVars });
   const { base } = server;
+  if (debugDir) await mkdir(debugDir, { recursive: true });
   const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ locale: 'en-US' });
+  if (debugDir) {
+    await context.tracing.start({ screenshots: true, snapshots: true });
+  }
   try {
-    const context = await browser.newContext({ locale: 'en-US' });
     const page = await context.newPage();
     currentPage = page;
     const authenticator = await addVirtualAuthenticator(context, page);
@@ -197,36 +209,44 @@ const main = async () => {
       await page.goto(`${base}/admin`);
       await page.waitForURL(`${base}/admin/setup`);
       await page
-        .getByRole('heading', { name: 'Create the first admin' })
+        .getByRole('heading', { name: ui('en', 'admin.setup.title') })
         .waitFor();
     });
     const submitSetup = async (token: string, email: string) => {
-      await page.getByLabel('Setup token').fill(token);
-      await page.getByLabel('Email address').fill(email);
-      await page.getByRole('button', { name: 'Continue' }).click();
+      await page.getByLabel(ui('en', 'admin.setup.token')).fill(token);
+      await page.getByLabel(ui('en', 'admin.setup.email')).fill(email);
+      await page
+        .getByRole('button', { name: ui('en', 'setup.continue') })
+        .click();
     };
     await step('setup checks the fields before sending', async () => {
-      await page.getByRole('button', { name: 'Continue' }).click();
-      await page.getByText('Required.').nth(1).waitFor();
-      await page.getByLabel('Email address').fill('not-an-address');
-      await page.getByText('Check this field.').waitFor();
-      await page.getByLabel('Email address').fill('');
+      await page
+        .getByRole('button', { name: ui('en', 'setup.continue') })
+        .click();
+      await page.getByText(ui('en', 'field.required')).nth(1).waitFor();
+      await page
+        .getByLabel(ui('en', 'admin.setup.email'))
+        .fill('not-an-address');
+      await page.getByText(ui('en', 'field.invalid')).waitFor();
+      await page.getByLabel(ui('en', 'admin.setup.email')).fill('');
     });
     await step('setup shows the wrong-token error', async () => {
       await submitSetup('wrong-token', ADMIN_EMAIL);
-      await page.getByText('The setup token is not correct.').waitFor();
+      await page.getByText(ui('en', 'error.invalid_setup_token')).waitFor();
     });
     await step('setup shows the email-not-allowed error', async () => {
       await submitSetup(SETUP_TOKEN, 'other@example.com');
-      await page
-        .getByText('This email address is not in ADMIN_EMAILS.')
-        .waitFor();
+      await page.getByText(ui('en', 'error.email_not_allowed')).waitFor();
     });
     await step('setup accepts the token and an allowed address', async () => {
-      await page.getByLabel('Your name').fill('Admin');
+      await page.getByLabel(ui('en', 'admin.setup.name')).fill('Admin');
       await submitSetup(SETUP_TOKEN, 'Admin@Example.com');
-      await page.getByRole('button', { name: 'Register a passkey' }).click();
-      await page.getByRole('heading', { name: 'Setup is complete' }).waitFor();
+      await page
+        .getByRole('button', { name: ui('en', 'admin.setup.registerPasskey') })
+        .click();
+      await page
+        .getByRole('heading', { name: ui('en', 'setup.doneTitle') })
+        .waitFor();
     });
     const credentials = await authenticator.credentials();
     check(
@@ -236,10 +256,17 @@ const main = async () => {
     );
 
     await step('setup leads to the list with the unread count', async () => {
-      await page.getByRole('button', { name: 'Open inquiries' }).click();
+      await page
+        .getByRole('button', { name: ui('en', 'setup.goToList') })
+        .click();
       await page.waitForURL(`${base}/admin`);
-      await page.getByRole('heading', { name: 'Inquiries' }).waitFor();
-      await page.getByTestId('unread-count').getByText('1 unread').waitFor();
+      await page
+        .getByRole('heading', { name: ui('en', 'list.title') })
+        .waitFor();
+      await page
+        .getByTestId('unread-count')
+        .getByText(ui('en', 'admin.unreadCount', { count: 1 }))
+        .waitFor();
     });
     await step('Slack is optional: only a quiet note', async () => {
       await page.getByTestId('slack-notice').waitFor();
@@ -252,14 +279,16 @@ const main = async () => {
       // The flag applies from the next page load.
       await setAutofill(false);
       await page.reload();
-      await page.getByRole('button', { name: 'Sign out' }).click();
+      await page
+        .getByRole('button', { name: ui('en', 'admin.signOut') })
+        .click();
       await page.waitForURL(`${base}/admin/login`);
       await page
-        .getByRole('heading', { name: 'Sign in to the admin screen' })
+        .getByRole('heading', { name: ui('en', 'login.title') })
         .waitFor();
     });
     await step('the sign-in screen does not link to closed setup', async () => {
-      await page.getByText('Only people who registered a passkey').waitFor();
+      await page.getByText(ui('en', 'login.setupNote')).waitFor();
       if (await page.getByTestId('setup-open').count()) {
         throw new Error('setup link shown after setup closed');
       }
@@ -272,7 +301,7 @@ const main = async () => {
 
     await step('passkey sign-in with the button opens the list', async () => {
       await page
-        .getByRole('button', { name: 'Sign in with a passkey' })
+        .getByRole('button', { name: ui('en', 'admin.signIn') })
         .click();
       await page.waitForURL(`${base}/admin`);
     });
@@ -280,25 +309,31 @@ const main = async () => {
       const row = page.getByTestId('inquiry-row').filter({
         hasText: 'E2E Visitor',
       });
-      await row.getByText('New').waitFor();
-      await row.getByText('Sales', { exact: true }).waitFor();
+      await row.getByText(ui('en', 'status.new')).waitFor();
+      await row.getByText(sales.label.en, { exact: true }).waitFor();
       await row.getByText('Hello from the end-to-end test.').waitFor();
     });
 
     await step('an invalid list URL falls back to the defaults', async () => {
       await page.goto(`${base}/admin?status=deleted&page=abc`);
-      await page.getByRole('tab', { name: 'All', selected: true }).waitFor();
+      await page
+        .getByRole('tab', { name: ui('en', 'list.filter.all'), selected: true })
+        .waitFor();
       await page.getByTestId('inquiry-row').first().waitFor();
     });
     await step('the status tab is kept in the URL', async () => {
-      await page.getByRole('tab', { name: 'New' }).click();
+      await page.getByRole('tab', { name: ui('en', 'status.new') }).click();
       await page.waitForURL(`${base}/admin?status=new`);
       await page.getByTestId('inquiry-row').first().waitFor();
     });
     await step('an unknown admin path shows not found', async () => {
       await page.goto(`${base}/admin/nope`);
-      await page.getByRole('heading', { name: 'Page not found' }).waitFor();
-      await page.getByRole('link', { name: 'Back to inquiries' }).click();
+      await page
+        .getByRole('heading', { name: ui('en', 'app.notFound.title') })
+        .waitFor();
+      await page
+        .getByRole('link', { name: ui('en', 'app.backToList') })
+        .click();
       await page.waitForURL(`${base}/admin`);
     });
 
@@ -310,13 +345,23 @@ const main = async () => {
         .getByTestId('inquiry-body')
         .getByText('Second line.')
         .waitFor();
-      await page.getByTestId('status-select').getByText('Read').waitFor();
-      await page.getByTestId('unread-count').getByText('0 unread').waitFor();
+      await page
+        .getByTestId('status-select')
+        .getByText(ui('en', 'status.read'))
+        .waitFor();
+      await page
+        .getByTestId('unread-count')
+        .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
+        .waitFor();
     });
     await step('status change to Done', async () => {
       await page.getByTestId('status-select').click();
-      await page.getByRole('option', { name: 'Done' }).click();
-      await page.getByText('Status changed to “Done”.').waitFor();
+      await page.getByRole('option', { name: ui('en', 'status.done') }).click();
+      await page
+        .getByText(
+          ui('en', 'detail.statusChanged', { status: ui('en', 'status.done') }),
+        )
+        .waitFor();
     });
     const afterChange = await query(
       `SELECT status FROM submissions WHERE id = '${id}'`,
@@ -327,12 +372,14 @@ const main = async () => {
       afterChange,
     );
     await step('back to the list keeps working', async () => {
-      await page.getByRole('button', { name: 'Back to inquiries' }).click();
+      await page
+        .getByRole('button', { name: ui('en', 'app.backToList') })
+        .click();
       await page.waitForURL(`${base}/admin`);
       await page
         .getByTestId('inquiry-row')
         .filter({ hasText: 'E2E Visitor' })
-        .getByText('Done')
+        .getByText(ui('en', 'status.done'))
         .waitFor();
     });
 
@@ -391,25 +438,31 @@ const main = async () => {
     );
 
     await step('language switch to Japanese is kept after reload', async () => {
-      await page.getByRole('button', { name: /^Language/ }).click();
-      await page.getByRole('menuitemradio', { name: '日本語' }).click();
+      await page.getByTestId('language-switch').click();
       await page
-        .getByRole('button', { name: 'お問い合わせ一覧に戻る' })
+        .getByRole('menuitemradio', { name: ui('ja', 'language.ja') })
+        .click();
+      await page
+        .getByRole('button', { name: ui('ja', 'app.backToList') })
         .waitFor();
       await page.reload();
       await page
-        .getByRole('button', { name: 'お問い合わせ一覧に戻る' })
+        .getByRole('button', { name: ui('ja', 'app.backToList') })
         .waitFor();
-      await page.getByText('製品・料金について').first().waitFor();
+      await page.getByText(sales.label.ja).first().waitFor();
     });
 
     await step('delete asks for confirmation, then removes it', async () => {
-      await page.getByRole('button', { name: '削除', exact: true }).click();
+      await page
+        .getByRole('button', { name: ui('ja', 'admin.delete'), exact: true })
+        .click();
       const dialog = page.getByRole('alertdialog');
-      await dialog.getByText('このお問い合わせを削除しますか？').waitFor();
-      await dialog.getByRole('button', { name: '削除する' }).click();
+      await dialog.getByText(ui('ja', 'detail.deleteTitle')).waitFor();
+      await dialog
+        .getByRole('button', { name: ui('ja', 'detail.deleteConfirm') })
+        .click();
       await page.waitForURL(`${base}/admin`);
-      await page.getByText('お問い合わせはまだありません。').waitFor();
+      await page.getByText(ui('ja', 'admin.empty')).waitFor();
     });
     const remaining = await query('SELECT COUNT(*) AS n FROM submissions');
     check('the row is deleted', remaining[0]?.n === 0, remaining);
@@ -426,6 +479,9 @@ const main = async () => {
       cspViolations,
     );
   } finally {
+    if (debugDir) {
+      await context.tracing.stop({ path: join(debugDir, 'trace.zip') });
+    }
     await browser.close();
     await server.stop();
   }

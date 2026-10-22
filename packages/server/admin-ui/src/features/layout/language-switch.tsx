@@ -18,6 +18,7 @@ export const LanguageSwitch = ({ className }: { className?: string }) => {
   return (
     <Menu>
       <MenuTrigger
+        data-testid='language-switch'
         aria-label={`${t('admin.language')}: ${t(`language.${locale}`)}`}
         className={cn(
           buttonVariants({ variant: 'ghost', size: 'sm' }),

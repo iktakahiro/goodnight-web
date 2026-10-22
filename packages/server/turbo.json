@@ -5,7 +5,8 @@
     "build": {
       "outputs": [
         "admin-ui/dist/**",
-        "src/features/admin-ui/admin-files.gen.ts"
+        "src/features/admin-ui/admin-files.gen.ts",
+        "src/features/admin-ui/admin-messages.gen.json"
       ]
     },
     "type-check": {

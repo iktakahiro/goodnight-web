@@ -4,6 +4,11 @@
 import { rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { BrowserContext, Page } from 'playwright';
+import {
+  uiMessages,
+  type UiMessageKey,
+} from '../admin-ui/src/shared/i18n/admin-messages.ts';
+import type { Locale } from '../src/shared/messages.ts';
 
 export const packageDir = resolve(import.meta.dir, '..');
 export const wranglerConfig = join(packageDir, 'e2e/wrangler.jsonc');
@@ -19,6 +24,20 @@ export const testVars: Readonly<Record<string, string>> = {
   IP_HASH_SECRET: 'e2e-ip-hash-secret',
   TURNSTILE_SECRET: 'e2e-turnstile-secret',
 };
+
+/**
+ * An admin UI string from the message catalog, with `{name}` placeholders
+ * filled. Tests find buttons and headings by these strings, so copy edits do
+ * not break them.
+ */
+export const ui = (
+  locale: Locale,
+  key: UiMessageKey,
+  params: Readonly<Record<string, string | number>> = {},
+): string =>
+  uiMessages[locale][key].replace(/\{(\w+)\}/g, (match, name: string) =>
+    String(params[name] ?? match),
+  );
 
 /** Runs a wrangler command in the package and returns its stdout. */
 export const runWrangler = async (args: string[]): Promise<string> => {

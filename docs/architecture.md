@@ -391,7 +391,9 @@ the Worker a token that can write to GitHub.
 - CI runs install with a frozen lockfile, lint, format check, type check,
   the SQL guard (`check:sql`), the migration check (`db:check`), tests,
   build, and `deploy:check`. `bun run validate` runs the same checks except
-  build and `deploy:check`.
+  build and `deploy:check`. A separate `e2e` job builds and runs the
+  end-to-end tests of `packages/server` and `templates/starter` with
+  Playwright Chromium, and uploads screenshots and traces when they fail.
 - Dependencies use exact versions and a 48-hour release-age gate
   (`bunfig.toml`); Dependabot uses a two-day cooldown.
 - `bunfig.toml` pins `linker = "isolated"`, so each workspace gets its own
@@ -425,7 +427,9 @@ the Worker a token that can write to GitHub.
   switch; and delete with confirmation. It also checks the API rules the UI
   relies on and fails on any CSP violation. The test Worker stubs Turnstile
   siteverify, so it calls no Cloudflare service. It needs
-  `bunx playwright install chromium` and is not run in CI yet.
+  `bunx playwright install chromium`. Buttons, labels, and headings are found
+  by role and by strings from the admin message catalog, so copy edits do not
+  break the test. CI runs it in the `e2e` job.
 - `bun run screenshots <dir>` in `packages/server` takes screenshots of the
   admin UI in Japanese and English with fictional sample inquiries, using the
   same local setup.
