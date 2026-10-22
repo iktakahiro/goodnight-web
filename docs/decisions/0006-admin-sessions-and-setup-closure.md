@@ -52,8 +52,9 @@ end-to-end test runs the same flow in Chromium.
 - **Only delete sessions, without the time check in `requireAdmin`.** The
   delete runs in the registration hook, before the plugin inserts the
   passkey. A setup request that lands between the two would create a session
-  that survives. The time check closes that gap and also covers sessions that
-  a future code path forgets to delete.
+  that survives. The time check rejects such a session when it is older than
+  the passkey, and it also covers sessions that a future code path forgets to
+  delete. It does not close the window completely (see Consequences).
 
 ## Consequences
 
@@ -62,3 +63,14 @@ end-to-end test runs the same flow in Chromium.
 - A second admin cannot be added after setup has closed. The docs say so.
 - Passkey rows without `created_at` do not count for `requireAdmin`; the
   passkey plugin always sets it.
+- Known gap (found by the post-fix verification of 2026-10-22). Closing setup
+  is not atomic: the hook deletes sessions and checks that setup is open
+  before the passkey row is written. A `POST /api/setup` that lands inside
+  that window can still create a session that passes `requireAdmin`, and two
+  first-passkey registrations for different allowed addresses that overlap
+  can both succeed. It needs `SETUP_TOKEN` before setup closes and timing
+  within the owner's registration request; the verifier reproduced it only
+  with an artificially delayed insert. A follow-up should claim
+  `setup_closed_at` atomically before deleting sessions, re-check it after
+  setup creates its session, and apply the session-time rule when a user who
+  already has a passkey registers another.
