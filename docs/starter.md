@@ -4,25 +4,28 @@ The starter is the Astro site that users copy and own. This document is for
 maintainers. The user-facing rules are in the starter's own `AGENTS.md` and
 `README.md`.
 
-Status: phase 1. The site, content, form UI, and GitHub files are in place.
-`src/worker.ts`, the Worker bindings in `wrangler.jsonc`, the contact form
-submission, and end-to-end tests are added after `@goodnight-web/server`
-exists.
+The starter depends on `@goodnight-web/server` through `workspace:*`. Its
+`src/worker.ts` calls `createGoodnightWorker()`, and `wrangler.jsonc` has the
+bindings the server needs.
 
 ## Layout
 
-| Path                                     | Contents                                                                    |
-| ---------------------------------------- | --------------------------------------------------------------------------- |
-| `site.config.ts`                         | Company details, nav, locales, theme colors, Turnstile site key, categories |
-| `src/pages/[...lang]/`                   | Every localized page, built once per locale                                 |
-| `src/pages/404.astro`                    | One 404 page with all languages                                             |
-| `src/content/{news,blog,pages}/<ja,en>/` | Markdown content, one folder per locale                                     |
-| `src/features/contact/`                  | Contact form markup, browser script, and the submit placeholder             |
-| `src/features/posts/`                    | News and blog lists, detail page, and collection helpers                    |
-| `src/components/ui/`                     | Small shadcn-style components written as `.astro` files                     |
-| `src/components/site/`                   | Header, footer, language switcher, page header                              |
-| `src/i18n/`                              | Locale helpers and shared UI strings                                        |
-| `.github/`                               | Dependabot config, Update check and Visibility check workflows              |
+| Path                                     | Contents                                                                       |
+| ---------------------------------------- | ------------------------------------------------------------------------------ |
+| `site.config.ts`                         | Company details, nav, locales, theme colors, contact categories                |
+| `src/worker.ts`                          | The `createGoodnightWorker()` call                                             |
+| `wrangler.jsonc`                         | Assets, `run_worker_first`, `DB`, `CONTACT_RATE_LIMITER`, `TURNSTILE_SITE_KEY` |
+| `.dev.vars.example`                      | Every secret with a comment; the Deploy button reads it                        |
+| `e2e/`                                   | End-to-end test (`run.ts`) and the test-only Worker (`worker.ts`)              |
+| `src/pages/[...lang]/`                   | Every localized page, built once per locale                                    |
+| `src/pages/404.astro`                    | One 404 page with all languages                                                |
+| `src/content/{news,blog,pages}/<ja,en>/` | Markdown content, one folder per locale                                        |
+| `src/features/contact/`                  | Contact form markup and its browser script                                     |
+| `src/features/posts/`                    | News and blog lists, detail page, and collection helpers                       |
+| `src/components/ui/`                     | Small shadcn-style components written as `.astro` files                        |
+| `src/components/site/`                   | Header, footer, language switcher, page header                                 |
+| `src/i18n/`                              | Locale helpers and shared UI strings                                           |
+| `.github/`                               | Dependabot config, Update check and Visibility check workflows                 |
 
 There is no React in the starter. The only browser scripts are the mobile
 menu toggle and the contact form script. Base UI or React islands should be
@@ -45,20 +48,56 @@ added only when a page needs real interactivity.
 - The 404 page shows every language because a static 404 cannot know the
   visitor's language.
 
+## Worker and bindings
+
+- `src/worker.ts` passes `locale: siteConfig.defaultLocale` and the category
+  values from `site.config.ts` to `createGoodnightWorker()`, so the allowed
+  categories are configured in one place.
+- `wrangler.jsonc`: `main: src/worker.ts`, `compatibility_date` 2026-10-15
+  with `nodejs_compat` (as in the server's e2e config), assets from `./dist`
+  with `binding: ASSETS`, `not_found_handling: 404-page`, and
+  `run_worker_first: ["/api/*", "/admin", "/admin/*"]`
+  ([0004](decisions/0004-admin-ui-delivery.md)); D1 `DB` with
+  `migrations_dir: node_modules/@goodnight-web/server/migrations`
+  ([0002](decisions/0002-migrations-from-package.md)); the Rate Limiting
+  binding `CONTACT_RATE_LIMITER` (5 per 60 s, namespace `1001`,
+  [0003](decisions/0003-rate-limit-binding.md)); and the variable
+  `TURNSTILE_SITE_KEY`, empty by default.
+- The D1 binding has no `database_id`. `wrangler dev`, `d1 migrations apply
+  --local`, and `deploy --dry-run` work without it. That the Deploy button
+  creates the database and fills in the ID is not verified yet (M2).
+- Secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`,
+  `IP_HASH_SECRET`, `TURNSTILE_SECRET`, optional `SLACK_WEBHOOK_URL`) are
+  listed with comments in `.dev.vars.example`. `package.json`
+  `cloudflare.bindings` has a Markdown description in Japanese and English
+  for each secret, variable, and binding, for the Deploy button form.
+- Scripts: `deploy` is `wrangler d1 migrations apply DB --remote && wrangler
+  deploy`; `deploy:check` is `wrangler deploy --dry-run` (CI runs it through
+  `turbo run deploy:check`); `preview` builds, applies migrations locally,
+  and runs `wrangler dev`.
+
 ## Contact form
 
-- Field names: `name`, `email`, `company`, `phone`, `category`, `body`,
-  `consent`, and the honeypot `website`. The Turnstile widget uses
-  `data-action="contact"`, so the server can check `action`.
-- When `turnstileSiteKey` is empty, the page shows "not available yet" and no
-  form. This mirrors the server, which returns 503 without
-  `TURNSTILE_SECRET`.
-- `src/features/contact/submit-contact.ts` is a placeholder that always
-  returns `unavailable`. Phase 2 replaces it with the client helper from
-  `@goodnight-web/server`.
-- Categories come from `site.config.ts`. `notify: false` (used for "sales
-  proposal") is meant for the server's Slack notification; the server option
-  does not exist yet.
+- The page renders the form hidden. The script
+  (`src/features/contact/contact-form-client.ts`) calls `getContactConfig()`
+  from `@goodnight-web/server/client`. When `available` is false (or the
+  request fails), it shows the "not available yet" notice with the company's
+  email and phone. Otherwise it loads Turnstile with `render=explicit` and
+  renders the widget with the site key and action from the config. The site
+  key is set only in `wrangler.jsonc`; the static pages never contain it.
+- Field names match `contactRequestSchema`: `name`, `email`, `company`,
+  `phone`, `category`, `message`, `consent`, and the honeypot `website`.
+  `maxlength` values come from `CONTACT_FIELD_LIMITS` at build time.
+- On submit the script checks the fields with the browser's constraint
+  validation, then sends them with `submitContact()`, adding the Turnstile
+  token, `elapsedMs`, and `pagePath`. Results: success (thank-you panel),
+  `invalid_input` (per-field messages from `fields`), `turnstile_failed`,
+  `rate_limited`, `contact_unavailable` (switches to the notice), and any
+  other error. The Turnstile widget is reset after every failed attempt
+  because tokens are single-use. Messages are the starter's own ja/en texts
+  in `contact-form.astro`.
+- Without JavaScript the page shows a `noscript` note with the other ways to
+  get in touch; the form never posts as `application/x-www-form-urlencoded`.
 
 ## Update check workflow
 
@@ -77,28 +116,26 @@ hidden marker `<!-- goodnight-web:update-check -->` and the
   `dependabot[bot]` with type `Bot`; the head repository is the base
   repository; the changed files are only root `package.json`,
   `package-lock.json`, `bun.lock`, or `pnpm-lock.yaml`, all with status
-  `modified`; every changed `package.json` line is an `@goodnight-web/*`
-  entry set to a version number; and every changed lockfile line belongs to
-  an `@goodnight-web/*` package. Anything that cannot be checked (for
-  example a diff that GitHub leaves out because it is too large) is not
-  official.
-- Lockfile lines are attributed to a package by name (`"node_modules/x"`,
-  bun.lock `["x@1.2.3", ...]` values, pnpm keys) or, for lines such as
-  `"version"` and `resolution`, by the nearest package entry above them in
-  the same hunk.
+  `modified`; `package.json` is one of them; and every changed
+  `package.json` line is an `@goodnight-web/*` entry set to a version
+  number. If GitHub leaves out the `package.json` diff, the pull request is
+  not official.
+- Lockfile contents are not checked (decision by the dev lead, 2026-10-22).
+  A new `@goodnight-web/server` version can change its own dependencies (for
+  example `hono`), and those changes appear only in the lockfile. The
+  site's direct dependencies are in `package.json`, which is checked line by
+  line. Dependabot generates the lockfile from the registry, and a pull
+  request from a fork or another author is never official.
 - Tests: `templates/starter/.github/scripts/update-check.test.ts`, run by the
   root `bun run test`. The root `tsconfig.json` type-checks the module with
   `checkJs`.
 
 Known limits:
 
-- A `@goodnight-web/server` release that changes its own dependencies also
-  changes those packages in the user's lockfile (for example `hono`). Such a
-  pull request gets the warning comment. Deciding whether to accept changes
-  that come from the server's dependency tree is open.
 - Not tested on GitHub yet: `pull_request_target` for Dependabot pull
   requests with `pull-requests: write`, and the comment flow.
-- The workflow pins `actions/checkout` and `actions/github-script` by SHA.
+- The workflow pins `actions/checkout` (v7.0.1) and `actions/github-script`
+  by SHA.
   The starter's Dependabot config covers npm only, so these pins do not get
   update pull requests in user repositories.
 
@@ -128,4 +165,36 @@ has to:
 - generate a `package-lock.json`, because users install with npm and
   Dependabot's npm ecosystem reads it;
 - leave out `*.test.ts` files from `.github/scripts`;
+- decide whether `e2e/` and the `playwright` dev dependency ship to users
+  (they are useful for AI tools that change the contact form);
 - keep the repository name in `visibility-check.yml` in step.
+
+## End-to-end test
+
+`bun run test:e2e` in `templates/starter` (`node e2e/run.ts`; it uses only
+Node APIs so users can run it with npm) builds the site, applies the
+migrations from `node_modules/@goodnight-web/server/migrations` to a fresh
+local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
+`E2E_PORT` (default 8791). Every secret is passed with `--var`, so a local
+`.dev.vars` does not change the result.
+
+1. `src/worker.ts` without Turnstile keys: the home page in ja and en, the
+   contact page shows "not available yet", `GET /api/contact/config` says
+   `available: false`, `POST /api/contact` answers 503, and `/admin` returns
+   the admin UI (HTML with a CSP header) from the Worker.
+2. `src/worker.ts` with Cloudflare's Turnstile test keys: the widget gives a
+   token, and the server rejects it, because siteverify answers the test
+   secret with `hostname: "example.com"` and no `action`
+   (`metadata.result_with_testing_key: true`; checked with `curl` on
+   2026-10-22). Nothing is stored.
+3. `e2e/worker.ts` with the test keys. It wraps `src/worker.ts` and, only for
+   siteverify answers marked `result_with_testing_key`, sets `hostname` to
+   the request's hostname and `action` to `contact`. The production check is
+   unchanged. The test checks the ja validation messages, waits 3.5 s (the
+   server holds faster submissions as `too_fast`), submits, and reads the row
+   with `wrangler d1 execute DB --local`: name, email, category, message,
+   `status = new`, `page_path`, and a 64-character hex `ip_hash`.
+
+`E2E_SCREENSHOT_DIR` saves screenshots. The test needs
+`npx playwright install chromium` and network access to
+`challenges.cloudflare.com`. It is not run in CI.

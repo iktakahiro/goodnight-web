@@ -11,8 +11,9 @@ Cloudflare Worker with one D1 database.
 ## What you may edit
 
 - `site.config.ts`: company name, address, phone, email, the company profile
-  table, navigation, theme colors, the Turnstile site key, and the contact
-  form categories.
+  table, navigation, theme colors, and the contact form categories.
+- `wrangler.jsonc`: only the value of `vars.TURNSTILE_SITE_KEY` (the public
+  Turnstile site key) and the Worker `name`.
 - `src/pages/`: the pages. Pages in `src/pages/[...lang]/` are built once per
   language. Each page keeps its Japanese and English text side by side in a
   `text` object at the top of the file.
@@ -26,23 +27,27 @@ Cloudflare Worker with one D1 database.
 ## What you must not change
 
 - `src/worker.ts`: keep the `createGoodnightWorker(...)` call as it is.
-- `wrangler.jsonc`: do not rename the bindings (`DB`, the rate limit binding,
-  `ASSETS`), and do not remove `/api/*`, `/admin`, or `/admin/*` from
-  `run_worker_first`. The contact form and the admin screen stop working
-  without them.
+- `wrangler.jsonc`: do not rename the bindings (`DB`, `CONTACT_RATE_LIMITER`,
+  `ASSETS`), do not change `migrations_dir`, and do not remove `/api/*`,
+  `/admin`, or `/admin/*` from `run_worker_first`. The contact form and the
+  admin screen stop working without them.
+- `e2e/`: the end-to-end test. `e2e/worker.ts` is for the test only; never
+  use it as the site's Worker.
 - `@goodnight-web/*` packages: do not edit files in `node_modules`, do not
   copy their code into this repository, and do not change their version by
   hand. Updates arrive as pull requests from Dependabot.
 - `.github/workflows/` and `.github/scripts/`: these check update pull
   requests and the repository visibility.
 - The field names in the contact form (`name`, `email`, `company`, `phone`,
-  `category`, `body`, `consent`, and the hidden `website`). The server reads
-  them. You may change labels, order, and styles.
+  `category`, `message`, `consent`, and the hidden `website`) and the
+  `data-*` attributes in `src/features/contact/contact-form.astro`. The
+  server and the form script read them. You may change labels, order, and
+  styles.
 - Do not run `wrangler d1 migrations create`. Database migrations ship inside
   `@goodnight-web/server`.
 - Do not add secrets, API keys, or passwords to any file. Secrets are set in
-  the Cloudflare dashboard. The Turnstile site key in `site.config.ts` is
-  public and is the only key that belongs in the code.
+  the Cloudflare dashboard. The Turnstile site key (`TURNSTILE_SITE_KEY` in
+  `wrangler.jsonc`) is public and is the only key that belongs in the code.
 
 ## Japanese and English
 
@@ -66,12 +71,22 @@ npm run check
 npm run build
 ```
 
-To look at the site, run `npm run dev` and open the URL it prints.
+To look at the site, run `npm run dev` and open the URL it prints. The
+contact form and the admin screen need the Worker: run `npm run preview`
+(it reads secrets from `.dev.vars`; see `.dev.vars.example`).
+
+When you change the contact form, the Worker, or `wrangler.jsonc`, also run
+`npm run test:e2e` (it needs `npx playwright install chromium` once and
+network access to Cloudflare Turnstile).
 
 ## Updates and pull requests
 
 - Merge only pull requests that have the "official goodnight-web update"
-  comment from the Update check workflow. If a pull request has the warning
+  comment from the Update check workflow. The workflow gives that comment
+  only to a Dependabot pull request from this repository that changes only
+  `package.json` and the lockfile, and only `@goodnight-web/*` versions in
+  `package.json`. The lockfile may also change packages that
+  `@goodnight-web/*` uses. If a pull request has the warning
   comment, do not merge it unless a person who understands the change has
   reviewed it.
 - Do not merge pull requests on your own. Tell the person what the pull

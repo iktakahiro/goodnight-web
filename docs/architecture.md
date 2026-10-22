@@ -255,7 +255,8 @@ workflow that fails while the repository is public. See
 [starter.md](starter.md).
 
 In this repository the starter depends on `@goodnight-web/server` through
-`workspace:*`. When the starter is copied out for users (planned for M2), that
+`workspace:*`. Its contact form uses `getContactConfig()` and
+`submitContact()` and gets the Turnstile site key from the config API. When the starter is copied out for users (planned for M2), that
 dependency is replaced with the published exact version.
 
 ## How updates reach users
@@ -314,6 +315,10 @@ the Worker a token that can write to GitHub.
   and the admin API. The test Worker stubs Turnstile siteverify, so it calls
   no Cloudflare service. It needs `bunx playwright install chromium` and is
   not run in CI yet.
+- `bun run test:e2e` in `templates/starter` runs the starter against
+  `wrangler dev` with Cloudflare's Turnstile test keys: pages, the
+  not-available state and 503, `/admin`, and a form submission saved to D1.
+  See [starter.md](starter.md#end-to-end-test).
 - `deploy:check` for the server package runs `wrangler deploy --dry-run` on
   the e2e Worker to check that the package bundles for Workers.
 

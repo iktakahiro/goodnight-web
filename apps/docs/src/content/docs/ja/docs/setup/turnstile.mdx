@@ -41,11 +41,15 @@ goodnight-web は安全側に倒します。Turnstile がないと、問い合�
 npx wrangler secret put TURNSTILE_SECRET
 ```
 
-<Callout type='warn' title='下書き / 未検証'>
-  サーバーはサイトキーを `TURNSTILE_SITE_KEY` から読みます。starter
-  はまだ書いていないので、starter のどこで設定するか（たとえば `wrangler.jsonc`
-  の `vars`）は、starter ができたら確かめて書きます。
-</Callout>
+starter では、サイトキーを `wrangler.jsonc` に書きます。変更をコミットすると、次のデプロイで反映されます。
+
+```jsonc
+"vars": {
+  "TURNSTILE_SITE_KEY": "0x4AAAAAAA...",
+},
+```
+
+設定する場所はここだけです。お問い合わせページにはキーを書かず、Worker から読み込みます。ダッシュボードだけで設定した値は、次のデプロイで `wrangler.jsonc` の値に置き換わります。`wrangler deploy` がファイルの変数をアップロードするためです。
 
 ## Worker が確認すること
 
@@ -59,7 +63,7 @@ Worker は送信のたびに、フォームから届いたトークンを siteve
 
 ## ローカルでの開発
 
-`wrangler dev` では、本物のキーではなく Cloudflare のテスト用キーを使います（[Cloudflare: テスト](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）。次の組み合わせは必ず成功します。
+`wrangler dev` では、本物のキーではなく Cloudflare のテスト用キーを使います（[Cloudflare: テスト](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）。この組み合わせでは、ウィジェットは必ず成功し、siteverify はどのトークンも受け付けます。
 
 ```txt
 site key:   1x00000000000000000000AA
@@ -67,3 +71,15 @@ secret key: 1x0000000000000000000000000000000AA
 ```
 
 テスト用キーは本番のサイトで使わないでください。すべてのリクエストを通してしまいます。
+
+テスト用のシークレットキーでは、siteverify は `hostname` を `example.com` とし、`action` を返しません（2026-10-22 に確認）。
+
+```json
+{
+  "success": true,
+  "hostname": "example.com",
+  "metadata": { "result_with_testing_key": true }
+}
+```
+
+Worker はこの2つを確認するので、テスト用キーでの送信を拒否し、フォームには確認に失敗したと表示されます。これは意図したものです。ローカルの開発のために本番の確認を変えることはしません。starter のエンドツーエンドのテスト（`npm run test:e2e`）は、この拒否が起きることを確かめます。そのうえで、テスト専用の Worker `e2e/worker.ts` を起動します。この Worker は `result_with_testing_key` が付いた応答に限って `hostname` と `action` を期待どおりの値にし、フォームの送信から D1 への保存までを確かめます。このファイルはデプロイしないでください。
