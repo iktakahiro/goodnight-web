@@ -1,5 +1,16 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { and, asc, count, desc, eq, lt, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { getDatabase } from '../../db/database.ts';
 import { submissions } from '../../db/schema.ts';
 import { isFieldId } from '../contact-form/form-definition.ts';
@@ -95,11 +106,18 @@ export interface SubmissionFilter {
   status?: SubmissionStatus | undefined;
   /** Only this form version. */
   formVersion?: number | undefined;
+  /** Only form versions up to and including this one. */
+  maxFormVersion?: number | undefined;
   /** Only submissions whose select or radio field has this option value. */
   choice?: { fieldId: string; value: string } | undefined;
 }
 
-const filterWhere = ({ status, formVersion, choice }: SubmissionFilter) => {
+const filterWhere = ({
+  status,
+  formVersion,
+  maxFormVersion,
+  choice,
+}: SubmissionFilter) => {
   let choiceIs: SQL | undefined;
   if (choice) {
     // Defense in depth: the route already took the id from the definition.
@@ -112,6 +130,9 @@ const filterWhere = ({ status, formVersion, choice }: SubmissionFilter) => {
     formVersion === undefined
       ? undefined
       : eq(submissions.formVersion, formVersion),
+    maxFormVersion === undefined
+      ? undefined
+      : lte(submissions.formVersion, maxFormVersion),
     choiceIs,
   );
 };

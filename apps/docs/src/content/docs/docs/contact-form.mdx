@@ -132,6 +132,7 @@ The CSV has the fixed columns (`id`, `received_at`, `status`, `email`, `locale`,
 - Select, radio, and checkbox values are written as option labels.
 - Every text cell that starts like a spreadsheet formula (`=`, `+`, `-`, `@`, or a tab) gets a leading `'`.
 - The file is streamed in batches of rows, so a large table is never held in memory.
+- The export holds the rows sent with the form version that was current when it started, and older ones. If someone saves a new version during the export, inquiries sent with that version are left out, because the header has no columns for its new fields. They appear in the next export.
 
 ## How the contact page gets the form
 

@@ -432,6 +432,48 @@ describe('CSV export', () => {
     expect(await csv('?field=f_category&value=press')).toHaveLength(2);
   });
 
+  test('leaves rows of a version saved during the export for the next one', async () => {
+    const pause = worker.pauseAt(/^select .* from "submissions"/s);
+    const response = await get('/api/admin/submissions.csv?lang=en');
+    expect(response.status).toBe(200);
+    const text = response.text();
+    await pause.reached;
+    const { current } = (await json('/api/admin/form')) as AdminFormState;
+    const saved = await worker.fetch('/api/admin/form', {
+      method: 'PUT',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        baseVersion: current.version,
+        fields: [
+          ...current.definition.fields.map(editable),
+          {
+            type: 'text',
+            label: { ja: '部署', en: 'Department' },
+            required: false,
+          },
+        ],
+      }),
+    });
+    expect(saved.status).toBe(200);
+    const v3: AdminFormState = await saved.json();
+    const departmentId = v3.current.definition.fields.at(-1)!.id;
+    await seed('during', {
+      formVersion: v3.current.version,
+      fields: { f_name: 'During Export', [departmentId]: 'Sales' },
+    });
+    pause.release();
+    const lines = (await text).split('\r\n').filter((line) => line !== '');
+    expect(lines[0]).not.toContain('"Department"');
+    expect(lines.some((line) => line.startsWith('"during"'))).toBe(false);
+    expect(lines.some((line) => line.startsWith('"new"'))).toBe(true);
+
+    const next = await csv('?lang=en');
+    expect(next[0]).toContain('"Department"');
+    expect(next.find((line) => line.startsWith('"during"'))).toContain(
+      '"Sales"',
+    );
+  });
+
   test.each([
     '=HYPERLINK("https://evil.example")',
     '+1+1',

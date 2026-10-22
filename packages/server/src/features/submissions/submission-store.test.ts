@@ -272,6 +272,18 @@ describe('submissionBatches', () => {
     ]);
   });
 
+  test('leaves out form versions above maxFormVersion and binds it', async () => {
+    const { d1, statements } = createRecordingD1();
+    await insertSubmission(d1, submission('v1', { formVersion: 1 }));
+    await insertSubmission(d1, submission('v2', { formVersion: 2 }));
+    await insertSubmission(d1, submission('v3', { formVersion: 3 }));
+    statements.length = 0;
+    const batches = await collect(submissionBatches(d1, { maxFormVersion: 2 }));
+    expect(batches.flat().sort()).toEqual(['v1', 'v2']);
+    expect(statements[0]?.sql).toContain('"form_version" <= ?');
+    expect(statements[0]?.params).toContain(2);
+  });
+
   test('stops after a full last batch with one more empty query', async () => {
     const { d1, statements } = createRecordingD1();
     await insertSubmission(d1, submission('a'));

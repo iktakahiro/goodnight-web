@@ -287,9 +287,12 @@ export const adminRoutes = new Hono<HonoEnv>()
     }
     const locale = query.data.lang ?? c.get('options').locale;
     const layout = csvLayout(current.definition, locale);
+    // The header comes from this version, so rows sent with a version saved
+    // during the export (and its new fields) are left for the next export.
     const batches = submissionBatches(c.env.DB, {
       status: query.data.status,
       formVersion: query.data.version,
+      maxFormVersion: current.version,
       choice,
     });
     const db = c.env.DB;
