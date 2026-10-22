@@ -22,6 +22,27 @@
       "when": 1792644143948,
       "tag": "0002_setup_closed_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792653107230,
+      "tag": "0003_form_definitions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792653119333,
+      "tag": "0004_form_definition_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792653134550,
+      "tag": "0005_drop_fixed_contact_columns",
+      "breakpoints": true
     }
   ]
 }

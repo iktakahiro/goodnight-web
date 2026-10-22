@@ -16,11 +16,13 @@ import {
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core';
+import type { FormDefinition } from '../features/contact-form/form-definition.ts';
 import { SUBMISSION_STATUSES } from '../features/submissions/submission-status.ts';
 
 /**
  * Contact form submissions. Times are unix milliseconds. `ip_hash` holds
- * `HMAC-SHA256(ip, IP_HASH_SECRET)`; the raw IP is never stored.
+ * `HMAC-SHA256(ip, IP_HASH_SECRET)`; the raw IP is never stored. The values
+ * of the editable form fields are in `fields`, keyed by field id.
  */
 export const submissions = sqliteTable(
   'submissions',
@@ -28,12 +30,8 @@ export const submissions = sqliteTable(
     /** ULID, sortable by time. */
     id: text('id').primaryKey(),
     createdAt: integer('created_at').notNull(),
-    name: text('name').notNull(),
+    /** The visitor's address. Fixed: it is not part of the editable form. */
     email: text('email').notNull(),
-    company: text('company'),
-    phone: text('phone'),
-    category: text('category'),
-    body: text('body').notNull(),
     status: text('status', { enum: SUBMISSION_STATUSES })
       .notNull()
       .default('new'),
@@ -51,10 +49,27 @@ export const submissions = sqliteTable(
     /** Time of a delivered Slack notification. */
     notifiedAt: integer('notified_at'),
     readAt: integer('read_at'),
+    /** Language of the page that sent the form (`ja` or `en`). */
+    locale: text('locale'),
+    /**
+     * Values of the form fields as a JSON object, keyed by field id. Empty
+     * fields are left out. Read it with the definition of `form_version`.
+     */
+    fields: text('fields', { mode: 'json' })
+      .$type<unknown>()
+      .notNull()
+      .default(sql`'{}'`),
+    /** The `form_definitions.version` the submission was validated against. */
+    formVersion: integer('form_version').notNull().default(1),
   },
   (table) => [
     // Retention pruning and the admin list.
     index('idx_submissions_created').on(table.createdAt),
+    // Admin list filtered by form version.
+    index('idx_submissions_version_created').on(
+      table.formVersion,
+      table.createdAt,
+    ),
     // Unread count and status filter.
     index('idx_submissions_status_created').on(table.status, table.createdAt),
     // Keep in step with SUBMISSION_STATUSES (checked by a test).
@@ -64,6 +79,25 @@ export const submissions = sqliteTable(
     ),
   ],
 );
+
+/**
+ * Versions of the contact form definition. Rows are append-only: triggers in
+ * migrations/0004 refuse UPDATE and DELETE, so a version never changes after
+ * it is saved and old submissions always render with their own labels. The
+ * highest version is the current form.
+ */
+export const formDefinitions = sqliteTable('form_definitions', {
+  version: integer('version').primaryKey(),
+  /** The {@link FormDefinition} as JSON. */
+  definition: text('definition', { mode: 'json' })
+    .$type<FormDefinition>()
+    .notNull(),
+  createdAt: integer('created_at').notNull(),
+  /** Email of the admin who saved it; `null` for the built-in first version. */
+  createdBy: text('created_by'),
+  /** The version this one restored, when it was made by a restore. */
+  restoredFrom: integer('restored_from'),
+});
 
 /**
  * Site settings as key-value text. Keys in use: `retention_days`,
