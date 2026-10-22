@@ -13,7 +13,7 @@ description: What protects the admin screen, the first admin setup, and the cont
 
 - **Fail closed.** When a required setting or secret is missing, the feature that needs it is turned off. Without `TURNSTILE_SECRET`, the contact API returns 503.
 - **Never open the admin screen without sign-in.** There is no development bypass, default account, or shared key.
-- **Do not lose inquiries.** An inquiry is saved before the reply. An inquiry with a high spam score is held, not dropped.
+- **Do not lose inquiries.** An inquiry is saved before the reply. Suspected spam (a filled honeypot or a high spam score) is saved and listed apart, not dropped.
 - **Keep personal data inside Cloudflare.** Notifications carry no personal data, and raw IP addresses are not stored.
 
 ## Admin screen
@@ -88,8 +88,8 @@ This does not open setup again: `settings.setup_closed_at` stays.
 
 - Turnstile is verified on the server, including `hostname` and `action`.
 - `Origin`, `Content-Type`, and the body size are checked before the body is parsed.
-- A filled honeypot field gets a normal success reply, but nothing is stored. The request still counts against the rate limit.
-- A high spam score moves a submission to `held`.
+- A filled honeypot field does not change the reply. The submission still needs Turnstile, counts against the rate limit, and must pass validation; then it is stored as suspected spam. The honeypot value itself is not stored.
+- A high spam score flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed apart in the admin screen.
 - The Rate Limiting binding limits submissions per `ip_hash`.
 - There is no API key in the page. A key that the browser can read is not a secret, so it would give a false sense of protection.
 
@@ -102,6 +102,7 @@ The server never puts input into SQL text.
 - Every query uses the [Drizzle ORM](https://orm.drizzle.team/) query builder. Values, including the page size and offset of the admin list, are sent to D1 as bound parameters.
 - Numbers from the URL are checked at the route before they reach a query. `page` must be 1 to 100,000 and `limit` 1 to 100, written with digits only. Values such as `1; DROP TABLE submissions`, `-1`, `1e9`, or `50 OFFSET 0` get a 400 response.
 - Raw SQL is allowed only through Drizzle's `sql` template, which also binds its values. A check in CI fails when the server code calls `sql.raw()` or D1's `prepare()` directly.
+- The email search escapes `%`, `_`, and `\` and sends the pattern as one bound parameter, with `ESCAPE '\'`.
 - Tests send injection strings to the admin list and check the 400 responses, and record the statements sent to the database to check that input appears only in the parameters.
 
 ```ts
@@ -114,30 +115,34 @@ const boundedInteger = (max: number) =>
     .transform(Number)
     .pipe(z.number().int().min(1).max(max));
 
-export const listQuerySchema = z.object({
-  status: statusParam,
+export const listQuerySchema = z.strictObject({
+  view: viewParam, // unread, read, all, or spam
+  q: emailSearchParam, // at most 254 characters
+  dir: z.enum(['asc', 'desc']).default('desc'),
   page: boundedInteger(ADMIN_MAX_PAGE).default(1),
   limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
+  // ... and the version and option filters
 });
 
 // packages/server/src/features/submissions/submission-store.ts
 orm
   .select()
   .from(submissions)
-  .where(statusIs(status))
-  .orderBy(...NEWEST_FIRST)
+  .where(and(viewIs(view), email ? emailContains(email) : undefined))
+  .orderBy(by(submissions.createdAt), by(submissions.id))
   .limit(limit)
   .offset(offset);
 ```
 
 ```sql
 select "id", "created_at", ... from "submissions"
-where "submissions"."status" = ?
+where (("submissions"."status" = ? and "submissions"."suspected_spam" = ?)
+  and lower("submissions"."email") like ? escape '\')
 order by "submissions"."created_at" desc, "submissions"."id" desc
 limit ? offset ?
 ```
 
-The SQL text is the same for every status, page, and page size; only the parameters change. See [Database and migrations](/docs/database/).
+The SQL text is the same for every search term, page, and page size; only the parameters change. See [Database and migrations](/docs/database/).
 
 ## Secrets
 
@@ -164,7 +169,7 @@ The SQL text is the same for every status, page, and page size; only the paramet
 - A device that has one of your passkeys, used by someone else.
 - Merging a pull request that is not an official update.
 - Content that you publish on your own site, and the code of any change you make to the starter.
-- Spam that passes Turnstile and the rate limit. It is held or marked as spam, not blocked completely.
+- Spam that passes Turnstile and the rate limit. The honeypot and the spam score flag much of it as suspected spam, but some will reach the normal list.
 
 ## Reporting a vulnerability
 

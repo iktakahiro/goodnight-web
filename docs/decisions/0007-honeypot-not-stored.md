@@ -1,6 +1,6 @@
 # 0007. Honeypot submissions are not stored
 
-- Status: accepted
+- Status: superseded by [0009](0009-unread-read-status-and-suspected-spam.md)
 - Date: 2026-10-22
 
 ## Context

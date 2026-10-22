@@ -42,14 +42,17 @@ Endpoints:
 - `GET /api/contact/form`: the current form fields, the form version, and
   whether the form is available (public, cached for 30 seconds).
 - `POST /api/contact`: `{ email, consent, fields, formVersion, locale,
-  turnstileToken, website, elapsedMs, pagePath }`. `fields` is validated
+  turnstileToken, gnw_hp_x, elapsedMs, pagePath }`. `fields` is validated
   against the current definition in D1; unknown keys are 400, an old
-  `formVersion` is 409 `form_outdated`.
+  `formVersion` is 409 `form_outdated`. A filled honeypot (`gnw_hp_x`) or a
+  spam score of 3 or more stores the submission as suspected spam, with no
+  Slack notification.
 - `/api/setup`, `/api/auth/*`: first-admin setup and Better Auth.
 - `/api/admin/*` (admin session with a passkey): status, the inquiry list
-  (filters `status`, `version`, `field` + `value`; sort `received_at`,
-  `email`, `status`; no keyword search), detail, status change, delete, and
-  CSV export.
+  (views `unread`, `read`, `all`, `spam`; email search `q`; filters
+  `version`, `field` + `value`; sorted by received time, `dir`), detail
+  (marks it read), unread/read and suspected spam changes, delete, and CSV
+  export.
 - `/api/admin/form`: `GET` the current definition and history, `PUT` a new
   version (`{ baseVersion, fields }`, 409 `form_conflict` when someone saved
   first), `GET /versions/:version`, and

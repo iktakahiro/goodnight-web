@@ -5,11 +5,11 @@ description: An optional Slack message tells you that a new inquiry arrived. It 
 
 ## What it does
 
-- If `SLACK_WEBHOOK_URL` is set, the Worker posts to that Slack incoming webhook after it has saved an inquiry with status `new`.
+- If `SLACK_WEBHOOK_URL` is set, the Worker posts to that Slack incoming webhook after it has saved an inquiry that is not suspected spam.
 - The message contains only the count ("1 new inquiry"), the time the inquiry was received, and a link to the admin screen. It contains no email address and no form field values, not even the answer of a select field. This does not change when admins add fields to the form.
 - The time is a Slack date token, so Slack shows it in each reader's own time zone.
 - When the post succeeds, the Worker records `notified_at`. There is no retry.
-- Held submissions and spam do not trigger a notification.
+- Suspected spam (a filled honeypot or a spam score of 3 or more) does not trigger a notification. It is saved and listed under **Suspected spam** in the admin screen. See [Contact form protection](/docs/how-it-works/contact-protection/).
 
 ## Why it is built this way
 

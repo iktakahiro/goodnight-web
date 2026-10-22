@@ -73,7 +73,13 @@ test easier.
 - Save a contact submission to D1 before responding. Notifications and cleanup
   run in `ctx.waitUntil` and never change the response.
 - Slack notifications contain no personal data and no form values: only the
-  count, the received time, and the admin URL.
+  count, the received time, and the admin URL. Suspected spam is never
+  notified.
+- Do not drop doubtful submissions. A filled honeypot or a spam score of
+  `SPAM_SUSPECT_THRESHOLD` or more stores the submission with
+  `suspected_spam = 1`; it is not a status. Store nothing before Turnstile
+  passes, and give a honeypot hit the same response as the same request
+  without it (docs/decisions/0009).
 - Validate contact submissions against the form definition stored in D1,
   never against one sent by the client. Reject unknown field keys.
 - Verify Turnstile on the server, including `hostname` and `action`. Check
@@ -93,6 +99,9 @@ D1 is accessed through Drizzle ORM only (see
   test helpers.
 - Validate numbers from requests (page, limit) as bounded integers with zod
   at the route, and pass them to `.limit()` and `.offset()`.
+- A `LIKE` search binds the whole pattern as one parameter, escapes `%`,
+  `_`, and `\` with `escapeLike()`, and adds `ESCAPE '\'`. The admin list
+  searches the email column only and sorts by `created_at` only.
 - Schema change workflow: edit `packages/server/src/db/schema.ts`, run
   `bun run db:generate` (drizzle-kit generate), read the generated SQL, and
   commit it with the schema. `bun run db:check` fails when the schema and the

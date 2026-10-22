@@ -100,11 +100,35 @@ Removing a field archives it. Nothing is deleted:
 
 ## The inquiry list
 
-The list has three fixed columns: received time, email address, and status. After them come the fields of the current version. Fields with **Show in list** are shown by default (in the first version: name, company, and message, with long text cut to 120 characters). You can show or hide each column; that choice is saved in your browser only (`localStorage`). Archived fields are not shown in the list.
+### Status: unread or read
 
-Filters:
+An inquiry has one of two statuses: **unread** or **read**. A new inquiry is unread. Opening its detail marks it read. An admin can set it back to unread, from the list (the envelope button next to the status) or from the detail, to keep it on the to-do pile. There are no other statuses; to keep a record of what was done, reply by email or export the CSV.
 
-- by status;
+**Suspected spam** is not a status. It is a separate mark, set by the honeypot or the spam score (see [Contact form protection](/docs/how-it-works/contact-protection/)) or by an admin. A suspected spam inquiry is also unread or read.
+
+The unread count in the header counts unread inquiries that are not suspected spam.
+
+### Columns
+
+The list has three fixed columns: received time, email address, and status (with the suspected spam badge when it applies). After them come the fields of the current version. Fields with **Show in list** are shown by default (in the first version: name, company, and message, with long text cut to 120 characters). You can show or hide each column; that choice is saved in your browser only (`localStorage`). Archived fields are not shown in the list.
+
+### Views and filters
+
+One switch at the top picks the view:
+
+| View           | Shows                                        |
+| -------------- | -------------------------------------------- |
+| Unread         | Unread inquiries that are not suspected spam |
+| Read           | Read inquiries that are not suspected spam   |
+| All (default)  | Every inquiry that is not suspected spam     |
+| Suspected spam | Only suspected spam, unread and read         |
+
+The Unread and Suspected spam tabs show their counts. The Unread, Read, and All views say that suspected spam is kept in its own view, with a link to it.
+
+Suspected spam has its own view because mixing it in would bury real inquiries and make the unread count useless. Nothing is hidden for good: the inquiries are saved, counted, and one click away.
+
+Within a view, you can also filter:
+
 - by form version;
 - by the option of a select or radio field of the current version.
 
@@ -114,9 +138,32 @@ The option filter runs `json_extract()` on the stored JSON. The field id is look
 choiceIs = sql`json_extract(${submissions.fields}, ${`$.${choice.fieldId}`}) = ${choice.value}`;
 ```
 
-The list can be sorted by received time, email address, or status. It cannot be sorted by a form field: the values live in one JSON column, and sorting on them would mean a different query plan for every field.
+### Order
 
-There is no keyword search. A search over free text would need `LIKE` over every stored value or a full-text index that has to follow every form change. Filters and the CSV export cover the common needs. An unknown query parameter, such as `q`, is refused with 400.
+The list is sorted by received time only: newest first by default, oldest first when you select the **Received** column header. It cannot be sorted by email address, status, or a form field. The received time is what admins look for, and the values of form fields live in one JSON column, where sorting would mean a different query plan for every field.
+
+### Search by email address
+
+The search box finds inquiries whose email address contains the text you type, ignoring case. `example.co` finds `taro@example.com` and `info@example.co.jp`. It searches the fixed email column only, never the form fields.
+
+The query uses Drizzle's `like` on `lower(email)` with one bound parameter. `%`, `_`, and `\` in the search text are escaped, so they match as plain characters:
+
+```ts title="packages/server/src/features/submissions/submission-store.ts"
+export const escapeLike = (term: string): string =>
+  term.replace(/[\\%_]/g, (char) => `\\${char}`);
+
+const emailContains = (term: string): SQL =>
+  sql`${like(
+    sql`lower(${submissions.email})`,
+    `%${escapeLike(term.toLowerCase())}%`,
+  )} escape '\\'`;
+```
+
+The search text is at most 254 characters (the longest email address). The search applies within the current view and filters, and the CSV export follows it.
+
+**Why there is no index for it.** A `LIKE '%text%'` search cannot use an index, so D1 reads every row of `submissions`. For a contact form this is fine: a busy small company gets a few thousand inquiries a year, and rows older than the retention period (180 days by default) are deleted. Reading a few thousand short rows takes milliseconds and costs few D1 row reads. An extra index would slow every insert and still not help a partial match. The `created_at` index serves the order and the retention cleanup.
+
+There is no search over the form fields. A search over free text would need `LIKE` over every stored value or a full-text index that has to follow every form change. Filters and the CSV export cover the common needs.
 
 ## The inquiry detail
 
@@ -124,13 +171,14 @@ The detail shows each inquiry with the labels of the version it was sent with, i
 
 ## CSV export
 
-The CSV has the fixed columns (`id`, `received_at`, `status`, `email`, `locale`, `form_version`, `page_path`, `country`, `spam_score`, `spam_reasons`) and then one column for every field id the form ever had: the current fields in form order, then archived fields.
+The CSV has the fixed columns (`id`, `received_at`, `status` (`unread` or `read`), `suspected_spam` (`1` or `0`), `email`, `locale`, `form_version`, `page_path`, `country`, `spam_score`, `spam_reasons`) and then one column for every field id the form ever had: the current fields in form order, then archived fields.
 
 - Headers are labels in the chosen language (Japanese or English).
 - An archived field's header ends with the last version that had it, for example `Budget (v3)`. A new field with the same label has its own column, `Budget`.
 - If two headers are still the same, the field id is added in brackets.
 - Select, radio, and checkbox values are written as option labels.
 - Every text cell that starts like a spreadsheet formula (`=`, `+`, `-`, `@`, or a tab) gets a leading `'`.
+- The export follows the list's view, email search, and filters. The All view leaves suspected spam out; export the Suspected spam view to get it.
 - The file is streamed in batches of rows, so a large table is never held in memory.
 - The export holds the rows sent with the form version that was current when it started, and older ones. If someone saves a new version during the export, inquiries sent with that version are left out, because the header has no columns for its new fields. They appear in the next export.
 
@@ -175,5 +223,5 @@ Each inquiry stores its values as JSON in `submissions.fields`, keyed by field i
 - **The server trusts only its own definition.** The definition from `GET /api/contact/form` is for drawing the form. On submit, the server reads the definition from D1 again and validates against that. A changed page or a hand-made request cannot add fields or skip checks.
 - **One JSON column instead of one column per field.** A column per field would need a schema migration for every form edit, and migrations ship only with package releases. A JSON column with values keyed by field id needs none.
 - **Immutable ids and versions keep data apart.** Labels change and fields come and go. Because values are keyed by an id that is never reused, and every inquiry records its version, answers to different questions never end up in the same column, and every inquiry can be shown as the visitor saw the form.
-- **Email is fixed.** Every inquiry needs a way to reply. Keeping it as a real column lets the list sort by it and the detail offer a reply button, whatever the form holds.
+- **Email is fixed.** Every inquiry needs a way to reply. Keeping it as a real column lets the list search it and the detail offer a reply button, whatever the form holds.
 - **Slack stays free of personal data.** Notifications contain only "1 new inquiry", the received time, and a link, whatever fields the form has. See [Slack notifications](/docs/how-it-works/notifications/).

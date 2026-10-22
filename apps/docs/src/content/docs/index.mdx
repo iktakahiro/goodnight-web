@@ -19,7 +19,7 @@ goodnight-web gives a small company the three things most company sites need:
 
 - **Pages and a blog.** An Astro site with a home page, company profile, services, news, blog, contact page, and privacy policy, in Japanese and English. Blog posts are Markdown files in the repository.
 - **A contact form.** Submissions are checked with Turnstile, rate limited, and saved to D1 before the visitor sees a reply.
-- **An admin screen for inquiries.** Admins sign in with a passkey, read inquiries, change their status, delete them, and export them as CSV.
+- **An admin screen for inquiries.** Admins sign in with a passkey, read inquiries, mark them unread or read, search them by email address, check suspected spam apart from the rest, delete them, and export them as CSV.
 
 Everything runs on Cloudflare: one Worker with Static Assets and one D1 database. The only other service is GitHub, where your copy of the site lives. A Slack notification is optional.
 

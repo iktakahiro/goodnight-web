@@ -85,8 +85,11 @@ added only when a page needs real interactivity.
   from `@goodnight-web/server/client` at runtime and renders the fields of
   the current form definition in order (labels, placeholders, hints,
   required marks, `maxlength`, and options in the page's language). The
-  email field, the privacy consent, the honeypot `website`, and the
-  Turnstile widget are always there. When the request fails, it shows a
+  email field, the privacy consent, the honeypot `gnw_hp_x` (off screen,
+  `aria-hidden`, `tabindex="-1"`, `autocomplete="off"`, and the
+  password-manager opt-outs `data-1p-ignore`, `data-lpignore`,
+  `data-bwignore`, `data-form-type="other"`), and the Turnstile widget are
+  always there. When the request fails, it shows a
   short error with the company email from `site.config.ts`. When
   `available` is false, it shows the "not available yet" notice. Otherwise
   it loads Turnstile with `render=explicit` and renders the widget with the
