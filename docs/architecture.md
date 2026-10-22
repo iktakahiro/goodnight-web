@@ -150,3 +150,27 @@ the Worker a token that can write to GitHub.
   tests, build, and `deploy:check`.
 - Dependencies use exact versions and a 48-hour release-age gate
   (`bunfig.toml`); Dependabot uses a two-day cooldown.
+
+## Documentation site
+
+`apps/docs` (`@goodnight-web/docs`, private) is the user-facing documentation.
+It follows the same setup as the calendarpit documentation site:
+
+- Fumadocs with TanStack Start. Every page is prerendered to static HTML; the
+  server bundle is deleted after the build.
+- A static-assets-only Worker serves `apps/docs/dist` (`wrangler.jsonc`: no
+  `main`, `html_handling: force-trailing-slash`, `not_found_handling:
+  404-page`, `workers_dev` and `preview_urls` off). There is no custom domain
+  yet.
+- English is at the root and Japanese under `/ja/`, with the same slugs. The
+  landing page is `/` (and `/ja/`); the documentation is under `/docs/` (and
+  `/ja/docs/`). Pages live in `apps/docs/src/content/docs/`.
+- The build also writes `llms.txt`, `llms-full.txt`, and one Markdown file per
+  page for AI tools.
+- `bun run test` in the workspace runs `scripts/check-static.ts` on the build:
+  one `h1` per page, `lang`, canonical and `hreflang` URLs, internal links and
+  anchors, local assets only, and identical code blocks in both languages.
+- `DOCS_SITE_URL` sets the origin for canonical URLs. Until a domain is chosen
+  it defaults to `https://goodnight-web.invalid`.
+
+Mark anything not tested end to end with a "Draft / not verified yet" callout.
