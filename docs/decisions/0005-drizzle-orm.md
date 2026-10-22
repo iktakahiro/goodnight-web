@@ -125,11 +125,28 @@ custom migration that keeps the child rows.
 `DrizzleQueryError` puts the SQL and the bound values into its message. A
 failed contact insert would have logged the visitor's name, address, and
 message, and a failed Better Auth write could log an address or a session
-token. `safeErrorMessage()` (`src/shared/log-error.ts`) logs only the
-database's own error message (for example "no such table: submissions"), and
-Better Auth gets a `logger.log` that drops every argument except error
-messages passed through the same function. Tests drop a table and check that
-the logs contain no submitted values and no address.
+token. `safeErrorMessage()` (`src/shared/log-error.ts`) is the one place that
+turns an error into log text. For a query error anywhere in the `cause` chain
+it keeps only the database's own error message (for example "no such table:
+submissions"), and it redacts query text that another error copied into its
+message. Every log call in the server passes errors through it:
+
+- Route code and the app's `onError` log `safeErrorMessage(error)`, never the
+  error object.
+- Better Auth gets a `logger.log` that redacts the message and drops every
+  argument except error messages passed through the same function.
+- Better Auth runs with `onAPIError.throw`. Without it, its HTTP router
+  (Better Call) logs a non-API error object with `console.error`, bypassing
+  the logger. The rethrown error reaches the app's `onError` and answers 500
+  `server_error`.
+- Better Auth runs with `advanced.database.joins`, so a session and its user
+  load in one relational query. The fallback runs a second query and logs a
+  failure with `console.error`, bound values included.
+
+Tests drop a table, call the HTTP endpoints (contact, setup, passkey
+registration, session reads, the admin API), and check with `Bun.inspect`,
+which shows an error's message and properties, that the logs contain no
+submitted values, address, user ID, session token, or query parameters.
 
 ## Bundle size and CPU
 

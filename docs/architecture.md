@@ -298,8 +298,10 @@ are not changed.
   `DROP TABLE user`, and `AGENTS.md` has the rules
   ([0005](decisions/0005-drizzle-orm.md)).
 - **Logs.** A failed Drizzle query carries its bound values in its message.
-  Errors are logged with `safeErrorMessage()`, and Better Auth's logger is
-  set to log messages only, so no submitted values or tokens reach the logs.
+  Errors are logged with `safeErrorMessage()` only. Better Auth's logger
+  logs redacted messages, and Better Auth rethrows endpoint errors to the
+  app's `onError` instead of logging them itself, so no submitted values or
+  tokens reach the logs ([0005](decisions/0005-drizzle-orm.md)).
 
 ## Package and starter
 
