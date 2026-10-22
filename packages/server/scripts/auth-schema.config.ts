@@ -3,8 +3,11 @@
 // src/db/schema.ts (docs/decisions/0005). The adapter is never connected, so
 // an empty object stands in for the Drizzle database.
 //
-// npx --yes auth@<better-auth version> generate \
-//   --config scripts/auth-schema.config.ts --output <tmp>/auth-schema.ts --yes
+// bun run auth:schema <tmp>/auth-schema.ts
+//
+// runs the Better Auth CLI (the `auth` devDependency, pinned to the same
+// version as better-auth and installed from bun.lock under the release-age
+// gate).
 import { passkey } from '@better-auth/passkey';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
