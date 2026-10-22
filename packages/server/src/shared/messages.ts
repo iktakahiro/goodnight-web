@@ -107,9 +107,9 @@ const ja: MessageCatalog = {
   'error.forbidden': 'このアカウントでは管理画面を使えません。',
   'error.passkey_required': 'パスキーを登録してください。',
   'error.auth_unavailable':
-    'ログインの設定がありません。このサイトに BETTER_AUTH_SECRET を設定してください。',
+    'ログインに必要な設定がありません。このサイトに BETTER_AUTH_SECRET を設定してください。',
   'error.setup_unavailable':
-    'セットアップの設定がありません。このサイトに SETUP_TOKEN と ADMIN_EMAILS を設定してください。',
+    'セットアップに必要な設定がありません。このサイトに SETUP_TOKEN と ADMIN_EMAILS を設定してください。',
   'error.setup_closed': 'セットアップは完了しています。',
   'error.invalid_setup_token': 'セットアップトークンが正しくありません。',
   'error.email_not_allowed':
@@ -140,14 +140,15 @@ const ja: MessageCatalog = {
   'admin.unreadCount': '未読 {count} 件',
   'admin.signIn': 'パスキーでログイン',
   'admin.signOut': 'ログアウト',
-  'admin.setup.title': '最初の管理者を作成',
+  'admin.setup.title': '最初の管理者を登録',
   'admin.setup.token': 'セットアップトークン',
   'admin.setup.email': 'メールアドレス',
   'admin.setup.name': 'お名前',
   'admin.setup.registerPasskey': 'パスキーを登録',
   'admin.export': 'CSV をダウンロード',
   'admin.delete': '削除',
-  'admin.deleteConfirm': 'このお問い合わせを削除しますか？元に戻せません。',
+  'admin.deleteConfirm':
+    'このお問い合わせを削除しますか？この操作は元に戻せません。',
   'admin.empty': 'お問い合わせはまだありません。',
   'admin.turnstileNotice':
     'お問い合わせフォームは受け付けを停止しています。Turnstile がまだ設定されていません。',
