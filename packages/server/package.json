@@ -15,10 +15,11 @@
     ".": "./src/index.ts",
     "./contact": "./src/contact.ts",
     "./client": "./src/client.ts",
-    "./messages": "./src/messages.ts"
+    "./messages": "./src/messages.ts",
+    "./admin-messages.json": "./src/features/admin-ui/admin-messages.gen.json"
   },
   "scripts": {
-    "build": "vite build --config admin-ui/vite.config.ts && bun scripts/build-admin-module.ts",
+    "build": "vite build --config admin-ui/vite.config.ts && bun scripts/build-admin-module.ts && bun scripts/build-admin-messages.ts",
     "type-check": "tsc -p tsconfig.json && tsc -p admin-ui/tsconfig.json",
     "test": "bun test src admin-ui/src",
     "test:e2e": "bun e2e/run.ts",
