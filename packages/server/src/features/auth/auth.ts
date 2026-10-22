@@ -4,7 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError } from 'better-auth/api';
 import { getDatabase } from '../../db/database.ts';
 import * as schema from '../../db/schema.ts';
-import { safeErrorMessage } from '../../shared/log-error.ts';
+import { redactQueryText, safeErrorMessage } from '../../shared/log-error.ts';
 import type { GoodnightEnv } from '../../env.ts';
 import { createSetupPlugin } from '../setup/setup-plugin.ts';
 import { AUTH_BASE_PATH } from './auth-paths.ts';
@@ -35,20 +35,30 @@ const buildAuth = (env: GoodnightEnv, origin: string) =>
     trustedOrigins: [origin],
     telemetry: { enabled: false },
     logger: {
-      // Better Auth passes errors and other values to the logger. A failed
-      // query carries its bound values (addresses, session tokens), so only
-      // the message and safe error messages are logged.
+      // Better Auth passes errors, query conditions, and error messages to
+      // the logger. A failed query carries its bound values (addresses,
+      // session tokens), so only redacted text and safe error messages are
+      // logged.
       log: (level, message, ...args: unknown[]) => {
         const errors = args
           .filter((arg) => arg instanceof Error)
           .map(safeErrorMessage);
-        console[level](`better-auth: ${message}`, ...errors);
+        console[level](`better-auth: ${redactQueryText(message)}`, ...errors);
       },
     },
+    // Rethrow errors from HTTP endpoints. Otherwise Better Call logs a
+    // non-API error object with console.error, bypassing the logger above.
+    // Rethrown errors reach the app's onError, which logs only
+    // safeErrorMessage. API errors still become their HTTP responses.
+    onAPIError: { throw: true },
     advanced: {
       // Never store raw IP addresses (the session table has an ip_address
       // column). Contact rate limits use the HMAC ip_hash instead.
       ipAddress: { disableIpTracking: true },
+      // Load joined rows (a session's user) in the same query through the
+      // schema's relations. The fallback runs a second query and logs its
+      // error object with console.error, bound values included.
+      database: { joins: true },
     },
     plugins: [
       passkey({

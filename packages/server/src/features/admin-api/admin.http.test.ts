@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { signInAsAdmin } from '../../testing/admin-session.ts';
+import { captureConsole } from '../../testing/console-capture.ts';
 import {
   createTestWorker,
   ORIGIN,
@@ -380,5 +381,66 @@ describe('admin API with an admin session', () => {
     expect(list.items.map((s: { id: string }) => s.id)).toContain('recent');
     expect((await get('/api/admin/submissions/old')).status).toBe(404);
     expect((await get('/api/admin/submissions/recent')).status).toBe(200);
+  });
+});
+
+describe('admin API database errors', () => {
+  const request = async (
+    worker: TestWorker,
+    cookie: string,
+    method: string,
+    path: string,
+  ) => {
+    const logs = captureConsole();
+    try {
+      const response = await worker.fetch(path, {
+        method,
+        headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+        body:
+          method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+      });
+      return { response, logged: logs.text() };
+    } finally {
+      logs.restore();
+    }
+  };
+
+  test('a failed query answers 500 and logs no bound values', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    await seed(worker, 'sub-7f3a9c', { name: 'Hanako' });
+    worker.sqlite.exec('DROP TABLE submissions');
+    const { response, logged } = await request(
+      worker,
+      cookie,
+      'PATCH',
+      '/api/admin/submissions/sub-7f3a9c',
+    );
+    expect(response.status).toBe(500);
+    expect((await response.json()).error.code).toBe('server_error');
+    expect(logged).toContain('no such table');
+    expect(logged).not.toContain('sub-7f3a9c');
+    expect(logged).not.toContain('params');
+  });
+
+  test('a failed session lookup logs no session token', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    const { token } = worker.sqlite
+      .query('SELECT token FROM session')
+      .get() as {
+      token: string;
+    };
+    worker.sqlite.exec('DROP TABLE session');
+    const { response, logged } = await request(
+      worker,
+      cookie,
+      'GET',
+      '/api/admin/me',
+    );
+    expect(response.status).toBe(500);
+    expect(logged).toContain('no such table');
+    expect(logged).not.toContain(token);
+    expect(logged).not.toContain('params');
   });
 });

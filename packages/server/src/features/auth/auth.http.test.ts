@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
+import { signInAsAdmin } from '../../testing/admin-session.ts';
+import { captureConsole } from '../../testing/console-capture.ts';
 import {
   CLIENT_IP,
   createTestWorker,
@@ -69,4 +71,61 @@ describe('/api/auth passkey sign-in', () => {
       expect(verificationCount(worker)).toBe(0);
     },
   );
+});
+
+describe('/api/auth database errors', () => {
+  const failingRequest = async (
+    worker: TestWorker,
+    path: string,
+    cookie: string,
+  ) => {
+    const logs = captureConsole();
+    try {
+      const response = await worker.fetch(path, { headers: { cookie } });
+      return { response, logged: logs.text() };
+    } finally {
+      logs.restore();
+    }
+  };
+
+  test('passkey registration logs no address, user ID, or bound values', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker, { passkey: false });
+    const { id } = worker.sqlite.query('SELECT id FROM user').get() as {
+      id: string;
+    };
+    worker.sqlite.exec('DROP TABLE verification');
+    const { response, logged } = await failingRequest(
+      worker,
+      '/api/auth/passkey/generate-register-options',
+      cookie,
+    );
+    expect(response.status).toBe(500);
+    expect((await response.json()).error.code).toBe('server_error');
+    expect(logged).toContain('no such table');
+    expect(logged).not.toContain('admin@example.com');
+    expect(logged).not.toContain(id);
+    expect(logged).not.toContain('params');
+    expect(logged).not.toContain('SERVER_ERROR');
+  });
+
+  test('a session lookup logs no session token or user ID', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker, { passkey: false });
+    const { token, user_id: userId } = worker.sqlite
+      .query('SELECT token, user_id FROM session')
+      .get() as { token: string; user_id: string };
+    worker.sqlite.exec('DROP TABLE user');
+    const { response, logged } = await failingRequest(
+      worker,
+      '/api/auth/get-session',
+      cookie,
+    );
+    expect(response.status).toBe(500);
+    expect(logged).toContain('no such table');
+    expect(logged).not.toContain(token);
+    expect(logged).not.toContain(userId);
+    expect(logged).not.toContain('admin@example.com');
+    expect(logged).not.toContain('params');
+  });
 });

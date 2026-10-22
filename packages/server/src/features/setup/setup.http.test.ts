@@ -1,6 +1,7 @@
-import { describe, expect, spyOn, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
 import { signInAsAdmin } from '../../testing/admin-session.ts';
+import { captureConsole } from '../../testing/console-capture.ts';
 import {
   CLIENT_IP,
   createTestWorker,
@@ -108,10 +109,7 @@ describe('/api/setup', () => {
   test('logs no address or token when the database write fails', async () => {
     const worker = createTestWorker();
     worker.sqlite.exec('DROP TABLE session');
-    const logs = [
-      spyOn(console, 'error').mockImplementation(() => {}),
-      spyOn(console, 'warn').mockImplementation(() => {}),
-    ];
+    const logs = captureConsole();
     try {
       const response = await setup(worker, {
         token: SECRETS.SETUP_TOKEN,
@@ -119,11 +117,13 @@ describe('/api/setup', () => {
         name: 'Admin',
       });
       expect(response.status).toBe(500);
-      const logged = JSON.stringify(logs.map((log) => log.mock.calls));
+      const logged = logs.text();
       expect(logged).toContain('no such table');
       expect(logged).not.toContain('admin@example.com');
+      expect(logged).not.toContain(SECRETS.SETUP_TOKEN);
+      expect(logged).not.toContain('params');
     } finally {
-      for (const log of logs) log.mockRestore();
+      logs.restore();
     }
   });
 
