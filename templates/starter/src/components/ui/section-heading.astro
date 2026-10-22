@@ -1,0 +1,32 @@
+---
+/** A section title with an optional short label above it. */
+interface Props {
+  eyebrow?: string;
+  title: string;
+  /** Heading level. Use 2 inside a page and 1 only for the page title. */
+  level?: 1 | 2;
+  id?: string;
+}
+
+const { eyebrow, title, level = 2, id } = Astro.props;
+const Tag = level === 1 ? 'h1' : 'h2';
+---
+
+<div class='space-y-2'>
+  {
+    eyebrow && (
+      <p class='text-sm font-bold tracking-wider text-primary-strong'>
+        {eyebrow}
+      </p>
+    )
+  }
+  <Tag
+    id={id}
+    class:list={[
+      'font-bold text-foreground',
+      level === 1 ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl',
+    ]}
+  >
+    {title}
+  </Tag>
+</div>

@@ -1,0 +1,32 @@
+---
+import PageHeader from '../../../components/site/page-header.astro';
+import PostList from '../../../features/posts/post-list.astro';
+import { getPosts } from '../../../features/posts/posts';
+import BaseLayout from '../../../layouts/base-layout.astro';
+import { localeFromParam, localeStaticPaths } from '../../../i18n/locales';
+
+export const getStaticPaths = localeStaticPaths;
+
+const locale = localeFromParam(Astro.params.lang);
+const posts = await getPosts('news', locale);
+
+const text = {
+  ja: {
+    eyebrow: 'News',
+    title: 'お知らせ',
+    lead: '営業日の変更や新しいサービスなど、ゆうなぎ工房からのお知らせです。',
+  },
+  en: {
+    eyebrow: 'News',
+    title: 'News',
+    lead: 'Announcements from Yunagi Works, such as changes to business days and new services.',
+  },
+}[locale];
+---
+
+<BaseLayout locale={locale} title={text.title} description={text.lead} path='/news/'>
+  <PageHeader eyebrow={text.eyebrow} title={text.title} lead={text.lead} />
+  <div class='mx-auto max-w-4xl px-5 pt-12 sm:px-8'>
+    <PostList locale={locale} collection='news' posts={posts} showDescription={false} />
+  </div>
+</BaseLayout>

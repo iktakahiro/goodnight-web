@@ -1,0 +1,18 @@
+---
+/** A small rounded label, for example for a date or a tag. */
+import type { HTMLAttributes } from 'astro/types';
+
+type Props = HTMLAttributes<'span'>;
+
+const { class: className, ...rest } = Astro.props;
+---
+
+<span
+  class:list={[
+    'inline-flex items-center rounded-full bg-primary-soft px-3 py-0.5 text-xs font-bold text-primary-strong',
+    className,
+  ]}
+  {...rest}
+>
+  <slot />
+</span>

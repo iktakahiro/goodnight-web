@@ -42,7 +42,9 @@ A pull request counts as an **official update** only if all of these are true:
 - The author is `dependabot[bot]` and the account type is `Bot`.
 - The branch is in your own repository, not in a fork.
 - The only changed files are `package.json` and lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`).
-- Every changed dependency is a `@goodnight-web/*` package.
+- In `package.json`, every changed line is the version of a `@goodnight-web/*` dependency.
+
+The lockfile may change in other ways. A new `@goodnight-web/server` version can bring new versions of the packages it uses (for example `hono`), and those changes appear only in the lockfile. The packages your site depends on directly are listed in `package.json`, and that diff is checked line by line. If the check cannot see every change, the pull request is not counted as official: for example, when GitHub leaves out or cuts short the `package.json` diff, or when the list of changed files may be incomplete.
 
 For an official update, the workflow posts: "Official goodnight-web update. Safe to merge after checking the preview." For anything else it posts: "This is not an official update. If you don't understand the changes, don't merge." The comment is in Japanese and English, and the workflow updates the same comment instead of adding new ones.
 

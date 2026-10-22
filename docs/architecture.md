@@ -287,10 +287,15 @@ Entry points (`exports` in `packages/server/package.json`):
 **`templates/starter`** is the part users own: Astro pages, Markdown content in
 Content Collections (ja and en), `site.config.ts`, styles, a `src/worker.ts`
 of about three lines that calls `createGoodnightWorker()`, `wrangler.jsonc`,
-and `AGENTS.md` / `CLAUDE.md` that tell AI tools which files to edit.
+and `AGENTS.md` / `CLAUDE.md` that tell AI tools which files to edit. It also
+ships GitHub files: a Dependabot config, an Update check workflow that marks
+official `@goodnight-web/*` update pull requests, and a Visibility check
+workflow that fails while the repository is public. See
+[starter.md](starter.md).
 
 In this repository the starter depends on `@goodnight-web/server` through
-`workspace:*`. When the starter is copied out for users (planned for M2), that
+`workspace:*`. Its contact form uses `getContactConfig()` and
+`submitContact()` and gets the Turnstile site key from the config API. When the starter is copied out for users (planned for M2), that
 dependency is replaced with the published exact version.
 
 ## How updates reach users
@@ -299,7 +304,9 @@ dependency is replaced with the published exact version.
    it fixes a vulnerability).
 2. The starter ships a `.github/dependabot.yml` that groups `@goodnight-web/*`
    updates with a cooldown. Dependabot opens one pull request in the user's
-   repository. Security updates are not delayed by the cooldown.
+   repository. Security updates are not delayed by the cooldown. The
+   starter's Update check workflow comments whether the pull request is an
+   official update, and the starter's README tells users to merge only those.
 3. The user's CI or Workers Builds builds the pull request and shows a preview.
 4. The user merges the pull request. The deploy script runs
    `wrangler d1 migrations apply DB --remote && wrangler deploy`, so migrations
@@ -357,6 +364,12 @@ the Worker a token that can write to GitHub.
 - `bun test` also runs the admin UI's unit tests (`admin-ui/src/**/*.test.ts`):
   language detection, date and number formatting, routes and the `next`
   parameter, list query parsing, and the message catalogs.
+- `bun run test:e2e` in `templates/starter` runs the starter against
+  `wrangler dev` with Cloudflare's Turnstile test keys: pages, the
+  not-available state and 503, a form submission saved to D1, then the admin
+  UI in a real browser: setup, passkey registration, sign-out, passkey
+  sign-in, the inquiry in the list with its category label, the detail, and a
+  status change. See [starter.md](starter.md#end-to-end-test).
 - `deploy:check` for the server package runs `wrangler deploy --dry-run` on
   the e2e Worker to check that the package bundles for Workers.
 

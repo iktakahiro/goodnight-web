@@ -1,0 +1,37 @@
+# Secrets for this site. Never commit real values.
+#
+# - Deploy to Cloudflare button: the setup form asks for each value below.
+# - Production: set them in the Cloudflare dashboard (Workers & Pages > your
+#   Worker > Settings > Variables and Secrets) or with `npx wrangler secret put
+#   <NAME>`.
+# - Local development: copy this file to .dev.vars and fill it in. `wrangler
+#   dev` reads .dev.vars. Git ignores it.
+#
+# A feature whose secret is missing is turned off: for example, the contact
+# form does not accept messages until TURNSTILE_SECRET and the public
+# TURNSTILE_SITE_KEY (in wrangler.jsonc) are set.
+
+# A long random string. You enter it once at /admin to create the first admin.
+# Create one with: openssl rand -base64 32
+SETUP_TOKEN=
+
+# Email addresses that may become admins, separated by commas.
+# Example: you@example.com,colleague@example.com
+ADMIN_EMAILS=
+
+# A random string of 32 characters or more. Signs admin sign-in sessions.
+# Create one with: openssl rand -base64 32
+BETTER_AUTH_SECRET=
+
+# A long random string. IP addresses are stored only as an HMAC made with this
+# key, never as they are. Create one with: openssl rand -base64 32
+IP_HASH_SECRET=
+
+# The Turnstile secret key (Cloudflare dashboard > Turnstile). It pairs with
+# TURNSTILE_SITE_KEY in wrangler.jsonc.
+TURNSTILE_SECRET=
+
+# Optional. A Slack incoming webhook URL (https://hooks.slack.com/...). Slack
+# gets "1 new inquiry", the topic, and a link to the admin screen; never the
+# name, email address, or message. Leave it empty for no notifications.
+SLACK_WEBHOOK_URL=

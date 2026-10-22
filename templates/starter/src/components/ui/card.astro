@@ -1,0 +1,21 @@
+---
+/** A white panel with a soft border and rounded corners. */
+import type { HTMLAttributes } from 'astro/types';
+
+type Props = HTMLAttributes<'div'> & {
+  /** Render as another element, such as `article` or `section`. */
+  as?: 'div' | 'article' | 'section' | 'li';
+};
+
+const { as: Tag = 'div', class: className, ...rest } = Astro.props;
+---
+
+<Tag
+  class:list={[
+    'rounded-card border border-border bg-card p-6 shadow-[0_1px_2px_rgb(60_40_120/0.04),0_8px_24px_-12px_rgb(60_40_120/0.12)] sm:p-8',
+    className,
+  ]}
+  {...rest}
+>
+  <slot />
+</Tag>

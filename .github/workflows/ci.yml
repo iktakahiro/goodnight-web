@@ -36,8 +36,9 @@ jobs:
         run: bun run build
 
       # Deploy check: runs `turbo run deploy:check`, which runs
-      # `wrangler deploy --dry-run` in each workspace that defines the script
-      # (templates/starter and apps/docs). It never deploys. Until a workspace
-      # defines `deploy:check`, Turborepo runs no tasks and the step passes.
+      # `wrangler deploy --dry-run` in each workspace that defines the script:
+      # templates/starter (the site Worker with @goodnight-web/server, its
+      # bindings, and the built pages), apps/docs, and packages/server (its
+      # e2e Worker). It never deploys and needs no Cloudflare account.
       - name: Deploy check (wrangler dry run)
         run: bun run deploy:check

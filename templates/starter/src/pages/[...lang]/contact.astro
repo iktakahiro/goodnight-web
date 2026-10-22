@@ -1,0 +1,74 @@
+---
+import PageHeader from '../../components/site/page-header.astro';
+import Card from '../../components/ui/card.astro';
+import ContactForm from '../../features/contact/contact-form.astro';
+import BaseLayout from '../../layouts/base-layout.astro';
+import { localeFromParam, localeStaticPaths } from '../../i18n/locales';
+import { siteConfig } from '../../../site.config';
+
+export const getStaticPaths = localeStaticPaths;
+
+const locale = localeFromParam(Astro.params.lang);
+const { company } = siteConfig;
+
+const text = {
+  ja: {
+    title: 'お問い合わせ',
+    lead: 'ご相談やご質問は、下のフォームからお送りください。2営業日以内にお返事します。',
+    asideTitle: 'フォーム以外の連絡先',
+    hours: '受付時間：平日 9:00〜17:00（土日祝・年末年始を除く）',
+    email: 'メール',
+    phone: '電話',
+    salesNote:
+      '営業・ご提案のご連絡は「営業・ご提案」を選んでください。内容を確認し、必要な場合のみお返事します。',
+  },
+  en: {
+    title: 'Contact',
+    lead: 'Send us your request or question with the form below. We reply within two business days.',
+    asideTitle: 'Other ways to reach us',
+    hours: 'Hours: weekdays 9:00–17:00 JST (closed on weekends, national holidays, and over the New Year)',
+    email: 'Email',
+    phone: 'Phone',
+    salesNote:
+      'For sales proposals, choose "Sales proposal". We read every message and reply only when needed.',
+  },
+}[locale];
+---
+
+<BaseLayout locale={locale} title={text.title} description={text.lead} path='/contact/'>
+  <PageHeader eyebrow='Contact' title={text.title} lead={text.lead} />
+
+  <div
+    class='mx-auto grid max-w-6xl gap-8 px-5 pt-12 sm:px-8 lg:grid-cols-[1fr_20rem]'
+  >
+    <Card>
+      <ContactForm locale={locale} />
+    </Card>
+
+    <aside class='space-y-4 text-sm' aria-labelledby='contact-aside-title'>
+      <div class='rounded-card bg-primary-softer p-6'>
+        <h2 id='contact-aside-title' class='text-base font-bold'>
+          {text.asideTitle}
+        </h2>
+        <dl class='mt-3 space-y-2'>
+          <div>
+            <dt class='font-bold'>{text.email}</dt>
+            <dd><a href={`mailto:${company.email}`}>{company.email}</a></dd>
+          </div>
+          {
+            company.phone && (
+              <div>
+                <dt class='font-bold'>{text.phone}</dt>
+                <dd>
+                  <a href={`tel:${company.phone}`}>{company.phone}</a>
+                </dd>
+              </div>
+            )
+          }
+        </dl>
+        <p class='mt-3 text-muted'>{text.hours}</p>
+      </div>
+      <p class='px-2 text-muted'>{text.salesNote}</p>
+    </aside>
+  </div>
+</BaseLayout>

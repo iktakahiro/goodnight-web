@@ -1,0 +1,33 @@
+---
+import { getEntry, render } from 'astro:content';
+import PageHeader from '../../components/site/page-header.astro';
+import BaseLayout from '../../layouts/base-layout.astro';
+import { formatDate, localeFromParam, localeStaticPaths } from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+
+export const getStaticPaths = localeStaticPaths;
+
+const locale = localeFromParam(Astro.params.lang);
+// The text is in src/content/pages/<locale>/privacy.md.
+const page = await getEntry('pages', `${locale}/privacy`);
+if (!page) throw new Error(`Missing src/content/pages/${locale}/privacy.md`);
+const { Content } = await render(page);
+---
+
+<BaseLayout
+  locale={locale}
+  title={page.data.title}
+  description={page.data.description}
+  path='/privacy/'
+>
+  <PageHeader eyebrow='Privacy' title={page.data.title}>
+    <p class='mt-4 text-sm text-muted'>
+      {ui.updated[locale]}: {formatDate(locale, page.data.updated)}
+    </p>
+  </PageHeader>
+  <div class='mx-auto max-w-3xl px-5 pt-12 sm:px-8'>
+    <div class='prose-content'>
+      <Content />
+    </div>
+  </div>
+</BaseLayout>

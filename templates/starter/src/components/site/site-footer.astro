@@ -1,0 +1,68 @@
+---
+/** The footer with the company details and links. */
+import { localizePath } from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+import { siteConfig, type Locale } from '../../../site.config';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const { company } = siteConfig;
+const year = new Date().getFullYear();
+---
+
+<footer class='mt-24 border-t border-border bg-primary-softer'>
+  <div
+    class='mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1.4fr_1fr]'
+  >
+    <div class='space-y-3'>
+      <p class='text-lg font-bold'>{company.name[locale]}</p>
+      <p class='text-sm text-muted'>{company.address[locale]}</p>
+      <p class='text-sm text-muted'>
+        {
+          company.phone && (
+            <>
+              <span>TEL </span>
+              <a href={`tel:${company.phone}`} class='hover:text-primary-strong'>
+                {company.phone}
+              </a>
+              <span aria-hidden='true'> / </span>
+            </>
+          )
+        }
+        <a href={`mailto:${company.email}`} class='hover:text-primary-strong'>
+          {company.email}
+        </a>
+      </p>
+    </div>
+    <nav aria-label={ui.footerNav[locale]}>
+      <ul class='grid grid-cols-2 gap-x-6 gap-y-2 text-sm'>
+        {
+          siteConfig.nav.map((item) => (
+            <li>
+              <a
+                href={localizePath(locale, item.path)}
+                class='text-foreground/80 hover:text-primary-strong'
+              >
+                {item.label[locale]}
+              </a>
+            </li>
+          ))
+        }
+        <li>
+          <a
+            href={localizePath(locale, '/privacy/')}
+            class='text-foreground/80 hover:text-primary-strong'
+          >
+            {ui.privacy[locale]}
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <p class='border-t border-border/70 py-5 text-center text-xs text-muted'>
+    © {year} {company.name[locale]}
+  </p>
+</footer>

@@ -1,0 +1,108 @@
+---
+import PageHeader from '../../components/site/page-header.astro';
+import Card from '../../components/ui/card.astro';
+import SectionHeading from '../../components/ui/section-heading.astro';
+import BaseLayout from '../../layouts/base-layout.astro';
+import { localeFromParam, localeStaticPaths } from '../../i18n/locales';
+import { siteConfig } from '../../../site.config';
+
+export const getStaticPaths = localeStaticPaths;
+
+const locale = localeFromParam(Astro.params.lang);
+
+const text = {
+  ja: {
+    title: '会社概要',
+    lead: 'ゆうなぎ工房の考え方と、会社の基本情報です。',
+    messageTitle: '代表あいさつ',
+    message: [
+      'ゆうなぎ工房は、2012年に金沢の小さな倉庫で始まりました。最初の仕事は、近所の喫茶店のカウンターの修理でした。',
+      'お店やオフィスの家具は、毎日たくさんの人が使います。だからこそ、丈夫で、直しながら長く使えることを大切にしています。新しくつくる家具も、10年後に修理しやすい構造で設計しています。',
+      '小さな相談から、どうぞお気軽にお声がけください。',
+    ],
+    signature: '代表取締役 山田 花子',
+    profileTitle: '会社情報',
+    historyTitle: '沿革',
+    history: [
+      { year: '2012年', body: '金沢市内で創業。家具の修理を中心に始める' },
+      { year: '2016年', body: '店舗向けのオーダー家具の製作を開始' },
+      { year: '2021年', body: '店舗内装の設計を開始' },
+      { year: '2026年', body: '工房を現在の所在地に移転' },
+    ],
+  },
+  en: {
+    title: 'About us',
+    lead: 'How we work at Yunagi Works, and our company details.',
+    messageTitle: 'A message from our CEO',
+    message: [
+      'Yunagi Works started in 2012 in a small warehouse in Kanazawa. Our first job was repairing the counter of a coffee shop in our neighborhood.',
+      'Furniture in shops and offices is used by many people every day. That is why we focus on furniture that is sturdy and can be repaired and used for a long time. Even new pieces are designed so that they are easy to repair ten years later.',
+      'Please feel free to contact us, even with a small question.',
+    ],
+    signature: 'Hanako Yamada, CEO',
+    profileTitle: 'Company profile',
+    historyTitle: 'History',
+    history: [
+      { year: '2012', body: 'Founded in Kanazawa, starting with furniture repair' },
+      { year: '2016', body: 'Started making custom furniture for shops' },
+      { year: '2021', body: 'Started shop interior design' },
+      { year: '2026', body: 'Moved the workshop to its current address' },
+    ],
+  },
+}[locale];
+---
+
+<BaseLayout locale={locale} title={text.title} description={text.lead} path='/about/'>
+  <PageHeader eyebrow='About' title={text.title} lead={text.lead} />
+
+  <div class='mx-auto max-w-4xl space-y-16 px-5 pt-14 sm:px-8'>
+    <section aria-labelledby='message-title' class='space-y-6'>
+      <SectionHeading id='message-title' title={text.messageTitle} />
+      <Card class='space-y-4'>
+        {text.message.map((paragraph) => <p>{paragraph}</p>)}
+        <p class='pt-2 text-right font-bold'>{text.signature}</p>
+      </Card>
+    </section>
+
+    <section aria-labelledby='profile-title' class='space-y-6'>
+      <SectionHeading id='profile-title' title={text.profileTitle} />
+      <div class='overflow-hidden rounded-card border border-border bg-card'>
+        <table class='w-full text-left text-[0.95rem]'>
+          <tbody class='divide-y divide-border'>
+            {
+              siteConfig.company.profile.map((row) => (
+                <tr class='flex flex-col sm:table-row'>
+                  <th
+                    scope='row'
+                    class='bg-primary-softer px-6 pt-4 pb-1 align-top font-bold whitespace-nowrap sm:w-48 sm:py-4'
+                  >
+                    {row.label[locale]}
+                  </th>
+                  <td class='px-6 pt-1 pb-4 sm:py-4'>{row.value[locale]}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby='history-title' class='space-y-6'>
+      <SectionHeading id='history-title' title={text.historyTitle} />
+      <ol class='space-y-0 border-l-2 border-primary-soft pl-6'>
+        {
+          text.history.map((item) => (
+            <li class='relative pb-6 last:pb-0'>
+              <span
+                aria-hidden='true'
+                class='absolute top-2 -left-[1.95rem] size-3 rounded-full border-2 border-card bg-primary'
+              />
+              <p class='text-sm font-bold text-primary-strong'>{item.year}</p>
+              <p>{item.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+  </div>
+</BaseLayout>
