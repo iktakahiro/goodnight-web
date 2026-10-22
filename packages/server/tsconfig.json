@@ -1,0 +1,8 @@
+{
+  "extends": "@goodnight-web/typescript-config/base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "e2e/**/*.ts"]
+}

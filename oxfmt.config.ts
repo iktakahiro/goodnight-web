@@ -19,6 +19,7 @@ export default defineConfig({
     '**/coverage/**',
     '**/*.gen.ts',
     '**/worker-configuration.d.ts',
+    'packages/server/e2e/public/app.js',
     'bun.lock',
   ],
 });
