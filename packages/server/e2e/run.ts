@@ -6,30 +6,29 @@
 // 8790 (override with E2E_PORT) and a fresh state directory under
 // .wrangler/e2e-state, so it does not touch other local databases.
 //
-// Covers: contact POST -> row in D1; first-admin setup -> passkey
-// registration (CDP virtual authenticator) -> sign-out -> passkey sign-in ->
-// admin list, detail, status change, and CSV export through the API.
-import { rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+// Covers: contact POST -> row in D1; then the real admin UI: first-admin
+// setup with wrong and right input -> passkey registration (CDP virtual
+// authenticator) -> sign-out -> passkey sign-in -> list -> detail -> status
+// change -> Slack-style deep link while signed out -> language switch ->
+// delete with confirmation. Also checks the API rules the UI relies on, and
+// that the UI runs under the admin CSP without violations.
+import { join } from 'node:path';
 import { chromium, type Page } from 'playwright';
+import {
+  ADMIN_EMAIL,
+  SETUP_TOKEN,
+  addVirtualAuthenticator,
+  buildPackage,
+  freshDatabase,
+  packageDir,
+  queryDatabase,
+  startDevServer,
+  testVars,
+} from './support.ts';
 
-const packageDir = resolve(import.meta.dir, '..');
-const config = join(packageDir, 'e2e/wrangler.jsonc');
 const stateDir = join(packageDir, '.wrangler/e2e-state');
 const port = Number(process.env.E2E_PORT ?? '8790');
-// WebAuthn rejects IP addresses as the relying party ID: use localhost.
-const base = `http://localhost:${port}`;
-const wrangler = join(packageDir, 'node_modules/.bin/wrangler');
-
-const SETUP_TOKEN = 'e2e-setup-token-0123456789';
-const ADMIN_EMAIL = 'admin@example.com';
-const vars = {
-  SETUP_TOKEN,
-  ADMIN_EMAILS: ADMIN_EMAIL,
-  BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
-  IP_HASH_SECRET: 'e2e-ip-hash-secret',
-  TURNSTILE_SECRET: 'e2e-turnstile-secret',
-};
+const query = (sql: string) => queryDatabase(stateDir, sql);
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -39,51 +38,21 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   );
 };
 
-const run = async (args: string[]) => {
-  const proc = Bun.spawn([wrangler, ...args], {
-    cwd: packageDir,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (code !== 0)
-    throw new Error(`wrangler ${args.join(' ')} failed:\n${out}\n${err}`);
-  return out;
-};
+let currentPage: Page | null = null;
 
-const query = async (sql: string): Promise<Record<string, unknown>[]> => {
-  const out = await run([
-    'd1',
-    'execute',
-    'DB',
-    '--local',
-    '-c',
-    config,
-    '--persist-to',
-    stateDir,
-    '--json',
-    '--command',
-    sql,
-  ]);
-  const parsed = JSON.parse(out) as { results: Record<string, unknown>[] }[];
-  return parsed[0]?.results ?? [];
-};
-
-const waitForServer = async () => {
-  for (let i = 0; i < 120; i++) {
-    try {
-      const response = await fetch(`${base}/api/contact/config`);
-      if (response.ok) return;
-    } catch {
-      // Not up yet.
+/** Runs a UI step; a timeout or a missing element counts as a failure. */
+const step = async (name: string, action: () => Promise<unknown>) => {
+  try {
+    await action();
+    check(name, true);
+  } catch (error) {
+    check(name, false, error instanceof Error ? error.message : String(error));
+    if (process.env.E2E_DEBUG_DIR && currentPage) {
+      const file = join(process.env.E2E_DEBUG_DIR, `${failures}.png`);
+      await currentPage.screenshot({ path: file, fullPage: true });
+      console.log(`  url: ${currentPage.url()} screenshot: ${file}`);
     }
-    await Bun.sleep(500);
   }
-  throw new Error(`wrangler dev did not start on ${base}`);
 };
 
 type Gnw = {
@@ -101,11 +70,10 @@ type Gnw = {
     email: string,
     name: string,
   ) => Promise<{ status: number; body: unknown }>;
-  addPasskey: () => Promise<{ data?: { id?: string } | null; error?: unknown }>;
   signOut: () => Promise<unknown>;
-  signInPasskey: () => Promise<{ error?: unknown }>;
 };
 
+/** Calls a helper from e2e/client/app.ts in the test page. */
 const gnw = <K extends keyof Gnw>(
   page: Page,
   name: K,
@@ -127,7 +95,7 @@ const contactBody = (token: string, name: string) => ({
   name,
   email: 'visitor@example.org',
   category: 'sales',
-  message: 'Hello from the end-to-end test.',
+  message: 'Hello from the end-to-end test.\nSecond line.',
   consent: true,
   turnstileToken: token,
   elapsedMs: 15_000,
@@ -135,6 +103,7 @@ const contactBody = (token: string, name: string) => ({
 });
 
 const main = async () => {
+  await buildPackage();
   const build = await Bun.build({
     entrypoints: [join(packageDir, 'e2e/client/app.ts')],
     outdir: join(packageDir, 'e2e/public'),
@@ -142,66 +111,45 @@ const main = async () => {
     minify: true,
   });
   if (!build.success) throw new Error(build.logs.join('\n'));
+  await freshDatabase(stateDir);
 
-  await rm(stateDir, { recursive: true, force: true });
-  await run([
-    'd1',
-    'migrations',
-    'apply',
-    'DB',
-    '--local',
-    '-c',
-    config,
-    '--persist-to',
-    stateDir,
-  ]);
-
-  const dev = Bun.spawn(
-    [
-      wrangler,
-      'dev',
-      '-c',
-      config,
-      '--port',
-      String(port),
-      '--ip',
-      '127.0.0.1',
-      '--persist-to',
-      stateDir,
-      '--show-interactive-dev-session=false',
-      ...Object.entries(vars).flatMap(([k, v]) => ['--var', `${k}:${v}`]),
-    ],
-    {
-      cwd: packageDir,
-      stdout: 'ignore',
-      stderr: 'inherit',
-      env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
-    },
-  );
+  const server = await startDevServer({ port, stateDir, vars: testVars });
+  const { base } = server;
   const browser = await chromium.launch({ headless: true });
   try {
-    await waitForServer();
-    const context = await browser.newContext();
+    const context = await browser.newContext({ locale: 'en-US' });
     const page = await context.newPage();
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('WebAuthn.enable');
-    const { authenticatorId } = await cdp.send(
-      'WebAuthn.addVirtualAuthenticator',
-      {
-        options: {
-          protocol: 'ctap2',
-          transport: 'internal',
-          hasResidentKey: true,
-          hasUserVerification: true,
-          isUserVerified: true,
-          automaticPresenceSimulation: true,
-        },
-      },
-    );
-    await page.goto(`${base}/`);
-    await page.waitForSelector('body[data-ready="true"]');
+    currentPage = page;
+    const authenticator = await addVirtualAuthenticator(context, page);
+    // The virtual authenticator also answers the sign-in screen's autofill
+    // request (conditional UI). To test the button, turn autofill off with a
+    // flag in localStorage.
+    await context.addInitScript(() => {
+      if (localStorage.getItem('e2e-no-autofill') === '1') {
+        PublicKeyCredential.isConditionalMediationAvailable = async () => false;
+      }
+    });
+    const setAutofill = (on: boolean) =>
+      page.evaluate((value) => {
+        if (value) localStorage.removeItem('e2e-no-autofill');
+        else localStorage.setItem('e2e-no-autofill', '1');
+      }, on);
+    const cspViolations: string[] = [];
+    page.on('console', (message) => {
+      if (/content security policy/i.test(message.text())) {
+        cspViolations.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => cspViolations.push(error.message));
 
-    // Contact form.
+    // A test page (not the admin UI) with helpers for API calls.
+    const openTestPage = async () => {
+      await page.goto(`${base}/`);
+      await page.waitForSelector('body[data-ready="true"]');
+    };
+    await openTestPage();
+
+    // Contact form API.
     const config = await gnw(page, 'call', '/api/contact/config');
     check(
       'contact config is available',
@@ -225,7 +173,7 @@ const main = async () => {
       rejected,
     );
     const stored = await query(
-      'SELECT name, status, ip_hash, category FROM submissions ORDER BY created_at',
+      'SELECT id, name, status, ip_hash FROM submissions ORDER BY created_at',
     );
     check(
       'exactly one row is in D1 with status new',
@@ -239,58 +187,131 @@ const main = async () => {
       /^[0-9a-f]{64}$/.test(String(stored[0]?.ip_hash)),
       stored[0]?.ip_hash,
     );
-
-    // First admin.
+    const id = String(stored[0]?.id);
     const before = await gnw(page, 'call', '/api/admin/submissions');
     check('admin list is 401 before sign-in', before.status === 401, before);
-    const state = await gnw(page, 'call', '/api/setup');
-    check(
-      'setup is open',
-      (state.body as { open?: boolean }).open === true,
-      state,
-    );
-    const wrong = await gnw(page, 'setup', 'wrong-token', ADMIN_EMAIL, 'Admin');
-    check('setup with a wrong token is 403', wrong.status === 403, wrong);
-    const notAllowed = await gnw(
-      page,
-      'setup',
-      SETUP_TOKEN,
-      'other@example.com',
-      'Other',
-    );
-    check(
-      'setup with an address outside ADMIN_EMAILS is 403',
-      notAllowed.status === 403,
-      notAllowed,
-    );
-    const created = await gnw(
-      page,
-      'setup',
-      SETUP_TOKEN,
-      'Admin@Example.com',
-      'Admin',
-    );
-    check('setup creates the admin', created.status === 200, created);
-    const noPasskey = await gnw(page, 'call', '/api/admin/submissions');
-    check(
-      'admin list needs a passkey first',
-      noPasskey.status === 403,
-      noPasskey,
-    );
 
-    const added = await gnw(page, 'addPasskey');
-    check(
-      'passkey registration',
-      !added.error && Boolean(added.data?.id),
-      added.error,
-    );
-    const { credentials } = await cdp.send('WebAuthn.getCredentials', {
-      authenticatorId,
+    // Setup through the admin UI.
+    await step('/admin sends a new site to setup', async () => {
+      await page.goto(`${base}/admin`);
+      await page.waitForURL(`${base}/admin/setup`);
+      await page
+        .getByRole('heading', { name: 'Create the first admin' })
+        .waitFor();
     });
+    const submitSetup = async (token: string, email: string) => {
+      await page.getByLabel('Setup token').fill(token);
+      await page.getByLabel('Email address').fill(email);
+      await page.getByRole('button', { name: 'Continue' }).click();
+    };
+    await step('setup shows the wrong-token error', async () => {
+      await submitSetup('wrong-token', ADMIN_EMAIL);
+      await page.getByText('The setup token is not correct.').waitFor();
+    });
+    await step('setup shows the email-not-allowed error', async () => {
+      await submitSetup(SETUP_TOKEN, 'other@example.com');
+      await page
+        .getByText('This email address is not in ADMIN_EMAILS.')
+        .waitFor();
+    });
+    await step('setup accepts the token and an allowed address', async () => {
+      await page.getByLabel('Your name').fill('Admin');
+      await submitSetup(SETUP_TOKEN, 'Admin@Example.com');
+      await page.getByRole('button', { name: 'Register a passkey' }).click();
+      await page.getByRole('heading', { name: 'Setup is complete' }).waitFor();
+    });
+    const credentials = await authenticator.credentials();
     check(
       'authenticator holds one resident credential',
       credentials.length === 1 && credentials[0]?.isResidentCredential === true,
+      credentials.length,
     );
+
+    await step('setup leads to the list with the unread count', async () => {
+      await page.getByRole('button', { name: 'Open inquiries' }).click();
+      await page.waitForURL(`${base}/admin`);
+      await page.getByRole('heading', { name: 'Inquiries' }).waitFor();
+      await page.getByTestId('unread-count').getByText('1 unread').waitFor();
+    });
+    await step('Slack is optional: only a quiet note', async () => {
+      await page.getByTestId('slack-notice').waitFor();
+      if (await page.getByTestId('turnstile-notice').count()) {
+        throw new Error('Turnstile notice shown although it is configured');
+      }
+    });
+
+    await step('sign-out returns to the sign-in screen', async () => {
+      // The flag applies from the next page load.
+      await setAutofill(false);
+      await page.reload();
+      await page.getByRole('button', { name: 'Sign out' }).click();
+      await page.waitForURL(`${base}/admin/login`);
+      await page
+        .getByRole('heading', { name: 'Sign in to the admin screen' })
+        .waitFor();
+    });
+    await step('the sign-in screen does not link to closed setup', async () => {
+      await page.getByText('Only people who registered a passkey').waitFor();
+      if (await page.getByTestId('setup-open').count()) {
+        throw new Error('setup link shown after setup closed');
+      }
+    });
+    const signedOut = await page.evaluate(async () => {
+      const response = await fetch('/api/admin/submissions');
+      return response.status;
+    });
+    check('admin list is 401 after sign-out', signedOut === 401, signedOut);
+
+    await step('passkey sign-in with the button opens the list', async () => {
+      await page
+        .getByRole('button', { name: 'Sign in with a passkey' })
+        .click();
+      await page.waitForURL(`${base}/admin`);
+    });
+    await step('the list shows the inquiry as new', async () => {
+      const row = page.getByTestId('inquiry-row').filter({
+        hasText: 'E2E Visitor',
+      });
+      await row.getByText('New').waitFor();
+      await row.getByText('Hello from the end-to-end test.').waitFor();
+    });
+
+    await step('a row opens the detail, which marks it read', async () => {
+      await page.getByTestId('inquiry-row').first().click();
+      await page.waitForURL(`${base}/admin/inquiries/${id}`);
+      await page.getByRole('heading', { name: 'E2E Visitor' }).waitFor();
+      await page
+        .getByTestId('inquiry-body')
+        .getByText('Second line.')
+        .waitFor();
+      await page.getByTestId('status-select').getByText('Read').waitFor();
+      await page.getByTestId('unread-count').getByText('0 unread').waitFor();
+    });
+    await step('status change to Done', async () => {
+      await page.getByTestId('status-select').click();
+      await page.getByRole('option', { name: 'Done' }).click();
+      await page.getByText('Status changed to “Done”.').waitFor();
+    });
+    const afterChange = await query(
+      `SELECT status FROM submissions WHERE id = '${id}'`,
+    );
+    check(
+      'the new status is stored',
+      afterChange[0]?.status === 'done',
+      afterChange,
+    );
+    await step('back to the list keeps working', async () => {
+      await page.getByRole('button', { name: 'Back to inquiries' }).click();
+      await page.waitForURL(`${base}/admin`);
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'E2E Visitor' })
+        .getByText('Done')
+        .waitFor();
+    });
+
+    // API rules that the UI relies on.
+    await openTestPage();
     const closed = await gnw(page, 'setup', SETUP_TOKEN, ADMIN_EMAIL, 'Admin');
     check(
       'setup is closed once a passkey exists',
@@ -305,47 +326,6 @@ const main = async () => {
       closedFlag.length === 1,
       closedFlag,
     );
-
-    await gnw(page, 'signOut');
-    const signedOut = await gnw(page, 'call', '/api/admin/submissions');
-    check(
-      'admin list is 401 after sign-out',
-      signedOut.status === 401,
-      signedOut,
-    );
-
-    const signedIn = await gnw(page, 'signInPasskey');
-    check('passkey sign-in', !signedIn.error, signedIn.error);
-
-    // Admin API.
-    const list = await gnw(page, 'call', '/api/admin/submissions');
-    const listBody = list.body as {
-      items: { id: string }[];
-      unreadCount: number;
-    };
-    check(
-      'admin list shows the submission',
-      list.status === 200 &&
-        listBody.items.length === 1 &&
-        listBody.unreadCount === 1,
-      list,
-    );
-    const id = listBody.items[0]?.id ?? '';
-    const detail = await gnw(page, 'call', `/api/admin/submissions/${id}`);
-    check(
-      'detail marks it read',
-      (detail.body as { status?: string }).status === 'read',
-      detail,
-    );
-    const patched = await gnw(page, 'call', `/api/admin/submissions/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'done' }),
-    });
-    check(
-      'status change',
-      (patched.body as { status?: string }).status === 'done',
-      patched,
-    );
     const csv = await gnw(page, 'call', '/api/admin/submissions.csv');
     check(
       'CSV export',
@@ -359,25 +339,68 @@ const main = async () => {
         true,
       status,
     );
-    const admin = await gnw(page, 'call', '/admin/inquiries/abc');
+    const shell = await gnw(page, 'call', `/admin/inquiries/${id}`);
     check(
       'admin UI deep link is served with the CSP',
-      admin.status === 200 &&
-        (admin.headers['content-security-policy'] ?? '').includes(
+      shell.status === 200 &&
+        String(shell.body).includes('/admin/assets/') &&
+        (shell.headers['content-security-policy'] ?? '').includes(
           "script-src 'self'",
         ),
-      admin.status,
+      shell.status,
     );
+
+    // The link in a Slack notification, opened while signed out.
+    // This time sign in through the passkey autofill (conditional UI).
+    await gnw(page, 'signOut');
+    await setAutofill(true);
+    await step(
+      'a deep link while signed out goes through sign-in',
+      async () => {
+        await page.goto(`${base}/admin/inquiries/${id}`);
+        await page.waitForURL(/\/admin\/login\?next=/);
+        await page.waitForURL(`${base}/admin/inquiries/${id}`);
+        await page.getByRole('heading', { name: 'E2E Visitor' }).waitFor();
+      },
+    );
+
+    await step('language switch to Japanese is kept after reload', async () => {
+      await page.getByRole('button', { name: /^Language/ }).click();
+      await page.getByRole('menuitemradio', { name: '日本語' }).click();
+      await page
+        .getByRole('button', { name: 'お問い合わせ一覧に戻る' })
+        .waitFor();
+      await page.reload();
+      await page
+        .getByRole('button', { name: 'お問い合わせ一覧に戻る' })
+        .waitFor();
+    });
+
+    await step('delete asks for confirmation, then removes it', async () => {
+      await page.getByRole('button', { name: '削除', exact: true }).click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog.getByText('このお問い合わせを削除しますか？').waitFor();
+      await dialog.getByRole('button', { name: '削除する' }).click();
+      await page.waitForURL(`${base}/admin`);
+      await page.getByText('お問い合わせはまだありません。').waitFor();
+    });
+    const remaining = await query('SELECT COUNT(*) AS n FROM submissions');
+    check('the row is deleted', remaining[0]?.n === 0, remaining);
+
     const sessions = await query('SELECT ipAddress FROM session');
     check(
       'sessions store no IP address',
       sessions.every((s) => !s.ipAddress),
       sessions,
     );
+    check(
+      'no CSP violations or page errors in the admin UI',
+      cspViolations.length === 0,
+      cspViolations,
+    );
   } finally {
     await browser.close();
-    dev.kill();
-    await dev.exited;
+    await server.stop();
   }
   console.log(
     failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`,
