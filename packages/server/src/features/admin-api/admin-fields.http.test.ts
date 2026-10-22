@@ -108,7 +108,7 @@ beforeEach(async () => {
   await seed('new', {
     createdAt: now - 2000,
     email: 'c@example.org',
-    status: 'done',
+    status: 'read',
     formVersion: 2,
     fields: {
       f_name: 'New Visitor',
@@ -178,18 +178,19 @@ describe('admin list', () => {
     expect(byId.new.fields.f_message.text).toBe(`${'x'.repeat(120)}…`);
     expect(byId.new).toMatchObject({
       email: 'c@example.org',
-      status: 'done',
+      status: 'read',
+      suspectedSpam: false,
       formVersion: 2,
     });
     expect(byId.new).not.toHaveProperty('ipHash');
   });
 
-  test('filters by status, version, and a choice field', async () => {
+  test('filters by view, version, and a choice field', async () => {
     const ids = async (query: string) =>
       (await json(`/api/admin/submissions?${query}`)).items.map(
         (item: { id: string }) => item.id,
       );
-    expect(await ids('status=done')).toEqual(['new']);
+    expect(await ids('view=read')).toEqual(['new']);
     expect(await ids('version=1')).toEqual(['old']);
     expect(await ids('version=2')).toEqual(['newest', 'new']);
     expect(await ids('field=f_category&value=sales')).toEqual([
@@ -197,27 +198,26 @@ describe('admin list', () => {
       'old',
     ]);
     expect(await ids(`field=${budgetId}&value=${under}`)).toEqual(['new']);
-    expect(await ids('field=f_category&value=press&status=new')).toEqual([]);
+    expect(await ids('field=f_category&value=press&view=unread')).toEqual([]);
     const counted = await json(
       '/api/admin/submissions?field=f_category&value=sales',
     );
     expect(counted.total).toBe(2);
   });
 
-  test('sorts by received time, email, and status', async () => {
+  test('sorts by received time only', async () => {
     const ids = async (query: string) =>
       (await json(`/api/admin/submissions?${query}`)).items.map(
         (item: { id: string }) => item.id,
       );
     expect(await ids('')).toEqual(['newest', 'new', 'old']);
-    expect(await ids('sort=received_at&dir=asc')).toEqual([
-      'old',
-      'new',
-      'newest',
-    ]);
-    expect(await ids('sort=email&dir=asc')).toEqual(['newest', 'old', 'new']);
-    expect(await ids('sort=email&dir=desc')).toEqual(['new', 'old', 'newest']);
-    expect(await ids('sort=status&dir=asc')).toEqual(['new', 'newest', 'old']);
+    expect(await ids('dir=desc')).toEqual(['newest', 'new', 'old']);
+    expect(await ids('dir=asc')).toEqual(['old', 'new', 'newest']);
+    for (const sort of ['email', 'status', 'received_at', 'f_name']) {
+      expect((await get(`/api/admin/submissions?sort=${sort}`)).status).toBe(
+        400,
+      );
+    }
   });
 
   const INJECTIONS: Record<string, string>[] = [
@@ -235,10 +235,21 @@ describe('admin list', () => {
     { field: 'constructor', value: 'sales' },
     { field: 'f_category' },
     { value: 'sales' },
-    { q: 'Visitor' },
+    { keyword: 'Visitor' },
     { search: 'Visitor' },
-    { field: 'f_category', value: 'sales', q: 'x' },
+    { field: 'f_category', value: 'sales', sort: 'email' },
   ];
+
+  test('the search matches the email address, never the form fields', async () => {
+    const ids = async (q: string) =>
+      (
+        await json(`/api/admin/submissions?${new URLSearchParams({ q })}`)
+      ).items.map((item: { id: string }) => item.id);
+    expect(await ids('Visitor')).toEqual([]);
+    expect(await ids('From version')).toEqual([]);
+    expect(await ids('C@EXAMPLE')).toEqual(['new']);
+    expect(await ids('example.org')).toEqual(['newest', 'new', 'old']);
+  });
 
   test.each(INJECTIONS)(
     'rejects %p with 400 and runs no query',
@@ -351,6 +362,7 @@ describe('CSV export', () => {
         'id',
         'received_at',
         'status',
+        'suspected_spam',
         'email',
         'locale',
         'form_version',

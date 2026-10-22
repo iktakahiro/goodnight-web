@@ -48,11 +48,8 @@ const en = {
   'field.too_long': 'Too long.',
 
   // Submission statuses.
-  'status.new': 'New',
+  'status.unread': 'Unread',
   'status.read': 'Read',
-  'status.done': 'Done',
-  'status.held': 'On hold',
-  'status.spam': 'Spam',
 
   // Contact form states.
   'contact.sent': 'Thank you. Your message has been sent.',
@@ -135,11 +132,8 @@ const ja: MessageCatalog = {
   'field.invalid': '入力内容を確認してください。',
   'field.too_long': '長すぎます。',
 
-  'status.new': '未読',
+  'status.unread': '未読',
   'status.read': '既読',
-  'status.done': '対応済み',
-  'status.held': '保留',
-  'status.spam': 'スパム',
 
   'contact.sent': 'ありがとうございます。お問い合わせを送信しました。',
   'contact.unavailable':

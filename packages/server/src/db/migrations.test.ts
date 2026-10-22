@@ -66,15 +66,15 @@ describe('migrations', () => {
   });
 });
 
-describe('the contact fields migration (0004, 0005)', () => {
-  const apply = (sqlite: Database, from: number, to: number) => {
-    for (const name of files.slice(from, to)) {
-      sqlite.exec(readFileSync(join(MIGRATIONS_DIR, name), 'utf8'));
-    }
-  };
-  const index = (prefix: string) =>
-    files.findIndex((name) => name.startsWith(prefix));
+const apply = (sqlite: Database, from: number, to: number) => {
+  for (const name of files.slice(from, to)) {
+    sqlite.exec(readFileSync(join(MIGRATIONS_DIR, name), 'utf8'));
+  }
+};
+const index = (prefix: string) =>
+  files.findIndex((name) => name.startsWith(prefix));
 
+describe('the contact fields migration (0004, 0005)', () => {
   test('moves existing submissions into fields without losing data', () => {
     const sqlite = new Database(':memory:');
     apply(sqlite, 0, index('0004'));
@@ -118,7 +118,7 @@ describe('the contact fields migration (0004, 0005)', () => {
       'こんにちは',
       'held',
     );
-    apply(sqlite, index('0004'), files.length);
+    apply(sqlite, index('0004'), index('0006'));
 
     const rows = sqlite
       .query(
@@ -236,8 +236,90 @@ describe('the contact fields migration (0004, 0005)', () => {
     );
     expect(
       sqlite
-        .query("SELECT fields, form_version FROM submissions WHERE id = 'x'")
+        .query(
+          "SELECT fields, form_version, status, suspected_spam FROM submissions WHERE id = 'x'",
+        )
         .get(),
-    ).toEqual({ fields: '{}', form_version: 1 });
+    ).toEqual({
+      fields: '{}',
+      form_version: 1,
+      status: 'unread',
+      suspected_spam: 0,
+    });
+  });
+});
+
+describe('the unread/read status migration (0006)', () => {
+  test('maps the old statuses to unread/read and flags held and spam', () => {
+    const sqlite = new Database(':memory:');
+    apply(sqlite, 0, index('0006'));
+    const insert = sqlite.query(
+      `INSERT INTO submissions (id, created_at, email, status, spam_score,
+        spam_reasons, ip_hash, consent_at, read_at, locale, fields,
+        form_version)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'hash', ?2, ?7, 'ja', ?8, 1)`,
+    );
+    const rows = [
+      ['new', 0, '[]', null],
+      ['read', 0, '[]', 10],
+      ['done', 1, '["links:1"]', 20],
+      ['held', 4, '["links:1","too_fast"]', null],
+      ['spam', 0, '[]', 30],
+    ] as const;
+    for (const [i, [status, score, reasons, readAt]] of rows.entries()) {
+      insert.run(
+        status,
+        i + 1,
+        `${status}@example.org`,
+        status,
+        score,
+        reasons,
+        readAt,
+        JSON.stringify({ f_name: status }),
+      );
+    }
+    apply(sqlite, index('0006'), files.length);
+
+    expect(
+      sqlite
+        .query(
+          'SELECT id, status, suspected_spam, spam_score, spam_reasons, read_at, fields, created_at, email FROM submissions ORDER BY created_at',
+        )
+        .all(),
+    ).toEqual(
+      [
+        ['new', 'unread', 0],
+        ['read', 'read', 0],
+        ['done', 'read', 0],
+        ['held', 'read', 1],
+        ['spam', 'read', 1],
+      ].map(([id, status, suspected], i) => ({
+        id,
+        status,
+        suspected_spam: suspected,
+        spam_score: rows[i]![1],
+        spam_reasons: rows[i]![2],
+        read_at: rows[i]![3],
+        fields: JSON.stringify({ f_name: id }),
+        created_at: i + 1,
+        email: `${id}@example.org`,
+      })),
+    );
+
+    const indexes = sqlite
+      .query(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'submissions' AND name LIKE 'idx_%' ORDER BY name",
+      )
+      .all();
+    expect(indexes).toEqual([
+      { name: 'idx_submissions_created' },
+      { name: 'idx_submissions_status_created' },
+      { name: 'idx_submissions_version_created' },
+    ]);
+    expect(() =>
+      sqlite.exec(
+        `INSERT INTO submissions (id, created_at, email, status, consent_at) VALUES ('x', 1, 'x@example.org', 'new', 1)`,
+      ),
+    ).toThrow();
   });
 });

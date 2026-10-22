@@ -288,7 +288,7 @@ export async function setupContactForm(root: HTMLElement): Promise<void> {
           formVersion: current.version,
           locale,
           turnstileToken: token,
-          website: honeypot.value,
+          gnw_hp_x: honeypot.value,
           elapsedMs: Date.now() - shownAt,
           pagePath: location.pathname,
         },

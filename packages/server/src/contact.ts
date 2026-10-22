@@ -34,8 +34,8 @@ export {
   type FieldValues,
 } from './features/contact-form/form-values-schema.ts';
 export {
-  SPAM_HOLD_THRESHOLD,
   SPAM_MIN_ELAPSED_MS,
+  SPAM_SUSPECT_THRESHOLD,
   scoreSubmission,
   type SpamScore,
 } from './features/contact/spam-score.ts';

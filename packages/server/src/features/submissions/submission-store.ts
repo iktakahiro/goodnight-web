@@ -5,6 +5,7 @@ import {
   count,
   desc,
   eq,
+  like,
   lt,
   lte,
   or,
@@ -19,8 +20,8 @@ import type {
   FieldValues,
 } from '../contact-form/form-values-schema.ts';
 import type { Locale } from '../../shared/messages.ts';
-import type { SubmissionSort } from './submission-sort.ts';
 import type { SubmissionStatus } from './submission-status.ts';
+import type { SubmissionOrder, SubmissionView } from './submission-view.ts';
 
 /** A row of the `submissions` table, with camelCase names. */
 export interface Submission {
@@ -34,6 +35,8 @@ export interface Submission {
   /** Language of the page that sent the form, when known. */
   locale: Locale | null;
   status: SubmissionStatus;
+  /** Flagged by the honeypot or the spam score, or by an admin. */
+  suspectedSpam: boolean;
   spamScore: number;
   spamReasons: string[];
   ipHash: string | null;
@@ -93,8 +96,41 @@ const fromRow = ({
 
 const NEWEST_FIRST = [desc(submissions.createdAt), desc(submissions.id)];
 
-const statusIs = (status: SubmissionStatus | undefined) =>
-  status ? eq(submissions.status, status) : undefined;
+const viewIs = (view: SubmissionView | undefined): SQL | undefined => {
+  switch (view) {
+    case 'unread':
+    case 'read':
+      return and(
+        eq(submissions.status, view),
+        eq(submissions.suspectedSpam, false),
+      );
+    case 'all':
+      return eq(submissions.suspectedSpam, false);
+    case 'spam':
+      return eq(submissions.suspectedSpam, true);
+    case undefined:
+      return undefined;
+    default:
+      throw new Error('invalid view');
+  }
+};
+
+/**
+ * Escapes `%`, `_`, and `\` for a `LIKE` pattern with `ESCAPE '\'`, so the
+ * term matches as plain text.
+ */
+export const escapeLike = (term: string): string =>
+  term.replace(/[\\%_]/g, (char) => `\\${char}`);
+
+/**
+ * Case-insensitive partial match on `email`. The pattern is one bound
+ * parameter; only the `ESCAPE` character is part of the SQL text.
+ */
+const emailContains = (term: string): SQL =>
+  sql`${like(
+    sql`lower(${submissions.email})`,
+    `%${escapeLike(term.toLowerCase())}%`,
+  )} escape '\\'`;
 
 /**
  * Filters of the admin list and the CSV export. Every value has been
@@ -102,8 +138,13 @@ const statusIs = (status: SubmissionStatus | undefined) =>
  * definition.
  */
 export interface SubmissionFilter {
-  /** Only this status, or every status when `undefined`. */
-  status?: SubmissionStatus | undefined;
+  /**
+   * One view of the list ({@link SubmissionView}). `undefined` means every
+   * submission, suspected spam included (used by tests and tools only).
+   */
+  view?: SubmissionView | undefined;
+  /** Only submissions whose email contains this text, ignoring case. */
+  email?: string | undefined;
   /** Only this form version. */
   formVersion?: number | undefined;
   /** Only form versions up to and including this one. */
@@ -113,7 +154,8 @@ export interface SubmissionFilter {
 }
 
 const filterWhere = ({
-  status,
+  view,
+  email,
   formVersion,
   maxFormVersion,
   choice,
@@ -126,7 +168,8 @@ const filterWhere = ({
     choiceIs = sql`json_extract(${submissions.fields}, ${`$.${choice.fieldId}`}) = ${choice.value}`;
   }
   return and(
-    statusIs(status),
+    viewIs(view),
+    email ? emailContains(email) : undefined,
     formVersion === undefined
       ? undefined
       : eq(submissions.formVersion, formVersion),
@@ -137,22 +180,10 @@ const filterWhere = ({
   );
 };
 
-const SORT_COLUMNS = {
-  received_at: submissions.createdAt,
-  email: submissions.email,
-  status: submissions.status,
-} as const;
-
-const orderBy = ({ column, direction }: SubmissionSort) => {
-  const by = direction === 'asc' ? asc : desc;
-  // Ties are broken by received time and id, so pages never overlap.
-  return column === 'received_at'
-    ? [by(submissions.createdAt), by(submissions.id)]
-    : [
-        by(SORT_COLUMNS[column]),
-        desc(submissions.createdAt),
-        desc(submissions.id),
-      ];
+// Ties on received time are broken by id, so pages never overlap.
+const orderBy = (order: SubmissionOrder) => {
+  const by = order === 'asc' ? asc : desc;
+  return [by(submissions.createdAt), by(submissions.id)];
 };
 
 /** Inserts a submission. Throws when D1 rejects the write. */
@@ -184,19 +215,20 @@ export interface SubmissionPage {
 }
 
 /**
- * Lists submissions. `limit` and `offset` are bound as parameters; the route
- * validates them as bounded integers. There is no keyword search.
+ * Lists submissions by received time (`order`, newest first by default).
+ * `limit` and `offset` are bound as parameters; the route validates them as
+ * bounded integers.
  */
 export const listSubmissions = async (
   db: D1Database,
   {
     filter = {},
-    sort = { column: 'received_at', direction: 'desc' },
+    order = 'desc',
     limit,
     offset,
   }: {
     filter?: SubmissionFilter;
-    sort?: SubmissionSort;
+    order?: SubmissionOrder;
     limit: number;
     offset: number;
   },
@@ -208,7 +240,7 @@ export const listSubmissions = async (
       .select()
       .from(submissions)
       .where(where)
-      .orderBy(...orderBy(sort))
+      .orderBy(...orderBy(order))
       .limit(limit)
       .offset(offset),
     orm.select({ total: count() }).from(submissions).where(where),
@@ -216,9 +248,13 @@ export const listSubmissions = async (
   return { items: rows.map(fromRow), total: counted?.total ?? 0 };
 };
 
-/** Counts submissions with status `new`. */
+/** Counts unread submissions that are not suspected spam. */
 export const countUnread = async (db: D1Database): Promise<number> =>
-  getDatabase(db).$count(submissions, eq(submissions.status, 'new'));
+  getDatabase(db).$count(submissions, viewIs('unread'));
+
+/** Counts suspected spam, read or unread. */
+export const countSuspectedSpam = async (db: D1Database): Promise<number> =>
+  getDatabase(db).$count(submissions, viewIs('spam'));
 
 /** Returns one submission, or `null` when it does not exist. */
 export const getSubmission = async (
@@ -233,10 +269,7 @@ export const getSubmission = async (
   return row ? fromRow(row) : null;
 };
 
-/**
- * Marks a `new` submission as `read` and sets `read_at`. Other statuses are
- * left as they are.
- */
+/** Marks an `unread` submission as `read` and sets `read_at`. */
 export const markRead = async (
   db: D1Database,
   id: string,
@@ -245,28 +278,36 @@ export const markRead = async (
   await getDatabase(db)
     .update(submissions)
     .set({ status: 'read', readAt: now })
-    .where(and(eq(submissions.id, id), eq(submissions.status, 'new')));
+    .where(and(eq(submissions.id, id), eq(submissions.status, 'unread')));
 };
 
+/** Changes an admin can make to a submission. Leave out what stays. */
+export interface SubmissionUpdate {
+  status?: SubmissionStatus | undefined;
+  suspectedSpam?: boolean | undefined;
+}
+
 /**
- * Sets the status of a submission. Leaving `new` sets `read_at` if it is not
- * set yet.
+ * Updates the status or the suspected spam flag of a submission. `read`
+ * sets `read_at` if it is not set yet; `unread` clears it.
  *
  * @returns `false` when the submission does not exist.
  */
-export const updateStatus = async (
+export const updateSubmission = async (
   db: D1Database,
   id: string,
-  status: SubmissionStatus,
+  { status, suspectedSpam }: SubmissionUpdate,
   now: number,
 ): Promise<boolean> => {
   const result = await getDatabase(db)
     .update(submissions)
-    .set(
-      status === 'new'
-        ? { status }
-        : { status, readAt: sql`coalesce(${submissions.readAt}, ${now})` },
-    )
+    .set({
+      ...(status === 'unread' ? { status, readAt: null } : {}),
+      ...(status === 'read'
+        ? { status, readAt: sql`coalesce(${submissions.readAt}, ${now})` }
+        : {}),
+      ...(suspectedSpam === undefined ? {} : { suspectedSpam }),
+    })
     .where(eq(submissions.id, id));
   return result.meta.changes > 0;
 };

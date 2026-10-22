@@ -36,7 +36,7 @@ const version = (n: number, definition: FormDefinition): FormVersion => ({
   restoredFrom: null,
 });
 
-const FIXED = 10;
+const FIXED = 11;
 
 const stored = (overrides: Partial<Submission>): Submission => ({
   ...testSubmission('x', overrides),

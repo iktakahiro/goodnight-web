@@ -43,6 +43,13 @@
       "when": 1792653134550,
       "tag": "0005_drop_fixed_contact_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792660001337,
+      "tag": "0006_unread_read_status",
+      "breakpoints": true
     }
   ]
 }

@@ -34,7 +34,15 @@ export const submissions = sqliteTable(
     email: text('email').notNull(),
     status: text('status', { enum: SUBMISSION_STATUSES })
       .notNull()
-      .default('new'),
+      .default('unread'),
+    /**
+     * Set when the honeypot was filled or the spam score reached
+     * `SPAM_SUSPECT_THRESHOLD`. Admins can clear or set it. Flagged rows are
+     * never sent to Slack and are listed apart from the others.
+     */
+    suspectedSpam: integer('suspected_spam', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     spamScore: integer('spam_score').notNull().default(0),
     /** JSON array of spam rule names. */
     spamReasons: text('spam_reasons'),
@@ -70,12 +78,12 @@ export const submissions = sqliteTable(
       table.formVersion,
       table.createdAt,
     ),
-    // Unread count and status filter.
+    // Unread count and the unread and read views.
     index('idx_submissions_status_created').on(table.status, table.createdAt),
     // Keep in step with SUBMISSION_STATUSES (checked by a test).
     check(
       'submissions_status_check',
-      sql`${table.status} in ('new', 'read', 'done', 'held', 'spam')`,
+      sql`${table.status} in ('unread', 'read')`,
     ),
   ],
 );
