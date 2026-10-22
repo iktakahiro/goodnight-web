@@ -361,7 +361,7 @@ export const FieldCard = ({
           <span className='flex flex-wrap items-center gap-1.5'>
             <Badge tone='outline'>{t(`form.type.${field.type}`)}</Badge>
             {field.required ? (
-              <Badge tone='violet'>{t('form.required')}</Badge>
+              <Badge tone='violet'>{t('form.previewRequired')}</Badge>
             ) : null}
             {field.id ? (
               <span className='font-mono text-[0.7rem] text-muted-foreground'>

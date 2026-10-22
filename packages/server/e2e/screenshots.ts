@@ -361,9 +361,13 @@ const main = async () => {
     await page.waitForTimeout(4500); // Let the toast close.
     await page.evaluate(() => window.scrollTo(0, 0));
     await shootFull(page, join(formDir, 'editor-ja-light.png'));
-    await page.getByTestId('form-preview').screenshot({
+    // A tall viewport, so the sticky header does not cover the card.
+    await page.setViewportSize({ width: 1280, height: 2200 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByTestId('form-preview-card').screenshot({
       path: join(formDir, 'editor-preview-ja.png'),
     });
+    await page.setViewportSize({ width: 1280, height: 800 });
     console.log(`wrote ${join(formDir, 'editor-preview-ja.png')}`);
     const customId = await insertCustomFieldSample();
     await page.goto(`${base}/admin/inquiries/${customId}`);

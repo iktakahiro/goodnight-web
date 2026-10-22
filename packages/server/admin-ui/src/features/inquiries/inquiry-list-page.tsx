@@ -326,8 +326,9 @@ export const InquiryListPage = () => {
             to='/inquiries/$id'
             params={{ id: item.id }}
             onClick={(event) => event.stopPropagation()}
+            title={item.email}
             className={cn(
-              'rounded-sm break-all outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/60',
+              'block max-w-56 truncate rounded-sm outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/60',
               unread ? 'font-bold' : 'font-medium',
             )}
           >

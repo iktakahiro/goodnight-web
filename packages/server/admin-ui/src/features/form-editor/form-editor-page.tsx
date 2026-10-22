@@ -91,7 +91,7 @@ const PreviewCard = ({ fields }: { fields: readonly EditorField[] }) => {
   const { locale, t } = useI18n();
   const [previewLocale, setPreviewLocale] = useState<Locale>(locale);
   return (
-    <Card className='flex flex-col gap-4 p-5'>
+    <Card data-testid='form-preview-card' className='flex flex-col gap-4 p-5'>
       <div className='flex flex-wrap items-start justify-between gap-3'>
         <div className='flex flex-col gap-1'>
           <h2 className='text-base font-semibold'>
