@@ -1,0 +1,64 @@
+---
+title: Security model
+icon: ShieldCheck
+description: What protects the admin screen, the first admin setup, and the contact form, how secrets are kept, and what goodnight-web does not protect against.
+---
+
+<Callout type='warn' title='Draft / not verified yet'>
+  This page describes the planned design. It will be checked against the code
+  once the server package lands.
+</Callout>
+
+## Principles
+
+- **Fail closed.** When a required setting or secret is missing, the feature that needs it is turned off. Without `TURNSTILE_SECRET`, the contact API returns 503.
+- **Never open the admin screen without sign-in.** There is no development bypass, default account, or shared key.
+- **Do not lose inquiries.** An inquiry is saved before the reply. Doubtful inquiries are held, not dropped.
+- **Keep personal data inside Cloudflare.** Notifications carry no personal data, and raw IP addresses are not stored.
+
+## Admin screen
+
+| Topic                          | How it is handled                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in                        | Better Auth with passkeys. Email and password sign-in is off. Password hashing can exceed the Workers free plan's CPU limit ([better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)); see [Passkey sign-in](/docs/how-it-works/passkeys/).                                                                                                                                                                                                          |
+| Cloudflare Access              | Strongly recommended, but optional. Put an Access application on `/admin/*` and `/api/admin/*`, for example with a Google login or a one-time code by email. Access is free for up to 50 users. When Access is on, the Worker verifies the signature and audience of the `Cf-Access-Jwt-Assertion` header ([Cloudflare: validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)). |
+| First admin                    | Requires `SETUP_TOKEN` and an address in `ADMIN_EMAILS`. With Access on, only users who passed Access. Setup closes once an admin exists. See [First admin setup](/docs/how-it-works/first-admin/).                                                                                                                                                                                                                                                                     |
+| `workers.dev` and preview URLs | These addresses are easy to leave out of an Access policy. Turn them off once your own domain works. Even without Access, the admin screen still requires a passkey sign-in.                                                                                                                                                                                                                                                                                            |
+| CSRF                           | `Origin` checks and `SameSite` cookies.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Headers                        | A Content Security Policy and other security headers on Worker responses.                                                                                                                                                                                                                                                                                                                                                                                               |
+
+The admin UI's page shell can load without a session, but every data request needs one.
+
+## Contact form
+
+- Turnstile is verified on the server, including `hostname` and `action`.
+- `Origin`, `Content-Type`, and the body size are checked before the body is parsed.
+- A honeypot field and a spam score move doubtful submissions to `held`.
+- The Rate Limiting binding limits submissions per `ip_hash`.
+- There is no API key in the page. A key that the browser can read is not a secret, so it would give a false sense of protection.
+
+See [Contact form protection](/docs/how-it-works/contact-protection/).
+
+## Secrets
+
+- All secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`, `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL`) are Worker secrets.
+- They are never sent to the browser and never written to D1. The admin screen does not show the Slack webhook URL.
+- There is no update button in the admin screen, because it would need a token that can write to your GitHub repository.
+
+## Updates and your repository
+
+- Fixes arrive as Dependabot pull requests. Merge only pull requests that have the official update comment. See [Distribution and updates](/docs/distribution/).
+- Keep your repository private. The starter's visibility check fails while it is public.
+- goodnight-web keeps its own dependencies small and pinned to exact versions.
+
+## What this does not protect against
+
+- Someone with access to your Cloudflare account or your GitHub repository.
+- A device that has one of your passkeys, used by someone else.
+- Merging a pull request that is not an official update.
+- Content that you publish on your own site, and the code of any change you make to the starter.
+- Spam that passes Turnstile and the rate limit. It is held or marked as spam, not blocked completely.
+
+## Reporting a vulnerability
+
+Report vulnerabilities privately through GitHub Security Advisories: open the goodnight-web repository's **Security** tab and choose **Report a vulnerability**. Do not open a public issue.

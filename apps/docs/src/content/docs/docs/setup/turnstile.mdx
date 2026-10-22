@@ -1,0 +1,68 @@
+---
+title: Set up Turnstile
+description: Create a Turnstile widget and give goodnight-web its site key and secret key. The contact form refuses submissions until both are set.
+---
+
+Turnstile is Cloudflare's check that a visitor is a person and not a bot. goodnight-web needs it for the contact form. It is free.
+
+## Why the form is off until you do this
+
+goodnight-web fails closed. Without Turnstile, the contact API would accept anything that a bot sends, so it refuses instead:
+
+- `POST /api/contact` returns 503.
+- The contact page says that the form is not available yet.
+- The admin screen shows a notice that the contact form is not accepting submissions, with a link to this page.
+
+Visitors see this notice instead of a form that seems to work but does not. Once both keys are set, the form starts working with no other change.
+
+## Create the widget
+
+1. In the Cloudflare dashboard, open **Turnstile** and select **Add widget**.
+2. **Widget name:** anything that helps you recognize it, for example your company name.
+3. **Hostnames:** your site's domain, for example `example.com`. If you also use the `workers.dev` address while testing, add it too, and remove it when you turn that address off.
+4. **Widget mode:** **Managed** is a good default. Most visitors see only a short check; some are asked to click.
+5. Select **Create**.
+
+Cloudflare then shows two values ([Cloudflare: create a widget in the dashboard](https://developers.cloudflare.com/turnstile/get-started/widget-management/dashboard/)):
+
+- **Site key.** Public. The contact page uses it to show the widget.
+- **Secret key.** Private. The Worker uses it to verify each submission with Turnstile siteverify.
+
+## Put the keys in place
+
+| Key        | Where it goes                        | Public?                                  |
+| ---------- | ------------------------------------ | ---------------------------------------- |
+| Secret key | The Worker secret `TURNSTILE_SECRET` | No. Never commit it or put it in a page. |
+| Site key   | The starter's site configuration     | Yes. It is part of the page.             |
+
+To set the secret, open the Worker in the Cloudflare dashboard and add `TURNSTILE_SECRET` under variables and secrets. From a terminal in your project, this does the same:
+
+```sh
+npx wrangler secret put TURNSTILE_SECRET
+```
+
+<Callout type='warn' title='Draft / not verified yet'>
+  The starter is not written yet, so the exact setting name for the site key is
+  not decided. This page will name it when the starter lands.
+</Callout>
+
+## What the Worker checks
+
+For each submission, the Worker sends the token from the form to siteverify and accepts it only if:
+
+- `success` is true,
+- `hostname` is your site's hostname, and
+- `action` is the action that the contact form sets.
+
+A token is valid for 300 seconds and can be verified only once ([Cloudflare: server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)). If the check fails, the reply is 400 and nothing is saved. [Contact form protection](/docs/how-it-works/contact-protection/) describes the other checks.
+
+## Local development
+
+For `wrangler dev`, use Cloudflare's test keys instead of real ones ([Cloudflare: testing](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)). This pair always passes:
+
+```txt
+site key:   1x00000000000000000000AA
+secret key: 1x0000000000000000000000000000000AA
+```
+
+Do not use test keys on the live site; they let every request through.

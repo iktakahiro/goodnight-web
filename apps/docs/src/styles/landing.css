@@ -1,0 +1,111 @@
+.landing {
+  width: 100%;
+  max-width: 1080px;
+  margin-inline: auto;
+  padding-inline: 2rem;
+}
+.landing-hero {
+  position: relative;
+  isolation: isolate;
+  padding-block: 4.5rem 3rem;
+  border-bottom: 1px solid var(--color-fd-border);
+}
+.landing-hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 -2rem;
+  pointer-events: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 12%,
+    #000 88%,
+    transparent
+  );
+  background:
+    radial-gradient(
+      ellipse at 85% 15%,
+      color-mix(in oklab, var(--color-fd-primary) 16%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 10% 90%,
+      color-mix(in oklab, hsl(330, 80%, 80%) 14%, transparent),
+      transparent 50%
+    );
+}
+.landing .eyebrow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0.25rem 1rem 0.25rem 0.25rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 999px;
+  background: var(--color-fd-card);
+}
+.landing .eyebrow-chip {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-fd-primary) 14%, transparent);
+  color: var(--color-fd-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.landing .eyebrow-text {
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.875rem;
+}
+.landing h1 {
+  max-width: 900px;
+  font-size: clamp(1.9rem, 4.2vw, 3.1rem);
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  margin-block: 1.5rem;
+  text-wrap: balance;
+}
+.landing h1:lang(ja) {
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+.hero-description {
+  max-width: 680px;
+  font-size: 1.0625rem;
+  line-height: 1.8;
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+.landing-body {
+  padding-block: 2.5rem;
+}
+.site-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-block: 2rem 3rem;
+  border-top: 1px solid var(--color-fd-border);
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.875rem;
+}
+.site-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+.site-footer-links a {
+  color: var(--color-fd-foreground);
+  text-decoration: none;
+}
+.site-footer-links a:hover {
+  color: var(--color-fd-primary);
+}
+.site-footer-meta {
+  margin: 0;
+}

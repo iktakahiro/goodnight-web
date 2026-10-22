@@ -1,0 +1,123 @@
+---
+title: はじめかた
+icon: Rocket
+description: Deploy to Cloudflare ボタンを使う予定の手順です。starter の private なコピーを作り、シークレットを入力し、Turnstile を設定し、ドメインを追加して、最初の管理者を作ります。
+---
+
+<Callout type='warn' title='下書き / 未検証'>
+  予定している手順です。starter リポジトリと Deploy
+  ボタンはまだなく、この手順を最後まで試した人はいません。M2
+  で試します。画面や項目の名前は、実際と違うことがあります。
+</Callout>
+
+## 必要なもの
+
+- Cloudflare のアカウント。小さな会社のサイトなら無料プランで足ります。
+- GitHub のアカウント。
+- 自分のドメインでサイトを公開するなら、そのドメイン名。パスキーを登録する前に決めてください（[ドメインを追加する](#custom-domain)を参照）。
+
+<Steps>
+
+<Step>
+
+### Deploy to Cloudflare ボタンを押す
+
+ボタンは starter の README にあります。Cloudflare が GitHub との連携を求めた後、starter をあなたのアカウントの新しいリポジトリにコピーし、D1 データベースを作り、Workers Builds で Worker をビルドしてデプロイします（[Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)）。
+
+設定フォームでは **「Create private Git repository」にチェックを入れてください**。リポジトリは private にする必要があります。理由は[配布と更新のしくみ](/ja/docs/distribution/#private-repository)で説明しています。
+
+<Callout type='warn' title='未検証'>
+  Cloudflare
+  のドキュメントには、リポジトリ名を変えられることは書かれていますが、リポジトリの公開範囲については何も書かれていません。「Create
+  private Git
+  repository」というチェックボックスの名前と、最初はチェックが外れていることがある（外れたままだと
+  public
+  で作られる）という話は、第三者のガイドによるものです。まだ確認していません。
+</Callout>
+
+public で作られてしまった場合は、GitHub で private に変えてください。**Settings > General > Danger Zone > Change visibility** を開き、private を選びます。private にするまで、starter の公開範囲チェックのワークフローは push のたびに失敗します。
+
+</Step>
+
+<Step>
+
+### シークレットを入力する
+
+Deploy のフォームで次の値を求められます。後から Cloudflare のダッシュボードで、Worker の設定の変数とシークレットから設定することもできます。
+
+| 名前                 | 入力するもの                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| `SETUP_TOKEN`        | 長いランダムな文字列。最初の管理者を作るときに一度だけ使います。                                  |
+| `ADMIN_EMAILS`       | 管理者になれるメールアドレス。複数ならカンマで区切ります。                                        |
+| `BETTER_AUTH_SECRET` | 長いランダムな文字列。Better Auth がセッションの署名に使います。                                  |
+| `IP_HASH_SECRET`     | 長いランダムな文字列。生の IP アドレスを保存しないよう、IP アドレスをハッシュにするのに使います。 |
+| `TURNSTILE_SECRET`   | Turnstile のシークレットキー。ここでは空のままにして、次の手順で入れても構いません。              |
+| `SLACK_WEBHOOK_URL`  | 任意。新しい問い合わせを通知する Slack の Incoming Webhook の URL。                               |
+
+ランダムな文字列は、たとえば手元のパソコンで次のように作れます。
+
+```sh
+openssl rand -base64 32
+```
+
+同じ値を 2 つのシークレットに使わないでください。シークレットをリポジトリにコミットしないでください。
+
+</Step>
+
+<Step>
+
+### Turnstile を設定する
+
+Turnstile のウィジェットを作り、サイトキーとシークレットキーを入れます。それまで、問い合わせフォームは「まだ利用できません」と表示し、送信を受け付けません。[Turnstile を設定する](/ja/docs/setup/turnstile/)の手順に従ってください。
+
+</Step>
+
+<Step>
+
+### 最初のデプロイを確認する
+
+Workers Builds に表示されるアドレスでサイトを開きます。ページが表示されれば大丈夫です。deploy スクリプトがデプロイの前に D1 のマイグレーションを適用するので、データベースのテーブルもできています。
+
+</Step>
+
+<Step>
+
+### パスキーを登録する前にドメインを追加する [#custom-domain]
+
+パスキーは 1 つのドメイン（relying party ID）に結びつきます。`workers.dev` のアドレスで登録したパスキーは、管理画面を自分のドメインに移した後は使えません。先にドメインを追加してください。
+
+Cloudflare のダッシュボードで、Worker にカスタムドメインを追加します。その後、`workers.dev` のアドレスとプレビュー URL を無効にして、管理画面に自分のドメインからしか入れないようにします。
+
+別のアドレスでパスキーを登録してしまった場合は、新しいドメインで登録し直す必要があります。管理者アカウントの復旧方法は、まだ決まっていません。
+
+</Step>
+
+<Step>
+
+### 最初の管理者を作る
+
+自分のドメインで `/admin/` を開きます。セットアップ画面で、`SETUP_TOKEN` と、`ADMIN_EMAILS` に入れたメールアドレスを入力します。続けて、ブラウザやパスワードマネージャーがパスキーを作ります。最初の管理者ができると、セットアップは閉じます。決まりは[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)で説明しています。
+
+</Step>
+
+<Step>
+
+### 任意: 管理画面の前に Cloudflare Access を置く
+
+Cloudflare Access を使うと、`/admin/*` と `/api/admin/*` の前にもう 1 段のログインを置けます。たとえばメールで届くワンタイムコードです。50 ユーザーまで無料です。推奨しますが必須ではありません。Access があってもなくても、管理画面には必ずパスキーでのログインが必要です。
+
+</Step>
+
+<Step>
+
+### サイトを編集する
+
+会社の情報は `site.config.ts`、ページは `src/pages`、記事は `src/content` で、日本語と英語の両方を編集します。プライバシーポリシーの雛形は、公開する前に専門家に確認してもらってください。雛形の内容は[プライバシーについて](/ja/docs/privacy/)にまとめています。
+
+</Step>
+
+</Steps>
+
+## Deploy ボタンを使わない場合
+
+`npm create cloudflare`（C3）でプロジェクトを作ることもできます。C3 が作るのは手元のプロジェクトだけです。GitHub のリポジトリは自分で作るので、**private で作ってください**。

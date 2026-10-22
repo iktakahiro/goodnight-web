@@ -1,0 +1,79 @@
+---
+title: Architecture
+icon: Layers
+description: One Worker with Static Assets and one D1 database serve the site, the contact API, and the admin screen. This page lists the parts and follows one contact submission.
+---
+
+<Callout type='warn' title='Draft / not verified yet'>
+  This is the planned design. The server package is not written yet, so details
+  such as route names can still change.
+</Callout>
+
+<ArchitectureDiagram locale='en' />
+
+## The parts
+
+| Part                         | Role                                                                                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker                       | One Worker per site. It serves the static pages and runs the API.                                                                                                       |
+| Static Assets                | The Astro build (`/`, `/blog/`, `/contact/`, and so on). Cloudflare serves these files without running Worker code.                                                     |
+| Hono app                     | Created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*` (and `/admin/*` if the admin UI needs it) reach it, through `run_worker_first`. |
+| D1                           | One SQLite database: inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                                           |
+| Turnstile                    | Cloudflare's bot check on the contact form. The Worker verifies each token on the server.                                                                               |
+| Rate Limiting binding        | A Workers binding that limits contact submissions per `ip_hash`. It works on the free plan.                                                                             |
+| Better Auth with passkeys    | Admin sign-in. Passkeys only; email and password sign-in is turned off.                                                                                                 |
+| Slack webhook (optional)     | A short "new inquiry" message, with no personal data.                                                                                                                   |
+| Cloudflare Access (optional) | An extra sign-in layer in front of `/admin/*` and `/api/admin/*`. Recommended, not required.                                                                            |
+
+Constraints that shape the design:
+
+- One Worker and one D1 database. No Queues, Cron Triggers, or KV.
+- Cloudflare and GitHub are the only required services.
+- Fail closed: when a setting or secret is missing, the feature that needs it is turned off.
+
+## Routes
+
+| Path                             | Who uses it      | What it does                                                                                                                                              |
+| -------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                        |
+| `POST /api/contact`              | The contact form | Checks, rate limits, and stores a submission.                                                                                                             |
+| `/api/setup`                     | The first admin  | Creates the first admin. Closes once an admin exists.                                                                                                     |
+| `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                            |
+| `/api/admin/*`                   | The admin screen | List (50 per page, with the unread count), detail, status change, delete, CSV export, and a status endpoint that reports whether Turnstile is configured. |
+| `/admin/*`                       | Admins           | The prebuilt admin UI (a React app). Every data request needs a session.                                                                                  |
+
+## A contact submission, step by step
+
+`POST /api/contact` runs these steps in this order:
+
+1. **Origin and size.** The request must come from the site's own origin, use the expected `Content-Type`, and be small (about 16 KB). Anything else is rejected before the body is parsed.
+2. **Honeypot.** The form has a field that people cannot see. If it is filled in, the submission is saved with status `held` and the reply is a normal success, so the bot learns nothing.
+3. **Turnstile.** The Worker sends the token to Turnstile siteverify and checks `success`, `hostname`, and `action`. If the check fails, the reply is 400 and nothing is saved.
+4. **Rate limit.** The Rate Limiting binding counts requests per `ip_hash`. Over the limit, the reply is 429.
+5. **Validation and spam score.** zod checks the fields. Simple rules add to a spam score. Above the threshold, the status becomes `held` instead of `new`.
+6. **Save, then reply.** The row is inserted into D1. Only after the insert succeeds does the visitor get a 200 reply. Nothing after this step can change the reply.
+7. **After the reply, in `ctx.waitUntil`:**
+   - If the status is `new` and a Slack webhook is set, post "1 new inquiry, category, admin URL" and record `notified_at`.
+   - If the last cleanup was more than an hour ago, delete inquiries older than the retention period (180 days by default).
+
+If `TURNSTILE_SECRET` is not set, the endpoint returns 503 and the form says it is not available yet. See [Set up Turnstile](/docs/setup/turnstile/).
+
+## Secrets and bindings
+
+| Name                 | Kind                  | Purpose                                                  |
+| -------------------- | --------------------- | -------------------------------------------------------- |
+| `DB`                 | D1 binding            | All stored data                                          |
+| rate limit binding   | Rate Limiting binding | Limits contact submissions per `ip_hash`                 |
+| `SETUP_TOKEN`        | Secret                | Required to create the first admin                       |
+| `ADMIN_EMAILS`       | Secret or variable    | Addresses that may become admins                         |
+| `BETTER_AUTH_SECRET` | Secret                | Better Auth signing secret                               |
+| `IP_HASH_SECRET`     | Secret                | Key for `HMAC-SHA256(ip, IP_HASH_SECRET)`                |
+| `TURNSTILE_SECRET`   | Secret                | Turnstile siteverify. Without it the contact API is off. |
+| `SLACK_WEBHOOK_URL`  | Secret, optional      | New-inquiry notification                                 |
+
+Secrets stay in the Worker. They are never sent to the browser or written to D1.
+
+## Related pages
+
+- [How it works](/docs/how-it-works/) explains each design decision.
+- [Distribution and updates](/docs/distribution/) explains which files you own.

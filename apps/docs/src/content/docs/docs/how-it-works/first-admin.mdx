@@ -1,0 +1,23 @@
+---
+title: First admin setup
+description: The first admin can be created only with the SETUP_TOKEN secret and an address in ADMIN_EMAILS. Setup closes once an admin exists.
+---
+
+<Callout type='info'>
+  Code excerpts will be added once the server package lands.
+</Callout>
+
+## What it does
+
+Right after a deploy, the site has no admin. The setup endpoint `/api/setup` creates the first one, and it accepts a request only if:
+
+- the request includes the correct `SETUP_TOKEN`, and
+- the email address is in `ADMIN_EMAILS`.
+
+The new admin then registers a passkey. Once an admin exists, the setup endpoint closes and stays closed.
+
+## Why it is built this way
+
+A newly deployed site is public on the internet before its owner has signed in. If the first visitor to the setup page became the admin, a stranger who found the site first could take it over. Requiring both a secret that only the owner knows and an allowed address closes that gap. Closing setup afterwards means that a leaked `SETUP_TOKEN` cannot create more admins later.
+
+If Cloudflare Access protects the admin paths, only people who pass Access can reach the setup screen at all.
