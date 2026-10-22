@@ -19,6 +19,10 @@ description: The contact API and admin screen come from an npm package that you 
 
 The starter's `src/worker.ts` only calls the factory, so the server code stays inside the package. The starter also has an `AGENTS.md` and a `CLAUDE.md` that tell AI tools which files to edit (`src/pages`, `src/content`, `site.config.ts`, `src/styles`) and which to leave alone (the factory call, the binding names, and `@goodnight-web/*`).
 
+### Colors
+
+The site and the admin screen have separate colors. Your site's colors are in the starter: the three main colors in `theme` in `site.config.ts`, and the shades mixed from them in `src/styles/global.css`. The sample site is green. The admin screen (`/admin`) has its own fixed theme inside the package, deep navy-violet with a light and a dark mode. Changing your site's colors does not change the admin screen, and a package update does not change your site's colors.
+
 ## How you get a copy
 
 The Deploy to Cloudflare button copies the public starter repository into a **new repository in your own GitHub account**. It is a copy, not a fork. Your copy does not follow the starter repository; the server code reaches you through the npm package instead. See [Getting started](/docs/getting-started/).

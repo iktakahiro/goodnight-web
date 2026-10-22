@@ -31,7 +31,7 @@
     ),
     radial-gradient(
       ellipse at 10% 90%,
-      color-mix(in oklab, hsl(330, 80%, 80%) 14%, transparent),
+      color-mix(in oklab, var(--hero-glow) 30%, transparent),
       transparent 50%
     );
 }
