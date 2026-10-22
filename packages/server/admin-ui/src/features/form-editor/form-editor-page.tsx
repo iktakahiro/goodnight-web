@@ -147,9 +147,13 @@ const FormEditor = ({
   const [errors, setErrors] = useState<EditorError[]>([]);
   const [conflict, setConflict] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  // Built once: `toEditorValues` makes new client keys on every call, and
+  // `useForm` resets an untouched form whenever `defaultValues` changes, so
+  // building them in render loops forever. A new version remounts the editor.
+  const [defaultValues] = useState(() => toEditorValues(current.definition));
 
   const form = useForm({
-    defaultValues: toEditorValues(current.definition),
+    defaultValues,
     onSubmit: async ({ value }) => {
       setConflict(false);
       const body = toUpdateBody(current.version, value);
@@ -287,7 +291,8 @@ const FormEditor = ({
             onClick={() => {
               setErrors([]);
               setConflict(false);
-              form.reset(toEditorValues(current.definition));
+              setOpen(new Set());
+              form.reset(defaultValues);
             }}
           >
             <ArrowUturnCcwLeft aria-hidden='true' />

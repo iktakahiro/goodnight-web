@@ -16,10 +16,10 @@
 // following without a reload -> email search -> a honeypot submission in the
 // suspected spam view, with its badge and reasons, cleared and set again ->
 // Slack-style deep link while signed out -> language switch -> light/dark
-// switch -> delete with confirmation -> the form editor: add a field and
-// remove one, save version 2, submit with the new field, see it in the list
-// (column toggle) and the detail, see an old submission with its own labels,
-// and restore version 1. Also checks the API rules the UI relies on, and that
+// switch -> delete with confirmation -> the form editor: open every saved
+// field, discard a change, add a field and remove one, save version 2, submit
+// with the new field, see it in the list (column toggle) and the detail, see
+// an old submission with its own labels, and restore version 1. Also checks the API rules the UI relies on, and that
 // the UI runs under the admin CSP without violations.
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -762,6 +762,61 @@ const main = async () => {
         .getByRole('heading', { name: ui('ja', 'form.title'), level: 1 })
         .waitFor();
       await page.getByText(ui('ja', 'form.emailNote')).waitFor();
+    });
+    await step('every saved field opens its settings', async () => {
+      // Before any change: the first re-render of an untouched editor used
+      // to reset the form in a loop (React error #185).
+      const cards = page.getByTestId('form-field-card');
+      const count = await cards.count();
+      if (count !== publicForm.fields.length) {
+        throw new Error(
+          `expected ${publicForm.fields.length} fields: ${count}`,
+        );
+      }
+      for (const [index, field] of publicForm.fields.entries()) {
+        const card = cards.nth(index);
+        const toggle = card.locator('button[aria-controls$="-settings"]');
+        await toggle.click();
+        await card.getByLabel(ui('ja', 'form.labelJa')).waitFor();
+        const label = await card
+          .getByLabel(ui('ja', 'form.labelJa'))
+          .inputValue();
+        if (label !== field.label.ja) {
+          throw new Error(`${field.id} shows the label ${label}`);
+        }
+        await toggle.click();
+        await card.getByLabel(ui('ja', 'form.labelJa')).waitFor({
+          state: 'detached',
+        });
+      }
+      const crashed = await page
+        .getByRole('heading', { name: ui('ja', 'app.errorTitle') })
+        .count();
+      if (crashed > 0) throw new Error('the editor shows the error screen');
+    });
+    await step('discard brings back the saved fields', async () => {
+      await page.getByTestId('form-add-field').click();
+      await page
+        .getByTestId('form-dirty')
+        .getByText(ui('ja', 'form.unsaved'))
+        .waitFor();
+      await page
+        .getByRole('button', { name: ui('ja', 'form.discard') })
+        .click();
+      await page
+        .getByTestId('form-field-card')
+        .nth(publicForm.fields.length)
+        .waitFor({ state: 'detached' });
+      // A re-render after the reset must not loop either.
+      const first = page.getByTestId('form-field-card').first();
+      await first.locator('button[aria-controls$="-settings"]').click();
+      await first.getByLabel(ui('ja', 'form.labelJa')).waitFor();
+      await first.locator('button[aria-controls$="-settings"]').click();
+      const unsaved = await page
+        .getByTestId('form-dirty')
+        .getByText(ui('ja', 'form.unsaved'))
+        .count();
+      if (unsaved > 0) throw new Error('still marked as unsaved');
     });
     await step('add a field and fill in its labels', async () => {
       await page.getByTestId('form-add-field').click();
