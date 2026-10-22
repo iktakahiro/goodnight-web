@@ -1,4 +1,3 @@
-import { ArrowUpRight } from 'lucide-react';
 import { sitePath } from '../paths';
 
 /**
@@ -42,7 +41,6 @@ export function DeployButton({
         />
       </span>
       Deploy to Cloudflare
-      <ArrowUpRight aria-hidden='true' />
     </a>
   );
 }
