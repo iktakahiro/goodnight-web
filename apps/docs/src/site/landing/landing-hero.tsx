@@ -24,7 +24,7 @@ const copy = {
     gloss: 'すべて自分の Cloudflare® アカウントで動きます。',
     whatIsCloudflare: 'Cloudflare とは',
     docs: 'ドキュメントを読む',
-    stage: 'Webサイトと管理画面の画面例',
+    stage: 'Webサイトと管理画面の表示例',
     adminAlt: '管理画面の問い合わせ一覧',
     siteAlt: 'スターターキットで作るWebサイトの例',
     admin: '管理画面',
