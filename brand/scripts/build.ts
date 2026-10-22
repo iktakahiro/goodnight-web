@@ -91,6 +91,7 @@ const copies: Record<string, readonly string[]> = {
     'png/icon-512.png:icon-512.png',
   ],
   'apps/docs/src/assets': [
+    'goodnight-web-icon.svg:app-icon.svg',
     'goodnight-web-lockup-light.svg:logo-lockup-light.svg',
     'goodnight-web-lockup-dark.svg:logo-lockup-dark.svg',
   ],

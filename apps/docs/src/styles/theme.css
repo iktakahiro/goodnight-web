@@ -131,8 +131,7 @@
   --tw-prose-body: var(--color-fd-foreground);
 }
 
-.page-description,
-.hero-description {
+.page-description {
   color: var(--lead);
 }
 

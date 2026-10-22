@@ -54,6 +54,14 @@ export function homeLayoutOptions(slug: string): BaseLayoutProps {
         text: japanese ? 'ドキュメント' : 'Documentation',
         url: `${homePath(slug)}docs/`,
       },
+      {
+        text: japanese ? 'はじめかた' : 'Getting started',
+        url: `${homePath(slug)}docs/getting-started/`,
+      },
+      {
+        text: japanese ? '構成' : 'Architecture',
+        url: `${homePath(slug)}docs/architecture/`,
+      },
     ],
   };
 }

@@ -1,16 +1,25 @@
 import { sitePath } from './paths';
 
-/** Landing page footer: project links, the license, and the project status. */
+const trademarks = {
+  en: 'Cloudflare, the Cloudflare logo, and Cloudflare Workers are trademarks and/or registered trademarks of Cloudflare, Inc. in the United States and other jurisdictions.',
+  ja: 'Cloudflare、Cloudflare のロゴ、Cloudflare Workers は、米国およびその他の地域における Cloudflare, Inc. の商標または登録商標です。',
+} as const;
+
+/**
+ * Landing page footer: project links, the license, and the Cloudflare
+ * trademark attribution. The Japanese page shows the attribution in Japanese
+ * and in English.
+ */
 export function SiteFooter({ japanese }: { japanese: boolean }) {
   const prefix = japanese ? 'ja/' : '';
   const links = [
     {
-      text: japanese ? 'ドキュメント' : 'Documentation',
-      url: sitePath(`${prefix}docs/`),
+      text: japanese ? '構成' : 'Architecture',
+      url: sitePath(`${prefix}docs/architecture/`),
     },
     {
-      text: japanese ? 'はじめかた' : 'Getting started',
-      url: sitePath(`${prefix}docs/getting-started/`),
+      text: japanese ? '配布と更新のしくみ' : 'Distribution and updates',
+      url: sitePath(`${prefix}docs/distribution/`),
     },
     {
       text: japanese ? 'セキュリティモデル' : 'Security model',
@@ -20,19 +29,22 @@ export function SiteFooter({ japanese }: { japanese: boolean }) {
 
   return (
     <footer className='site-footer'>
-      <nav className='site-footer-links' aria-label='Footer'>
-        {links.map((link) => (
-          <a key={link.url} href={link.url}>
-            {link.text}
-          </a>
-        ))}
-      </nav>
-      <p className='site-footer-meta'>
-        goodnight-web · MIT License ·{' '}
-        {japanese
-          ? '開発中（M1）。まだ公開していません。'
-          : 'Work in progress (M1). Not published yet.'}
-      </p>
+      <div className='landing-wrap'>
+        <div className='site-footer-row'>
+          <p className='site-footer-meta'>goodnight-web · MIT License</p>
+          <nav className='site-footer-links' aria-label='Footer'>
+            {links.map((link) => (
+              <a key={link.url} href={link.url}>
+                {link.text}
+              </a>
+            ))}
+          </nav>
+        </div>
+        <div className='site-footer-trademarks'>
+          {japanese ? <p>{trademarks.ja}</p> : null}
+          <p lang={japanese ? 'en' : undefined}>{trademarks.en}</p>
+        </div>
+      </div>
     </footer>
   );
 }
