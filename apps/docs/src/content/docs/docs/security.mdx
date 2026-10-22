@@ -68,7 +68,7 @@ When both settings below are set, the Worker checks the `Cf-Access-Jwt-Assertion
 | `ACCESS_TEAM_DOMAIN` | Your team domain, such as `your-team.cloudflareaccess.com`.                                                  |
 
 - A missing or invalid token gets 403 (`access_denied`).
-- When only one of the two settings is set, or the keys cannot be fetched, those paths answer 503 (`access_unavailable`).
+- When only one of the two settings is set, `ACCESS_TEAM_DOMAIN` is not a plain host name, or the keys cannot be fetched, those paths answer 503 (`access_unavailable`).
 - Without either setting, the Worker does not check Access tokens. Access in front of the site still works; the Worker just does not double-check it.
 - Passkey sign-in is still required with Access.
 

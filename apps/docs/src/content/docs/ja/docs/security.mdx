@@ -68,7 +68,7 @@ Access のアプリケーションは次のパスに設定します。
 | `ACCESS_TEAM_DOMAIN` | チームドメイン。たとえば `your-team.cloudflareaccess.com` です。                                 |
 
 - トークンがない、または正しくないときは 403（`access_denied`）を返します。
-- 2 つの設定の片方だけがあるとき、または鍵を取得できないときは、これらのパスは 503（`access_unavailable`）を返します。
+- 2 つの設定の片方だけがあるとき、`ACCESS_TEAM_DOMAIN` がホスト名だけの形になっていないとき、または鍵を取得できないときは、これらのパスは 503（`access_unavailable`）を返します。
 - どちらの設定もなければ、Worker は Access のトークンを確認しません。サイトの前の Access はそのまま働きます。Worker が二重に確認しないだけです。
 - Access を使っていても、パスキーでのログインは必要です。
 

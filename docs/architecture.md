@@ -329,9 +329,11 @@ Two app-wide middlewares run before the routes, for the admin areas
   must be an RS256 JWT signed by a key from
   `https://<team>/cdn-cgi/access/certs` (cached per isolate for an hour; an
   unknown `kid` refetches at most every 30 seconds), with `iss` equal to the
-  team origin, an `aud` in `ACCESS_AUD`, a future `exp`, and `nbf` not in the
-  future. Missing or invalid: 403 `access_denied`. One setting only, or the
-  certs cannot be fetched: 503 `access_unavailable`.
+  team origin, an `aud` in `ACCESS_AUD`, a future `exp`, and `nbf` no more
+  than 60 seconds in the future. `iat` is not checked. Missing or invalid:
+  403 `access_denied`. One setting only, an `ACCESS_TEAM_DOMAIN` that is not
+  a plain host name, or certs that cannot be fetched: 503
+  `access_unavailable`.
 
 ### Security headers
 

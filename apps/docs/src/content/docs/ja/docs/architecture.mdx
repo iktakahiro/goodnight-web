@@ -12,18 +12,18 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 
 ## 部品
 
-| 部品                      | 役割                                                                                                                                                                                                                |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker                    | サイトごとに 1 つ。静的なページを配信し、API を動かします。                                                                                                                                                         |
-| Static Assets             | Astro のビルド結果（`/`、`/blog/`、`/contact/` など）。Cloudflare が Worker のコードを動かさずに配信します。                                                                                                        |
-| Hono アプリ               | `@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけがここに届きます。                                                            |
-| D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを入れます。マイグレーションは npm パッケージに入っています。                                                                                   |
-| Turnstile                 | 問い合わせフォームのボット対策（Cloudflare 製）。Worker がトークンをサーバー側で検証します。                                                                                                                        |
-| Rate Limiting binding     | `ip_hash` ごとに問い合わせの送信回数を制限する Workers の binding。無料プランで使えます。                                                                                                                           |
-| Better Auth とパスキー    | 管理者のログイン。パスキーだけを使い、メールとパスワードでのログインは無効にします。                                                                                                                                |
-| 管理画面                  | React と TanStack Router、Form、Table で作り、Vite でビルドしたアプリ。ビルド済みで `@goodnight-web/server` に入っていて、Worker が配信します。                                                                     |
-| Slack Webhook（任意）     | 「新しい問い合わせ」の短い通知。個人情報は含めません。                                                                                                                                                              |
-| Cloudflare Access（任意） | `/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すると、Worker も Access のトークンを確認します。 |
+| 部品                      | 役割                                                                                                                                                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker                    | サイトごとに 1 つ。静的なページを配信し、API を動かします。                                                                                                                                                                   |
+| Static Assets             | Astro のビルド結果（`/`、`/blog/`、`/contact/` など）。Cloudflare が Worker のコードを動かさずに配信します。                                                                                                                  |
+| Hono アプリ               | `@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけがここに届きます。                                                                      |
+| D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを入れます。マイグレーションは npm パッケージに入っています。                                                                                             |
+| Turnstile                 | 問い合わせフォームのボット対策（Cloudflare 製）。Worker がトークンをサーバー側で検証します。                                                                                                                                  |
+| Rate Limiting binding     | `ip_hash` ごとに問い合わせの送信回数を制限する Workers の binding。無料プランで使えます。                                                                                                                                     |
+| Better Auth とパスキー    | 管理者のログイン。パスキーだけを使い、メールとパスワードでのログインは無効にします。                                                                                                                                          |
+| 管理画面                  | React と TanStack Router、Form、Table で作り、Vite でビルドしたアプリ。ビルド済みで `@goodnight-web/server` に入っていて、Worker が配信します。                                                                               |
+| Slack Webhook（任意）     | 「新しい問い合わせ」の短い通知。個人情報は含めません。                                                                                                                                                                        |
+| Cloudflare Access（任意） | `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すると、Worker も Access のトークンを確認します。 |
 
 設計を決めている制約:
 
