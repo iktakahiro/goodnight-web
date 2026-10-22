@@ -6,3 +6,12 @@ dist/
 .env
 *.log
 .DS_Store
+.output/
+.tanstack/
+.astro/
+coverage/
+*.tsbuildinfo
+.dev.vars.*
+!.dev.vars.example
+.env.*
+!.env.example

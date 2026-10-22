@@ -1,0 +1,34 @@
+{
+  "name": "goodnight-web-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "templates/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "bun --bun oxlint .",
+    "lint:fix": "bun --bun oxlint --fix .",
+    "format": "bun --bun oxfmt --check .",
+    "format:fix": "bun --bun oxfmt .",
+    "type-check": "turbo run type-check && tsc -p tsconfig.json",
+    "test": "turbo run test",
+    "validate": "bun run lint && bun run format && bun run type-check && bun run test",
+    "fix": "bun run lint:fix && bun run format:fix",
+    "deploy:check": "turbo run deploy:check"
+  },
+  "devDependencies": {
+    "@goodnight-web/typescript-config": "workspace:*",
+    "@types/bun": "1.4.3",
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0",
+    "turbo": "2.11.9",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "bun": ">=1.4.3"
+  },
+  "packageManager": "bun@1.4.3"
+}
