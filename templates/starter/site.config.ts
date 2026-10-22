@@ -1,6 +1,6 @@
 /**
  * Site settings: company information, navigation, languages, theme colors,
- * and the contact form. Edit the values in `siteConfig` below.
+ * and the contact form categories. Edit the values in `siteConfig` below.
  *
  * Every text that visitors see has a Japanese (`ja`) and an English (`en`)
  * version. When you change one, change the other in the same edit.
@@ -30,14 +30,13 @@ export interface ProfileRow {
 
 /** One choice in the contact form's category select. */
 export interface ContactCategory {
-  /** Value sent to the server and stored with the inquiry. Use lowercase ASCII. */
+  /**
+   * Value sent to the server and stored with the inquiry. Use lowercase ASCII.
+   * The server accepts only the values listed here (`src/worker.ts` passes
+   * them on), and the optional Slack notification shows this value.
+   */
   value: string;
   label: Localized;
-  /**
-   * Set to `false` to skip the optional Slack notification for this category.
-   * The inquiry is still saved and shown in the admin screen.
-   */
-  notify?: boolean;
 }
 
 /** Colors used across the site. Use 6-digit hex values such as `#7c5fd3`. */
@@ -77,11 +76,10 @@ export interface SiteConfig {
   nav: NavItem[];
   theme: ThemeColors;
   /**
-   * The public Turnstile site key for the contact form. It is not a secret.
-   * While it is empty, the contact page says that the form is not available
-   * yet. The matching secret key is the `TURNSTILE_SECRET` Worker secret.
+   * Choices for "category" in the contact form, in order. The Turnstile keys
+   * are not set here: the site key is `TURNSTILE_SITE_KEY` in
+   * `wrangler.jsonc`, and the secret key is a Worker secret.
    */
-  turnstileSiteKey: string;
   contactCategories: ContactCategory[];
 }
 
@@ -169,17 +167,11 @@ export const siteConfig: SiteConfig = {
     foreground: '#2f2a40',
   },
 
-  turnstileSiteKey: '',
-
   contactCategories: [
     { value: 'service', label: { ja: 'サービスについて', en: 'Our services' } },
     { value: 'press', label: { ja: '取材', en: 'Press' } },
     { value: 'recruit', label: { ja: '採用', en: 'Careers' } },
-    {
-      value: 'sales',
-      label: { ja: '営業・ご提案', en: 'Sales proposal' },
-      notify: false,
-    },
+    { value: 'sales', label: { ja: '営業・ご提案', en: 'Sales proposal' } },
     { value: 'other', label: { ja: 'その他', en: 'Other' } },
   ],
 };

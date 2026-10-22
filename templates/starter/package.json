@@ -7,17 +7,21 @@
     "dev": "astro dev",
     "build": "astro build",
     "check": "astro check",
-    "preview": "astro preview",
-    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
     "type-check": "astro check",
-    "deploy:check": "wrangler deploy --dry-run"
+    "preview": "astro build && wrangler d1 migrations apply DB --local && wrangler dev",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "deploy:check": "wrangler deploy --dry-run",
+    "test:e2e": "node e2e/run.ts"
   },
   "dependencies": {
+    "@goodnight-web/server": "workspace:*",
     "astro": "7.4.1"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.11",
     "@tailwindcss/vite": "4.3.3",
+    "@types/node": "26.6.5",
+    "playwright": "1.64.1",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "wrangler": "4.151.2"
@@ -25,22 +29,31 @@
   "cloudflare": {
     "bindings": {
       "SETUP_TOKEN": {
-        "description": "A long random string. You enter it once at /admin/setup to create the first admin. 最初の管理者を作るときに /admin/setup で入力する、長いランダムな文字列です。"
+        "description": "A long random string. You enter it once on the admin screen (`/admin`) to create the first admin. Create one with `openssl rand -base64 32`.\n\n最初の管理者を作るときに管理画面（`/admin`）で一度だけ入力する、長いランダムな文字列です。`openssl rand -base64 32` で作れます。"
       },
       "ADMIN_EMAILS": {
-        "description": "Email addresses that may become admins, separated by commas. 管理者になれるメールアドレスです。複数ある場合はカンマで区切ります。"
+        "description": "Email addresses that may become admins, separated by commas, for example `you@example.com,colleague@example.com`.\n\n管理者になれるメールアドレスです。複数ある場合はカンマで区切ります（例: `you@example.com,colleague@example.com`）。"
       },
       "BETTER_AUTH_SECRET": {
-        "description": "A long random string used to sign admin sessions (32 characters or more). 管理画面のログイン情報の署名に使う、長いランダムな文字列です（32文字以上）。"
+        "description": "A random string of **32 characters or more**. It signs admin sign-in sessions. Create one with `openssl rand -base64 32`.\n\n管理画面のログイン情報の署名に使う、**32 文字以上**のランダムな文字列です。`openssl rand -base64 32` で作れます。"
       },
       "IP_HASH_SECRET": {
-        "description": "A long random string used to hash IP addresses. Raw IP addresses are never stored. IP アドレスをハッシュ化するための長いランダムな文字列です。IP アドレスそのものは保存しません。"
+        "description": "A long random string. IP addresses are stored only as an HMAC made with this key, **never as they are**. Create one with `openssl rand -base64 32`.\n\nIP アドレスはこの鍵で作った HMAC としてだけ保存し、**そのままの値は保存しません**。長いランダムな文字列を入れてください。`openssl rand -base64 32` で作れます。"
       },
       "TURNSTILE_SECRET": {
-        "description": "The Turnstile secret key. Without it, the contact form does not accept inquiries. Turnstile のシークレットキーです。未設定の間、問い合わせフォームは受け付けを停止します。"
+        "description": "The Turnstile **secret key** (Cloudflare dashboard > Turnstile). Until both this and `TURNSTILE_SITE_KEY` are set, the contact form does not accept messages.\n\nTurnstile の**シークレットキー**です（Cloudflare ダッシュボード > Turnstile）。これと `TURNSTILE_SITE_KEY` の両方を設定するまで、お問い合わせフォームは受け付けを停止します。"
+      },
+      "TURNSTILE_SITE_KEY": {
+        "description": "The Turnstile **site key** (public, not a secret). The contact form reads it from the Worker. Leave it empty until you have created a Turnstile widget.\n\nTurnstile の**サイトキー**です（公開される値で、秘密ではありません）。お問い合わせフォームは Worker からこの値を読み込みます。Turnstile のウィジェットを作るまでは空のままにしてください。"
       },
       "SLACK_WEBHOOK_URL": {
-        "description": "Optional. A Slack incoming webhook URL for new-inquiry notices (no personal data is sent). 任意。新着の問い合わせを知らせる Slack の Incoming Webhook URL です（個人情報は送りません）。"
+        "description": "Optional. A Slack incoming webhook URL (`https://hooks.slack.com/...`). Slack gets only \"1 new inquiry\", the topic, and a link to the admin screen; never the name, email address, or message.\n\n任意。Slack の Incoming Webhook URL（`https://hooks.slack.com/...`）です。Slack には「新しいお問い合わせが 1 件」、種類、管理画面へのリンクだけを送り、名前・メールアドレス・本文は送りません。"
+      },
+      "DB": {
+        "description": "The D1 database for contact messages and admin accounts. The tables are created by `npm run deploy`.\n\nお問い合わせと管理者アカウントを保存する D1 データベースです。テーブルは `npm run deploy` で作られます。"
+      },
+      "CONTACT_RATE_LIMITER": {
+        "description": "Limits contact form submissions, setup attempts, and passkey sign-ins per visitor (5 per minute).\n\nお問い合わせの送信、セットアップ、パスキーでのログインを、訪問者ごとに制限します（1 分あたり 5 回）。"
       }
     }
   }

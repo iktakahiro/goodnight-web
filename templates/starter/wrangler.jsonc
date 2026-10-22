@@ -1,17 +1,47 @@
 // Cloudflare Workers settings for this site.
-// Do not rename the bindings (such as "DB"): the goodnight-web server package
-// looks them up by name.
+//
+// Do not rename the bindings (DB, CONTACT_RATE_LIMITER, ASSETS) and do not
+// remove the run_worker_first paths: @goodnight-web/server looks them up by
+// name, and the contact form and the admin screen stop working without them.
+// Secrets (SETUP_TOKEN, ADMIN_EMAILS, and so on) are not set here. See
+// .dev.vars.example.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "goodnight-web-starter",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-10-15",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "404-page",
+    // The contact API and the admin screen run in the Worker. Every other
+    // path is a page from ./dist.
+    "run_worker_first": ["/api/*", "/admin", "/admin/*"],
   },
-  // Phase 2 (after @goodnight-web/server is available) adds:
-  // "main": "src/worker.ts", "compatibility_flags": ["nodejs_compat"],
-  // assets.binding "ASSETS", assets.run_worker_first
-  // ["/api/*", "/admin", "/admin/*"], the D1 binding "DB" with migrations_dir
-  // "node_modules/@goodnight-web/server/migrations", and the rate limit binding.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "goodnight-web-starter",
+      // The database migrations ship inside @goodnight-web/server. Do not run
+      // `wrangler d1 migrations create`.
+      "migrations_dir": "node_modules/@goodnight-web/server/migrations",
+    },
+  ],
+  "ratelimits": [
+    {
+      // Limits contact form submissions, setup attempts, and passkey sign-ins
+      // per visitor. Other Workers in the same Cloudflare account that use
+      // the same namespace_id share the counter.
+      "name": "CONTACT_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 5, "period": 60 },
+    },
+  ],
+  "vars": {
+    // The public Turnstile site key. The contact form reads it from the
+    // Worker, so this is the only place to set it. While it is empty, the
+    // contact form says that it is not available yet.
+    "TURNSTILE_SITE_KEY": "",
+  },
 }
