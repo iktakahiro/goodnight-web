@@ -18,11 +18,12 @@
     "./messages": "./src/messages.ts"
   },
   "scripts": {
-    "build": "bun scripts/build-admin-module.ts",
-    "type-check": "tsc -p tsconfig.json",
-    "test": "bun test src",
+    "build": "vite build --config admin-ui/vite.config.ts && bun scripts/build-admin-module.ts",
+    "type-check": "tsc -p tsconfig.json && tsc -p admin-ui/tsconfig.json",
+    "test": "bun test src admin-ui/src",
     "test:e2e": "bun e2e/run.ts",
-    "deploy:check": "wrangler deploy --dry-run -c e2e/wrangler.jsonc --outdir dist/dry-run"
+    "deploy:check": "wrangler deploy --dry-run -c e2e/wrangler.jsonc --outdir dist/dry-run",
+    "screenshots": "bun e2e/screenshots.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.11",
@@ -31,11 +32,24 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@base-ui/react": "1.9.0",
     "@cloudflare/workers-types": "5.20261019.1",
     "@goodnight-web/typescript-config": "workspace:*",
+    "@tailwindcss/vite": "4.3.3",
     "@types/bun": "1.4.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "1.57.0",
     "playwright": "1.64.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "3.7.0",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
+    "vite": "8.3.4",
     "wrangler": "4.151.2"
   }
 }

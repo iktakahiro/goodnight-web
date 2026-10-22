@@ -16,3 +16,5 @@ coverage/
 .env.*
 !.env.example
 packages/server/e2e/public/app.js
+packages/server/src/features/admin-ui/admin-files.gen.ts
+packages/server/.screenshots/
