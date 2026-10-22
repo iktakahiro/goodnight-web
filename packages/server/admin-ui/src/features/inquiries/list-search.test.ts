@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { listSearch, listSearchSchema } from './list-search.ts';
+import { csvExportUrl } from './inquiries-api.ts';
+import { listQuery, listSearch, listSearchSchema } from './list-search.ts';
 
 const parse = (input: Record<string, unknown>) => listSearchSchema.parse(input);
 
@@ -19,15 +20,68 @@ test('page accepts whole numbers from 2; anything else is the first page', () =>
   }
 });
 
-test('ignores unknown parameters', () => {
-  expect(parse({ sort: 'oldest', page: 2 })).toEqual({
+test('sort accepts the fixed columns only', () => {
+  expect(parse({ sort: 'email', dir: 'asc' })).toMatchObject({
+    sort: 'email',
+    dir: 'asc',
+  });
+  for (const sort of ['received_at', 'f_name', 'name', "email'--"]) {
+    expect(parse({ sort }).sort).toBeUndefined();
+  }
+  expect(parse({ dir: 'sideways' }).dir).toBeUndefined();
+});
+
+test('field filters accept well-formed ids and values only', () => {
+  expect(parse({ field: 'f_category', value: 'press' })).toMatchObject({
+    field: 'f_category',
+    value: 'press',
+  });
+  for (const field of ['__proto__', 'f_', "f_x') OR 1=1", '$.f_a', 'F_A']) {
+    expect(parse({ field }).field).toBeUndefined();
+  }
+  expect(parse({ value: 'a"b' }).value).toBeUndefined();
+  expect(parse({ version: '2' }).version).toBe(2);
+  expect(parse({ version: '0' }).version).toBeUndefined();
+});
+
+test('ignores unknown parameters, including a keyword search', () => {
+  expect(parse({ q: 'hello', page: 2 })).toEqual({
     status: undefined,
     page: 2,
+    sort: undefined,
+    dir: undefined,
+    version: undefined,
+    field: undefined,
+    value: undefined,
   });
 });
 
-test('listSearch leaves out defaults', () => {
-  expect(listSearch('all')).toEqual({ status: undefined, page: undefined });
-  expect(listSearch('new')).toEqual({ status: 'new', page: undefined });
-  expect(listSearch('done', 3)).toEqual({ status: 'done', page: 3 });
+test('listSearch leaves out defaults and round-trips with listQuery', () => {
+  expect(listSearch()).toEqual(parse({}));
+  expect(listSearch({ status: 'new' })).toMatchObject({ status: 'new' });
+  const query = listQuery(
+    parse({ status: 'done', page: '3', sort: 'status', dir: 'asc' }),
+  );
+  expect(query).toMatchObject({
+    status: 'done',
+    page: 3,
+    sort: 'status',
+    dir: 'asc',
+  });
+  expect(listQuery(listSearch(query))).toEqual(query);
+  expect(listQuery(parse({ field: 'f_a' }))).not.toHaveProperty('field');
+});
+
+test('the CSV link carries the filters and the language', () => {
+  expect(
+    csvExportUrl(
+      { status: 'new', version: 2, field: 'f_a', value: 'b', page: 3 },
+      'ja',
+    ),
+  ).toBe(
+    '/api/admin/submissions.csv?status=new&version=2&field=f_a&value=b&lang=ja',
+  );
+  expect(csvExportUrl({ status: 'all' }, 'en')).toBe(
+    '/api/admin/submissions.csv?lang=en',
+  );
 });

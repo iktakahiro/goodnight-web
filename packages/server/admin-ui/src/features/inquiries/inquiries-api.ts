@@ -2,25 +2,54 @@ import type {
   AdminSubmission,
   AdminSubmissionList,
 } from '../../../../src/features/admin-api/admin-routes.ts';
+import type { Locale } from '../../../../src/shared/messages.ts';
+import type { SubmissionSortColumn } from '../../../../src/features/submissions/submission-sort.ts';
 import type { SubmissionStatus } from '../../../../src/features/submissions/submission-status.ts';
 import { apiFetch } from '../../shared/api/api-client.ts';
 
 /** A status filter in the list: one status or every inquiry. */
 export type StatusFilter = SubmissionStatus | 'all';
 
-const statusQuery = (status: StatusFilter) =>
-  status === 'all' ? '' : `status=${status}`;
+/** Filters, order, and page of the list. */
+export interface ListQuery {
+  status: StatusFilter;
+  page: number;
+  sort: SubmissionSortColumn;
+  dir: 'asc' | 'desc';
+  version?: number | undefined;
+  /** A select or radio field id; set together with `value`. */
+  field?: string | undefined;
+  value?: string | undefined;
+}
 
-/** `GET /api/admin/submissions`: one page (50) of inquiries, newest first. */
+const filterParams = (query: Partial<ListQuery>): URLSearchParams => {
+  const params = new URLSearchParams();
+  if (query.status && query.status !== 'all') {
+    params.set('status', query.status);
+  }
+  if (query.version) params.set('version', String(query.version));
+  if (query.field && query.value) {
+    params.set('field', query.field);
+    params.set('value', query.value);
+  }
+  return params;
+};
+
+const withQuery = (path: string, params: URLSearchParams) => {
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+};
+
+/** `GET /api/admin/submissions`: one page (50) of inquiries. */
 export const fetchInquiries = (
-  status: StatusFilter,
-  page: number,
+  query: ListQuery,
 ): Promise<AdminSubmissionList> => {
-  const query = [statusQuery(status), page > 1 ? `page=${page}` : '']
-    .filter(Boolean)
-    .join('&');
+  const params = filterParams(query);
+  if (query.sort !== 'received_at') params.set('sort', query.sort);
+  if (query.dir !== 'desc') params.set('dir', query.dir);
+  if (query.page > 1) params.set('page', String(query.page));
   return apiFetch<AdminSubmissionList>(
-    `/api/admin/submissions${query ? `?${query}` : ''}`,
+    withQuery('/api/admin/submissions', params),
   );
 };
 
@@ -44,8 +73,15 @@ export const deleteInquiry = (id: string): Promise<{ ok: true }> =>
     method: 'DELETE',
   });
 
-/** URL of the CSV export for a status filter. The browser downloads it. */
-export const csvExportUrl = (status: StatusFilter): string => {
-  const query = statusQuery(status);
-  return `/api/admin/submissions.csv${query ? `?${query}` : ''}`;
+/**
+ * URL of the CSV export for the list's filters, with headers and option
+ * labels in `lang`. The browser downloads it.
+ */
+export const csvExportUrl = (
+  query: Partial<ListQuery>,
+  lang: Locale,
+): string => {
+  const params = filterParams(query);
+  params.set('lang', lang);
+  return withQuery('/api/admin/submissions.csv', params);
 };
