@@ -333,6 +333,40 @@ html:has(.landing):not(.dark) {
 .landing-button.secondary:hover {
   background: var(--landing-soft);
 }
+/* Deploy to Cloudflare: the site's button shape in Cloudflare orange
+   (#f6821f, from the official button). Dark text, because white text on this
+   orange is only 2.6:1. The same in both themes and on the night bands. */
+.landing-button.primary.deploy-button {
+  --deploy-orange: #f6821f;
+  background: var(--deploy-orange);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 25%) inset,
+    0 6px 16px -6px rgb(246 130 31 / 55%);
+  color: #1d1d1f;
+}
+.landing-button.primary.deploy-button:hover {
+  background: #fb9a45;
+}
+.deploy-button-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 5px;
+  border-radius: 6px;
+}
+.deploy-button.primary .deploy-button-mark {
+  background: #ffffff;
+}
+.deploy-button-mark img {
+  display: block;
+  width: 30px;
+  height: auto;
+}
+.secondary.deploy-button .deploy-button-mark {
+  padding: 0;
+}
 .landing .landing-button:focus-visible,
 .landing .deploy-button:focus-visible {
   border-radius: 10px;
