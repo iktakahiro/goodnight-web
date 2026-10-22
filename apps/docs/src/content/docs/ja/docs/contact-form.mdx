@@ -4,11 +4,6 @@ icon: ListChecks
 description: 管理者は、お問い合わせフォームの項目を管理画面で追加、削除、並べ替えできます。定義はバージョン付きで D1 に保存するので、変更にデプロイはいらず、古い問い合わせは送信時のラベルのまま表示されます。
 ---
 
-<Callout type='warn' title='下書き / 未検証'>
-  パッケージはまだ公開していません。このページの内容は、テストと `wrangler dev`
-  に対する E2E テストで確認していますが、実際のデプロイでは確認していません。
-</Callout>
-
 ## フォームを編集する
 
 管理画面にログインし、**フォーム**（英語表示では Form）を開きます。**お問い合わせフォーム**という見出しのページに項目が順番に並んでいて、次のことができます。
@@ -308,4 +303,4 @@ return z
   .pipe(z.strictObject(shape))
 ```
 
-問い合わせは、値を項目 ID をキーにした JSON として `submissions.fields` に、バージョンを `submissions.form_version` に保存します。[データベースとマイグレーション](/ja/docs/database/)を参照してください。
+問い合わせは、値を項目 ID をキーにした JSON として `submissions.fields` に、バージョンを `submissions.form_version` に保存します。[データベース](/ja/docs/database/)を参照してください。

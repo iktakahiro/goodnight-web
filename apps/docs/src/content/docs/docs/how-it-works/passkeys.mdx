@@ -74,9 +74,3 @@ export const getAuth = (env: GoodnightEnv, origin: string): GoodnightAuth => {
 
 - **A passkey belongs to one domain.** Register passkeys after you add your own domain. A passkey registered on a `workers.dev` address does not work on your domain.
 - **Losing every passkey locks you out.** Register more than one passkey (for example a phone and a laptop). A second admin cannot be added after setup has closed: a user without a passkey cannot register one then. The recovery procedure is still an open question.
-
-<Callout type='warn' title='Draft / not verified yet'>
-  Passkey registration, sign-out, and sign-in passed in Chromium with a virtual
-  authenticator against `wrangler dev` and a local D1 database. CPU time on
-  Cloudflare itself has not been measured yet.
-</Callout>

@@ -4,11 +4,6 @@ icon: ShieldCheck
 description: What protects the admin screen, the first admin setup, and the contact form, how secrets are kept, and what goodnight-web does not protect against.
 ---
 
-<Callout type='warn' title='Draft / not verified yet'>
-  This page describes the code in `@goodnight-web/server`. The Cloudflare Access
-  steps have not been tried against a real Access application yet.
-</Callout>
-
 ## Principles
 
 - **Fail closed.** When a required setting or secret is missing, the feature that needs it is turned off. Without `TURNSTILE_SECRET`, the contact API returns 503.
@@ -101,7 +96,7 @@ The server never puts input into SQL text.
 
 - Every query uses the [Drizzle ORM](https://orm.drizzle.team/) query builder. Values, including the page size and offset of the admin list, are sent to D1 as bound parameters.
 - Numbers from the URL are checked at the route before they reach a query. `page` must be 1 to 100,000 and `limit` 1 to 100, written with digits only. Values such as `1; DROP TABLE submissions`, `-1`, `1e9`, or `50 OFFSET 0` get a 400 response.
-- Raw SQL is allowed only through Drizzle's `sql` template, which also binds its values. A check in CI fails when the server code calls `sql.raw()` or D1's `prepare()` directly, or reaches the D1 binding through Drizzle's `$client` (`bun run check:sql`; see [Database and migrations](/docs/database/#how-queries-are-written)).
+- Raw SQL is allowed only through Drizzle's `sql` template, which also binds its values. A check in CI fails when the server code calls `sql.raw()` or D1's `prepare()` directly, or reaches the D1 binding through Drizzle's `$client` (`bun run check:sql`; see [Database](/docs/database/#how-queries-are-written)).
 - The email search escapes `%`, `_`, and `\` and sends the pattern as one bound parameter, with `ESCAPE '\'`.
 - Tests send injection strings to the admin list and check the 400 responses, and record the statements sent to the database to check that input appears only in the parameters.
 
@@ -126,7 +121,7 @@ export const listQuerySchema = z
   .refine(bothOrNeither);
 ```
 
-`filterShape` holds `view` (`unread`, `read`, `all`, or `spam`), `q` (the email search, at most 254 characters), and the version and option filters, each with its own zod schema. The store then builds the query with Drizzle (see [Database and migrations](/docs/database/#how-queries-are-written)). For `?view=unread&q=50%_off&page=3`, the test suite's recording D1 shows this statement and these parameters:
+`filterShape` holds `view` (`unread`, `read`, `all`, or `spam`), `q` (the email search, at most 254 characters), and the version and option filters, each with its own zod schema. The store then builds the query with Drizzle (see [Database](/docs/database/#how-queries-are-written)). For `?view=unread&q=50%_off&page=3`, the test suite's recording D1 shows this statement and these parameters:
 
 ```sql
 select "id", "created_at", "email", "status", "suspected_spam", ... from "submissions"
@@ -140,7 +135,7 @@ limit ? offset ?
 ["unread", 0, "%50\\%\\_off%", 50, 100]
 ```
 
-The SQL text is the same for every search term, page, and page size; only the parameters change. See [Database and migrations](/docs/database/).
+The SQL text is the same for every search term, page, and page size; only the parameters change. See [Database](/docs/database/).
 
 ## Secrets
 

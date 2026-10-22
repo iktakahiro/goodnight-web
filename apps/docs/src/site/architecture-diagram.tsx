@@ -1,3 +1,4 @@
+import { Fragment, useId } from 'react';
 import './architecture-diagram.css';
 
 const copy = {
@@ -15,13 +16,13 @@ const copy = {
       'Astro build: /, /blog/, /contact/',
       'served without running Worker code',
     ],
-    hono: 'Hono app · createGoodnightWorker()',
+    hono: ['Hono app', 'createGoodnightWorker()'],
     routes: [
-      '/api/contact/* — form fields, submissions',
-      '/api/setup — first admin only',
-      '/api/auth/* — Better Auth, passkeys',
-      '/api/admin/* — inquiry API',
-      '/admin/* — prebuilt admin UI',
+      ['/api/contact/*', 'form fields, submissions'],
+      ['/api/setup', 'first admin only'],
+      ['/api/auth/*', 'Better Auth, passkeys'],
+      ['/api/admin/*', 'inquiry API'],
+      ['/admin/*', 'prebuilt admin UI'],
     ],
     d1: ['D1', 'inquiries, form, settings, auth'],
     rateLimit: ['Rate Limiting', 'binding, keyed by ip_hash'],
@@ -43,13 +44,13 @@ const copy = {
       'Astro のビルド: /, /blog/, /contact/',
       'Worker のコードを動かさずに配信',
     ],
-    hono: 'Hono アプリ · createGoodnightWorker()',
+    hono: ['Hono アプリ', 'createGoodnightWorker()'],
     routes: [
-      '/api/contact/* — フォームの項目と送信',
-      '/api/setup — 最初の管理者だけ',
-      '/api/auth/* — Better Auth（パスキー）',
-      '/api/admin/* — 問い合わせの API',
-      '/admin/* — ビルド済みの管理画面',
+      ['/api/contact/*', 'フォームの項目と送信'],
+      ['/api/setup', '最初の管理者だけ'],
+      ['/api/auth/*', 'Better Auth（パスキー）'],
+      ['/api/admin/*', '問い合わせの API'],
+      ['/admin/*', 'ビルド済みの管理画面'],
     ],
     d1: ['D1', '問い合わせ・フォーム・設定・認証'],
     rateLimit: ['Rate Limiting', 'binding（ip_hash ごと）'],
@@ -59,149 +60,94 @@ const copy = {
   },
 } as const;
 
-/** One box with a title and a smaller second line. */
-function Node({
-  x,
-  y,
-  width,
+/** One box with a title, a smaller second line, and an optional code note. */
+function Box({
   lines,
+  note,
   optional = false,
 }: {
-  x: number;
-  y: number;
-  width: number;
   lines: readonly [string, string];
+  note?: string;
   optional?: boolean;
 }) {
   return (
-    <g>
-      <rect
-        className={optional ? 'ad-box ad-optional' : 'ad-box'}
-        x={x}
-        y={y}
-        width={width}
-        height={56}
-        rx={12}
-      />
-      <text className='ad-title' x={x + width / 2} y={y + 23}>
-        {lines[0]}
-      </text>
-      <text className='ad-sub' x={x + width / 2} y={y + 42}>
-        {lines[1]}
-      </text>
-    </g>
+    <div className={optional ? 'ad-box ad-optional' : 'ad-box'}>
+      <span className='ad-title'>{lines[0]}</span>
+      <span className='ad-sub'>{lines[1]}</span>
+      {note ? <code className='ad-note'>{note}</code> : null}
+    </div>
   );
 }
 
+/** A downward connector. Screen readers skip it; the text carries the meaning. */
+function Arrow() {
+  return <span className='ad-arrow' aria-hidden='true' />;
+}
+
 /**
- * Inline SVG of the runtime architecture with English or Japanese labels.
- * It renders at build time, so the static HTML needs no script to show it.
+ * The runtime architecture as boxes and arrows with English or Japanese
+ * labels. It is plain HTML and CSS rendered at build time, so the static page
+ * needs no script, and the text wraps and stacks on narrow screens.
  */
 export function ArchitectureDiagram({ locale }: { locale: 'en' | 'ja' }) {
   const text = copy[locale];
-  const bottom = [
-    { x: 30, lines: text.d1 },
-    { x: 220, lines: text.rateLimit },
-    { x: 410, lines: text.turnstile },
-    { x: 600, lines: text.slack, optional: true },
-  ];
+  const descriptionId = useId();
   return (
-    <figure className='architecture-diagram not-prose'>
-      <svg viewBox='0 0 800 520' role='img' aria-label={text.label}>
-        <defs>
-          <marker
-            id='ad-arrow'
-            viewBox='0 0 10 10'
-            refX='9'
-            refY='5'
-            markerWidth='7'
-            markerHeight='7'
-            orient='auto-start-reverse'
-          >
-            <path className='ad-arrowhead' d='M0 0L10 5L0 10z' />
-          </marker>
-        </defs>
+    <figure
+      className='architecture-diagram not-prose'
+      aria-describedby={descriptionId}
+    >
+      <p id={descriptionId} className='ad-visually-hidden'>
+        {text.label}
+      </p>
+      <div className='ad-clients'>
+        <div className='ad-lane'>
+          <Box lines={text.visitors} />
+          <Arrow />
+        </div>
+        <div className='ad-lane'>
+          <Box lines={text.admins} />
+          <Arrow />
+          <Box lines={text.access} optional />
+          <Arrow />
+        </div>
+      </div>
 
-        <Node x={60} y={16} width={220} lines={text.visitors} />
-        <Node x={520} y={16} width={220} lines={text.admins} />
-        <Node x={500} y={96} width={260} lines={text.access} optional />
+      <div className='ad-worker'>
+        <span className='ad-worker-label'>{text.worker}</span>
+        <div className='ad-worker-parts'>
+          <div className='ad-box'>
+            <span className='ad-title'>{text.assets[0]}</span>
+            <span className='ad-sub'>{text.assets[1]}</span>
+            <span className='ad-sub'>{text.assets[2]}</span>
+          </div>
+          <div className='ad-box ad-accent'>
+            <span className='ad-title'>{text.hono[0]}</span>
+            <code className='ad-note'>{text.hono[1]}</code>
+            <dl className='ad-routes'>
+              {text.routes.map(([path, role]) => (
+                <Fragment key={path}>
+                  <dt>
+                    <code>{path}</code>
+                  </dt>
+                  <dd>{role}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </div>
 
-        <rect
-          className='ad-worker'
-          x={16}
-          y={172}
-          width={768}
-          height={208}
-          rx={20}
-        />
-        <text className='ad-worker-label' x={36} y={196}>
-          {text.worker}
-        </text>
+      <div className='ad-uses'>
+        <Arrow />
+      </div>
+      <div className='ad-services'>
+        <Box lines={text.d1} />
+        <Box lines={text.rateLimit} />
+        <Box lines={text.turnstile} />
+        <Box lines={text.slack} note={text.waitUntil} optional />
+      </div>
 
-        <rect
-          className='ad-box'
-          x={36}
-          y={212}
-          width={276}
-          height={150}
-          rx={14}
-        />
-        <text className='ad-title' x={174} y={262}>
-          {text.assets[0]}
-        </text>
-        <text className='ad-sub' x={174} y={290}>
-          {text.assets[1]}
-        </text>
-        <text className='ad-sub' x={174} y={312}>
-          {text.assets[2]}
-        </text>
-
-        <rect
-          className='ad-box ad-accent'
-          x={332}
-          y={212}
-          width={432}
-          height={150}
-          rx={14}
-        />
-        <text className='ad-title' x={548} y={238}>
-          {text.hono}
-        </text>
-        {text.routes.map((route, index) => (
-          <text key={route} className='ad-route' x={352} y={264 + index * 21}>
-            {route}
-          </text>
-        ))}
-
-        {bottom.map((node) => (
-          <Node
-            key={node.x}
-            x={node.x}
-            y={448}
-            width={170}
-            lines={node.lines}
-            optional={node.optional}
-          />
-        ))}
-
-        <line className='ad-line' x1={150} y1={72} x2={150} y2={210} />
-        <line className='ad-line' x1={240} y1={72} x2={420} y2={210} />
-        <line className='ad-line' x1={630} y1={72} x2={630} y2={94} />
-        <line className='ad-line' x1={630} y1={152} x2={630} y2={210} />
-        <line className='ad-line' x1={420} y1={362} x2={115} y2={446} />
-        <line className='ad-line' x1={480} y1={362} x2={305} y2={446} />
-        <line className='ad-line' x1={540} y1={362} x2={495} y2={446} />
-        <line
-          className='ad-line ad-optional'
-          x1={620}
-          y1={362}
-          x2={685}
-          y2={446}
-        />
-        <text className='ad-note' x={668} y={410}>
-          {text.waitUntil}
-        </text>
-      </svg>
       <figcaption>{text.caption}</figcaption>
     </figure>
   );
