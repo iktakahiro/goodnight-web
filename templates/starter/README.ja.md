@@ -24,10 +24,9 @@ API、問い合わせを読むための管理画面を配信し、1つの D1 デ
 
 ## デプロイ
 
-> **下書き（DRAFT）。** この手順はまだ最初から最後まで試していません。
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web-starter)
 
-1. **Deploy to Cloudflare** ボタンを押します。
-   <!-- ボタンはスターターのリポジトリを公開したときに追加します。 -->
+1. 上の **Deploy to Cloudflare** ボタンを押します。
 2. 設定画面で **Create private Git repository** にチェックを入れます。
    チェックを入れないと、作られるリポジトリは公開（public）になります。
 3. 下の表のシークレットを入力します。Cloudflare が Worker と D1
@@ -84,7 +83,7 @@ Turnstile の確認。項目を変えたら、プライバシーポリシー
    設定します。
 
 詳しい手順はドキュメントの「セットアップ > Turnstile」にあります。
-<!-- ドキュメントサイトを公開したときにリンクを追加します。 -->
+<!-- ドキュメントサイトのドメインが決まったら、ここにリンクを追加します。 -->
 
 ## 最初の管理者
 

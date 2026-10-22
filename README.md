@@ -5,7 +5,7 @@
 
 # goodnight-web
 
-goodnight-web is a template for a website with a blog and a contact
+goodnight-web is a starter kit for a website with a blog and a contact
 form. It runs on Cloudflare only: one Worker serves the static site, the
 contact API, and an admin screen for reading inquiries, and one D1 database
 stores the inquiries.
@@ -25,14 +25,14 @@ stores the inquiries.
 - Deliver fixes as dependency update pull requests. Site owners still need to
   review and merge those pull requests; that maintenance remains.
 
-Everything user-facing will be available in Japanese and English.
+Everything user-facing is available in Japanese and English.
 
-## Planned layout
+## Layout
 
 | Path                         | Contents                                                                   |
 | ---------------------------- | -------------------------------------------------------------------------- |
 | `packages/server`            | `@goodnight-web/server`: Worker, contact API, admin API and UI, migrations |
-| `packages/astro`             | `@goodnight-web/astro`: optional Astro integration                         |
+| `packages/astro`             | `@goodnight-web/astro`: optional Astro integration, added only if needed   |
 | `packages/typescript-config` | Shared TypeScript presets                                                  |
 | `templates/starter`          | The Astro site that users copy and edit                                    |
 | `apps/docs`                  | Documentation site                                                         |
@@ -40,10 +40,6 @@ Everything user-facing will be available in Japanese and English.
 | `brand`                      | Logo, favicon, and app icon files and their build script                   |
 
 See [docs/architecture.md](docs/architecture.md) for details.
-
-## Status
-
-Work in progress (M1). Nothing is published yet and it is not ready for use.
 
 ## Development
 

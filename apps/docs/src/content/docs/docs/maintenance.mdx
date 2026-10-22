@@ -1,0 +1,22 @@
+---
+title: Maintenance
+icon: ClipboardCheck
+description: The work that remains once your website runs.
+---
+
+There are no servers or runtimes to maintain. Some work remains, so plan for it:
+
+- **Review and merge dependency update pull requests.** Fixes to goodnight-web arrive in your repository as pull requests from Dependabot, GitHub's tool that opens update pull requests. They are not merged automatically; you review and merge them.
+- **Update the website's own dependencies**, such as Astro and Tailwind CSS. These also arrive as Dependabot pull requests.
+- **Keep up with Cloudflare changes**, such as a new `compatibility_date` (the date that sets which Workers runtime behavior you get) or a change to a free plan limit.
+- **Keep your repository private.** Also keep your Worker secrets (private values stored with the Worker) safe.
+- **Have a professional review your privacy policy** before you publish it.
+
+You do not write server code. The contact API and the admin screen come from an npm package that you do not edit, so its fixes reach you as the update pull requests above.
+
+## Related pages
+
+- [Distribution and updates](/docs/distribution/): what comes from the npm package, how Dependabot opens update pull requests, and how to tell an official update from other changes.
+- [Database](/docs/database/): how schema changes reach your website and are applied before the new code goes live.
+- [Security model](/docs/security/): what protects the admin screen and the contact form, and what goodnight-web does not protect against.
+- [Privacy notes](/docs/privacy/): what the privacy policy template covers.

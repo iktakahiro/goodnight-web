@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  ClipboardCheck,
   Compass,
   Database,
   Layers,
@@ -13,6 +14,7 @@ import {
 
 const icons = {
   BookOpen,
+  ClipboardCheck,
   Compass,
   Database,
   Layers,
