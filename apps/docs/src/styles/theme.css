@@ -25,16 +25,16 @@
   --color-fd-card: #ffffff;
   --color-fd-card-foreground: #1b1f3f;
   --color-fd-border: #e4e4e7;
-  --color-fd-primary: #2f3482;
+  --color-fd-primary: #743bc4;
   --color-fd-primary-foreground: #ffffff;
-  --color-fd-secondary: #e8eaf7;
-  --color-fd-secondary-foreground: #262b6b;
-  --color-fd-accent: #e8eaf8;
-  --color-fd-accent-foreground: #23286a;
-  --color-fd-ring: #5a60c8;
-  --inline-code: #37309b;
+  --color-fd-secondary: #eee8f7;
+  --color-fd-secondary-foreground: #42256a;
+  --color-fd-accent: #eee8f8;
+  --color-fd-accent-foreground: #41246b;
+  --color-fd-ring: #885bc8;
+  --inline-code: #5d309c;
   --lead: #464d70;
-  --hero-glow: #c9c4f3;
+  --hero-glow: #d7c4f3;
 }
 .dark {
   --color-fd-background: #111113;
@@ -46,16 +46,16 @@
   --color-fd-card: #1a1a1d;
   --color-fd-card-foreground: #e4e6f6;
   --color-fd-border: #2e2e33;
-  --color-fd-primary: #a9aefc;
-  --color-fd-primary-foreground: #12163a;
-  --color-fd-secondary: #242a55;
-  --color-fd-secondary-foreground: #dfe2fb;
-  --color-fd-accent: #272e5e;
-  --color-fd-accent-foreground: #e2e5ff;
-  --color-fd-ring: #9ea4f6;
-  --inline-code: #c7c9ff;
+  --color-fd-primary: #bfabfc;
+  --color-fd-primary-foreground: #1c123b;
+  --color-fd-secondary: #312556;
+  --color-fd-secondary-foreground: #e6dffb;
+  --color-fd-accent: #35275d;
+  --color-fd-accent-foreground: #e8e0ff;
+  --color-fd-ring: #b39df6;
+  --inline-code: #d5c7ff;
   --lead: #c3c7e4;
-  --hero-glow: #3a3f8f;
+  --hero-glow: #4f3a8d;
 }
 
 .site-brand {
