@@ -7,6 +7,7 @@ import { Button } from '../../shared/ui/button.tsx';
 import { cn } from '../../shared/ui/cn.ts';
 import { LanguageSwitch } from './language-switch.tsx';
 import { LogoMark } from './logo-mark.tsx';
+import { ThemeSwitch } from './theme-switch.tsx';
 
 const NavLink = ({
   to,
@@ -24,7 +25,7 @@ const NavLink = ({
     aria-current={active ? 'page' : undefined}
     data-testid={`nav-${to === '/' ? 'inquiries' : 'form'}`}
     className={cn(
-      'inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/60 sm:px-3',
+      'inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring sm:px-3',
       active
         ? 'bg-accent text-accent-foreground'
         : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -39,7 +40,7 @@ const NavLink = ({
  * The header on signed-in screens: the mark, the section links (inquiries
  * and the contact form), the unread count (always shown,
  * so a missed Slack notification is not a missed inquiry), the language
- * switch, and sign-out.
+ * and light/dark switches, and sign-out.
  */
 export const AppHeader = () => {
   const { locale, t } = useI18n();
@@ -54,7 +55,7 @@ export const AppHeader = () => {
       <div className='mx-auto flex h-16 max-w-5xl items-center gap-2 px-4 sm:gap-3 sm:px-6'>
         <Link
           to='/'
-          className='-ml-1 flex items-center gap-2.5 rounded-xl px-1 py-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/60'
+          className='-ml-1 flex items-center gap-2.5 rounded-xl px-1 py-1 outline-none focus-visible:ring-3 focus-visible:ring-ring'
         >
           <LogoMark className='size-9' />
           <span className='hidden flex-col leading-tight lg:flex'>
@@ -91,7 +92,7 @@ export const AppHeader = () => {
             })}`}
             data-testid='unread-count'
             className={cn(
-              'inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/60',
+              'inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring',
               hasUnread
                 ? 'border-primary/25 bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover'
                 : 'border-border bg-card text-muted-foreground hover:bg-muted',
@@ -107,6 +108,7 @@ export const AppHeader = () => {
             </span>
           </Link>
           <LanguageSwitch />
+          <ThemeSwitch />
           <Button
             variant='ghost'
             size='sm'

@@ -113,7 +113,7 @@ const PreviewCard = ({ fields }: { fields: readonly EditorField[] }) => {
               aria-pressed={previewLocale === option}
               onClick={() => setPreviewLocale(option)}
               className={cn(
-                'h-7 cursor-pointer rounded-full px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/60',
+                'h-7 cursor-pointer rounded-full px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring',
                 previewLocale === option
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground',

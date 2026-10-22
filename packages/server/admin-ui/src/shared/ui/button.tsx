@@ -5,7 +5,7 @@ import { cn } from './cn.ts';
 
 /** Class names for buttons and button-like links. */
 export const buttonVariants = cva(
-  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-55 data-disabled:cursor-not-allowed data-disabled:opacity-55 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-55 data-disabled:cursor-not-allowed data-disabled:opacity-55 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -16,7 +16,7 @@ export const buttonVariants = cva(
           'border border-border bg-card text-foreground shadow-xs hover:border-ring/50 hover:bg-muted',
         ghost: 'text-foreground hover:bg-accent hover:text-accent-foreground',
         destructive:
-          'bg-destructive text-white shadow-sm hover:bg-destructive-hover',
+          'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive-hover',
         'destructive-outline':
           'border border-destructive/30 bg-card text-destructive hover:bg-destructive-soft',
         link: 'h-auto rounded-sm px-0 text-primary underline-offset-4 hover:underline',

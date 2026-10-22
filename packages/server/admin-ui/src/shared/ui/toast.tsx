@@ -29,7 +29,7 @@ const ToastList = ({ closeLabel }: { closeLabel: string }) => {
       </BaseToast.Content>
       <BaseToast.Close
         aria-label={closeLabel}
-        className='flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/60'
+        className='flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring'
       >
         <X aria-hidden='true' className='size-4' />
       </BaseToast.Close>

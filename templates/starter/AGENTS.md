@@ -21,8 +21,43 @@ Cloudflare Worker with one D1 database.
   privacy policy (`pages/`). Each language has its own folder (`ja/`, `en/`).
 - `src/components/`, `src/layouts/`, `src/features/`: the look of the site,
   including the look of the contact form and its fixed texts.
-- `src/styles/`: CSS. Theme colors are set in `site.config.ts`.
+- `src/styles/`: CSS. Theme colors are set in `site.config.ts`. See "Site
+  colors" and "Fonts" below.
 - `public/`: images, the favicon, and other files served as they are.
+
+## Site colors
+
+The site's colors belong to this repository. The admin screen (`/admin`)
+comes from `@goodnight-web/server` with its own fixed theme; it does not use
+these colors and you cannot change it here.
+
+- `site.config.ts`, `theme`: the three main colors. `primary` is used for
+  buttons, links, highlights, and the keyboard focus outline; `background` is
+  the page background; `foreground` is the main text color. Use 6-digit hex
+  values.
+- `src/styles/global.css`, `@theme inline`: the shades mixed from the main
+  colors (`--color-primary-soft`, `--color-primary-strong`,
+  `--color-border`, `--color-muted`, and others), and the colors that do not
+  follow them: `--color-danger`, `--color-success`, and the home page
+  decorations `--color-decor-wood` and `--color-decor-leaf`.
+- When you change a color, keep the text readable (WCAG AA): white text on
+  `primary`, and `foreground` text on `background`, need a contrast ratio of
+  at least 4.5:1. Form field borders and the focus outline need 3:1. Check
+  the result with a contrast checker before you finish.
+- Use the color names (`bg-primary`, `text-muted`, `border-border`) in
+  classes, not hex values, so a color change in one place reaches every page.
+
+## Fonts
+
+The site uses the fonts installed on the visitor's device and loads no web
+fonts. The font stacks are defined once, in `src/styles/global.css`
+(`@theme inline`): `--font-sans` for all text and `--font-mono` for code.
+Change them there, and use the `font-sans` and `font-mono` classes instead of
+writing `font-family` in components.
+
+Do not add web fonts (font packages, font files in `public/`, or links to a
+font service) unless the site owner asks for them. A font service receives a
+request from every visitor, and the privacy policy would need to mention it.
 
 ## What you must not change
 

@@ -3,54 +3,59 @@
 @import 'fumadocs-ui/css/preset.css';
 
 @theme {
+  /* System font stacks: the docs site loads no web fonts. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic',
-    Meiryo, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans',
+    'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', Meiryo,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
-/* A soft lavender palette: pale backgrounds, a muted violet accent, and
-   deep plum text. The light theme is the default. */
+/* The project palette: a violet primary on neutral backgrounds. The admin
+   screen (packages/server/admin-ui/src/styles.css) uses the same colors. The
+   light theme is the default; Fumadocs switches to .dark. */
 :root {
-  --color-fd-background: hsl(260, 60%, 98.8%);
-  --color-fd-foreground: hsl(258, 32%, 18%);
-  --color-fd-muted: hsl(258, 50%, 96%);
-  --color-fd-muted-foreground: hsl(256, 16%, 40%);
-  --color-fd-popover: hsl(260, 60%, 99%);
-  --color-fd-popover-foreground: hsl(258, 32%, 18%);
-  --color-fd-card: hsl(258, 70%, 97.5%);
-  --color-fd-card-foreground: hsl(258, 32%, 18%);
-  --color-fd-border: hsl(258, 40%, 89%);
-  --color-fd-primary: hsl(258, 48%, 52%);
-  --color-fd-primary-foreground: hsl(0, 0%, 100%);
-  --color-fd-secondary: hsl(258, 60%, 95%);
-  --color-fd-secondary-foreground: hsl(258, 32%, 22%);
-  --color-fd-accent: hsl(258, 70%, 94%);
-  --color-fd-accent-foreground: hsl(258, 45%, 30%);
-  --color-fd-ring: hsl(258, 60%, 70%);
-  --inline-code: hsl(262, 45%, 42%);
-  --lead: hsl(258, 22%, 38%);
+  --color-fd-background: #f7f7f8;
+  --color-fd-foreground: #1b1f3f;
+  --color-fd-muted: #f1f1f3;
+  --color-fd-muted-foreground: #525979;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #1b1f3f;
+  --color-fd-card: #ffffff;
+  --color-fd-card-foreground: #1b1f3f;
+  --color-fd-border: #e4e4e7;
+  --color-fd-primary: #743bc4;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #eee8f7;
+  --color-fd-secondary-foreground: #42256a;
+  --color-fd-accent: #eee8f8;
+  --color-fd-accent-foreground: #41246b;
+  --color-fd-ring: #885bc8;
+  --inline-code: #5d309c;
+  --lead: #464d70;
+  --hero-glow: #d7c4f3;
 }
 .dark {
-  --color-fd-background: hsl(258, 22%, 11%);
-  --color-fd-foreground: hsl(258, 40%, 95%);
-  --color-fd-muted: hsl(258, 20%, 16%);
-  --color-fd-muted-foreground: hsl(258, 20%, 76%);
-  --color-fd-popover: hsl(258, 22%, 12%);
-  --color-fd-popover-foreground: hsl(258, 40%, 95%);
-  --color-fd-card: hsl(258, 22%, 14%);
-  --color-fd-card-foreground: hsl(258, 40%, 95%);
-  --color-fd-border: hsl(258, 18%, 24%);
-  --color-fd-primary: hsl(258, 80%, 80%);
-  --color-fd-primary-foreground: hsl(258, 30%, 14%);
-  --color-fd-secondary: hsl(258, 20%, 18%);
-  --color-fd-secondary-foreground: hsl(258, 40%, 92%);
-  --color-fd-accent: hsl(258, 24%, 22%);
-  --color-fd-accent-foreground: hsl(258, 60%, 90%);
-  --color-fd-ring: hsl(258, 70%, 72%);
-  --inline-code: hsl(262, 85%, 84%);
-  --lead: hsl(258, 30%, 82%);
+  --color-fd-background: #111113;
+  --color-fd-foreground: #e4e6f6;
+  --color-fd-muted: #232327;
+  --color-fd-muted-foreground: #a6acd0;
+  --color-fd-popover: #1f1f23;
+  --color-fd-popover-foreground: #e4e6f6;
+  --color-fd-card: #1a1a1d;
+  --color-fd-card-foreground: #e4e6f6;
+  --color-fd-border: #2e2e33;
+  --color-fd-primary: #bfabfc;
+  --color-fd-primary-foreground: #1c123b;
+  --color-fd-secondary: #312556;
+  --color-fd-secondary-foreground: #e6dffb;
+  --color-fd-accent: #35275d;
+  --color-fd-accent-foreground: #e8e0ff;
+  --color-fd-ring: #b39df6;
+  --inline-code: #d5c7ff;
+  --lead: #c3c7e4;
+  --hero-glow: #4f3a8d;
 }
 
 .site-brand {

@@ -37,7 +37,12 @@ export const LanguageSwitch = ({ className }: { className?: string }) => {
           }}
         >
           {LOCALES.map((option) => (
-            <MenuRadioItem key={option} value={option} lang={option}>
+            <MenuRadioItem
+              key={option}
+              value={option}
+              lang={option}
+              closeOnClick
+            >
               {t(`language.${option}`)}
             </MenuRadioItem>
           ))}

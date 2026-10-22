@@ -278,6 +278,14 @@ const setLocale = async (page: Page, locale: 'ja' | 'en') => {
   await page.reload();
 };
 
+const setTheme = async (page: Page, theme: 'light' | 'dark') => {
+  await page.evaluate(
+    (value) => localStorage.setItem('goodnight-web.admin.theme', value),
+    theme,
+  );
+  await page.reload();
+};
+
 const main = async () => {
   await mkdir(outDir, { recursive: true });
   await buildPackage();
@@ -329,6 +337,12 @@ const main = async () => {
       .waitFor();
     await shoot(page, 'admin-login-en.png');
     await setLocale(page, 'ja');
+    await setTheme(page, 'dark');
+    await page
+      .getByRole('button', { name: ui('ja', 'admin.signIn') })
+      .waitFor();
+    await shoot(page, 'admin-login-ja-dark.png');
+    await setTheme(page, 'light');
     await page.getByRole('button', { name: ui('ja', 'admin.signIn') }).click();
     await page.waitForURL(`${base}/admin`);
 
@@ -342,12 +356,25 @@ const main = async () => {
     await page.goto(`${base}/admin/inquiries/${spamSample?.id}`);
     await page.getByTestId('spam-notice').waitFor();
     await shoot(page, 'admin-detail-spam-ja.png');
+    await setTheme(page, 'dark');
+    await page.getByTestId('spam-notice').waitFor();
+    await shoot(page, 'admin-detail-spam-ja-dark.png');
+    await page.goto(`${base}/admin?view=spam`);
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-spam-ja-dark.png');
+    await setTheme(page, 'light');
     await page.goto(`${base}/admin`);
     await page.getByTestId('inquiry-row').first().waitFor();
     await setLocale(page, 'en');
     await page.getByTestId('inquiry-row').first().waitFor();
     await shoot(page, 'admin-list-en.png');
+    await setTheme(page, 'dark');
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-en-dark.png');
     await setLocale(page, 'ja');
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-ja-dark.png');
+    await setTheme(page, 'light');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByTestId('inquiry-row').first().waitFor();
     await shoot(page, 'admin-list-mobile-ja.png');
@@ -361,6 +388,10 @@ const main = async () => {
     await page.goto(`${base}/admin/inquiries/${samples[0]?.id}`);
     await page.getByTestId('inquiry-body').waitFor();
     await shoot(page, 'admin-detail-ja.png');
+    await setTheme(page, 'dark');
+    await page.getByTestId('inquiry-body').waitFor();
+    await shoot(page, 'admin-detail-ja-dark.png');
+    await setTheme(page, 'light');
 
     // The form editor: add a "Budget" field and save it as version 2.
     const formDir = join(outDir, 'form-editor');
@@ -397,6 +428,16 @@ const main = async () => {
       await page.goto(`${base}/admin/inquiries/${customId}`);
       await page.getByText('80 万円前後').waitFor();
       await shootFull(page, join(formDir, 'detail-custom-field-ja-dark.png'));
+      // A narrow window, scrolled sideways: the sticky columns, their
+      // shadow, and the edge fade on the dark surfaces.
+      await page.setViewportSize({ width: 820, height: 800 });
+      await page.goto(`${base}/admin`);
+      await page.getByTestId('inquiry-row').first().waitFor();
+      await page
+        .getByTestId('inquiry-table-scroll')
+        .evaluate((element) => element.scrollBy({ left: 160 }));
+      await shoot(page, 'admin-list-scrolled-ja-dark.png');
+      await page.setViewportSize({ width: 1280, height: 800 });
     }
 
     // Restart without TURNSTILE_SECRET: the contact form closes and the

@@ -51,7 +51,7 @@ export const previewFromField = (field: FormField): PreviewField => ({
 });
 
 const control =
-  'block w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-[0.95rem] text-foreground placeholder:text-muted-foreground/70';
+  'block w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-[0.95rem] text-foreground placeholder:text-muted-foreground';
 
 const PreviewLabel = ({
   text,

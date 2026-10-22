@@ -54,7 +54,7 @@ export const Input = ({
 }: ComponentProps<typeof BaseInput>) => (
   <BaseInput
     className={cn(
-      'h-11 w-full min-w-0 rounded-xl border border-input bg-card px-3.5 text-base text-foreground shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-60 data-invalid:border-destructive/60 data-invalid:ring-destructive/20 sm:text-[0.95rem]',
+      'h-11 w-full min-w-0 rounded-xl border border-input bg-card px-3.5 text-base text-foreground shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-60 data-invalid:border-destructive/60 data-invalid:ring-destructive/20 sm:text-[0.95rem]',
       className,
     )}
     {...props}

@@ -358,7 +358,8 @@ The UI does not use TanStack Start; the Worker serves the static build.
   passkey (403 `passkey_required`) goes to the passkey step of setup. There
   is no client-side bypass: the API decides.
 - **Header.** The unread count from `GET /api/admin/status` (and from each
-  list response) is always shown, with the language switch and sign-out.
+  list response) is always shown, with the language switch, the light/dark
+  switch, and sign-out.
 - **Setup notices.** When `turnstileConfigured` is `false`, the list and
   detail screens show a notice that the contact form is not accepting
   submissions, with a link to the Turnstile setup page in the documentation.
@@ -374,6 +375,31 @@ The UI does not use TanStack Start; the Worker serves the static build.
   `admin-ui/src/shared/i18n/admin-messages.ts`. API errors are shown with
   the `error.<code>` message in the UI's language. Dates use `Intl` in the
   viewer's time zone.
+- **Theme.** A fixed theme with a violet primary on neutral backgrounds,
+  separate from the starter's colors (the starter owns its colors in
+  `site.config.ts` and `src/styles/global.css`). All colors are tokens in
+  `admin-ui/src/styles.css`: light values in `@theme`, dark values under
+  `:root.dark`; components use only token classes. The inquiry table's
+  sticky columns use opaque `table-*` tokens so scrolled cells do not show
+  through, and the sticky-column shadow is the `--shadow-sticky` token.
+  `theme-contrast.test.ts` reads that file and checks WCAG AA for the main
+  pairs in both modes (4.5:1 text, 3:1 control borders and focus rings),
+  including the warning, badge, and table row colors.
+- **Fonts.** No web fonts. `--font-sans` and `--font-mono` in
+  `admin-ui/src/styles.css` are system font stacks, so the admin UI
+  requests no font files and the CSP needs no font host or `font-src`.
+  The docs site (`apps/docs/src/styles/theme.css`) and the starter
+  (`src/styles/global.css`) define the same stacks in their own tokens.
+- **Light and dark mode.** The default follows `prefers-color-scheme`. The
+  header switch (system, light, dark) saves the choice in `localStorage`
+  (`goodnight-web.admin.theme`). To avoid a flash of the wrong colors,
+  `index.html` loads `admin-ui/public/theme-init.js` as a blocking script in
+  `<head>`; it sets the `dark` class on `<html>` before the CSS and the app
+  load. It is a file, not an inline script, so the CSP stays
+  `script-src 'self'` with no hash or `'unsafe-inline'`. The same rules are
+  in `admin-ui/src/shared/theme/color-scheme.ts`; a unit test runs the
+  script against them, and the end-to-end test checks the class when
+  `#root` is parsed.
 - **CSP.** Every admin response gets the admin CSP
   (`default-src 'self'; script-src 'self'; style-src 'self'; ...`). The
   build has no inline scripts or styles. Base UI's one inline `<style>`

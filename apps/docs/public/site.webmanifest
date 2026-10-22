@@ -3,7 +3,7 @@
   "short_name": "goodnight-web",
   "start_url": "./",
   "display": "browser",
-  "background_color": "#fbf9ff",
-  "theme_color": "#fbf9ff",
+  "background_color": "#f7f7f8",
+  "theme_color": "#f7f7f8",
   "icons": [{ "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any" }]
 }

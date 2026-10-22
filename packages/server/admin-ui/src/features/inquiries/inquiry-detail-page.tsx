@@ -246,14 +246,14 @@ const AnswerRow = ({
             href={text}
             target='_blank'
             rel='noopener noreferrer nofollow'
-            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
           >
             {text}
           </a>
         ) : entry.type === 'tel' ? (
           <a
             href={`tel:${text}`}
-            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
           >
             {text}
           </a>
@@ -371,7 +371,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
     <button
       type='button'
       onClick={backToList}
-      className='inline-flex items-center gap-1.5 self-start rounded-full py-1 pr-3 text-sm font-medium text-muted-foreground transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/60'
+      className='inline-flex items-center gap-1.5 self-start rounded-full py-1 pr-3 text-sm font-medium text-muted-foreground transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring'
     >
       <ArrowLeft aria-hidden='true' className='size-4' />
       {t('app.backToList')}
@@ -422,7 +422,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
       {back}
       <div className='grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]'>
         <Card className='overflow-hidden'>
-          <div className='flex flex-col gap-3 border-b border-border/70 bg-gradient-to-b from-accent/50 to-card px-6 pt-6 pb-5 sm:px-8 sm:pt-8'>
+          <div className='flex flex-col gap-3 border-b border-border/70 bg-gradient-to-b from-muted to-card px-6 pt-6 pb-5 sm:px-8 sm:pt-8'>
             <div className='flex flex-wrap items-center gap-2'>
               <StatusBadge status={item.status} />
               {item.suspectedSpam ? <SuspectedSpamBadge /> : null}
@@ -487,7 +487,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                 <a
                   href={`mailto:${item.email}`}
                   data-testid='inquiry-email'
-                  className='rounded-sm break-all text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+                  className='rounded-sm break-all text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
                 >
                   {item.email}
                 </a>

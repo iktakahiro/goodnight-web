@@ -339,7 +339,7 @@ export const FieldCard = ({
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={`${id}-settings`}
-          className='flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-1 rounded-lg py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/60'
+          className='flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-1 rounded-lg py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring'
         >
           <span className='flex w-full min-w-0 items-center gap-2'>
             <span
