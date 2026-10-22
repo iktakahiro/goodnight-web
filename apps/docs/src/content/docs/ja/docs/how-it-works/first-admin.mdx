@@ -3,21 +3,59 @@ title: 最初の管理者の作成
 description: 最初の管理者は、シークレットの SETUP_TOKEN と、ADMIN_EMAILS にあるメールアドレスがそろったときだけ作れます。最初のパスキーが登録されたらセットアップは閉じます。
 ---
 
-<Callout type='info'>
-  コードの抜粋は、サーバーのパッケージができたら追加します。
-</Callout>
-
 ## 何をするか
 
-デプロイした直後のサイトには、管理者がいません。セットアップ用のエンドポイント `/api/setup` が最初の管理者を作ります。受け付けるのは、次の両方を満たすリクエストだけです。
+デプロイした直後のサイトには、管理者がいません。セットアップ用のエンドポイント `/api/setup` が最初の管理者を作ります。受け付けるのは、次のすべてを満たすリクエストだけです。
 
 - サイト自身から送られている（`Origin` ヘッダーを確認します）。
+- `https://` で送られている（平文の HTTP は `localhost` でだけ使えます）。
 - 正しい `SETUP_TOKEN` が含まれている（比較にかかる時間が一定になる方法で比べます）。
 - メールアドレスが `ADMIN_EMAILS` に入っている（大文字と小文字は区別しません）。
 
-セットアップの試行回数にも制限があります。この制限をかけられないとき（Rate Limiting binding か `IP_HASH_SECRET` がないとき）は、セットアップは使えません。新しい管理者はログインした状態になり、続けてパスキーを登録します。最初のパスキーが登録されると、セットアップのエンドポイントは閉じ、後でパスキーをすべて削除しても閉じた状態が続きます。それまではセットアップをやり直せるので、パスキーを登録する前に離れても締め出されません。
+セットアップの試行回数にも制限があります。この制限をかけられないとき（Rate Limiting binding か `IP_HASH_SECRET` がないとき）は、セットアップは使えません。`SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上が必要です。短い値があるとセットアップは使えず、セットアップ画面にその設定の名前を表示します。新しい管理者はログインした状態になり、続けてパスキーを登録します。最初のパスキーが登録されると、セットアップのエンドポイントは閉じ、後でパスキーをすべて削除しても閉じた状態が続きます。それまではセットアップをやり直せるので、パスキーを登録する前に離れても締め出されません。
 
 管理 API が受け付けるのは、ログインしていて、まだ `ADMIN_EMAILS` に入っていて、パスキーを持っているユーザーだけです。セットアップで得たセッションだけでは、最初のパスキーの登録しかできません。
+
+## セッション [#sessions]
+
+以前にトークンを知っていた別の人が、同じアドレスでセットアップを行い、そのセッションを持ち続けているかもしれません。次の決まりで、そうしたセッションが管理者のセッションにならないようにします。
+
+- すでにユーザーがいるアドレスでセットアップをもう一度行うと、そのユーザーの以前のセッションを削除します。
+- 最初のパスキーを登録すると、データベースにあるすべてのセッションを削除します。それまでにあるセッションは、セットアップで作ったものだけです。セットアップ画面は `createSession` を付けてパスキーを登録するので、パスキーより後に作られた新しいセッションが渡され、ログインしたままになります。
+- セットアップが閉じたあとは、パスキーを持たないユーザーはパスキーを登録できません。
+- 最初のパスキーより前に作られたセッションは、管理 API が拒否します（401）。
+
+```ts
+// packages/server/src/features/setup/first-passkey.ts
+export const beforePasskeySaved = async (
+  db: D1Database,
+  userId: string,
+): Promise<void> => {
+  const orm = getDatabase(db);
+  const existing = await orm
+    .select({ id: passkey.id })
+    .from(passkey)
+    .where(eq(passkey.userId, userId))
+    .get();
+  if (existing) return;
+  if (await isSetupClosed(db)) {
+    throw new APIError('FORBIDDEN', { message: 'setup closed' });
+  }
+  await orm.delete(session);
+};
+
+// packages/server/src/features/auth/require-admin.ts
+const first = await getDatabase(c.env.DB)
+  .select({ createdAt: passkey.createdAt })
+  .from(passkey)
+  .where(and(eq(passkey.userId, user.id), isNotNull(passkey.createdAt)))
+  .orderBy(asc(passkey.createdAt))
+  .get();
+if (!first?.createdAt) return apiError(c, 403, 'passkey_required');
+if (session.createdAt.getTime() < first.createdAt.getTime()) {
+  return apiError(c, 401, 'unauthorized');
+}
+```
 
 ## セットアップ画面
 
@@ -25,7 +63,7 @@ description: 最初の管理者は、シークレットの SETUP_TOKEN と、ADM
 
 1. **セットアップトークン。** `SETUP_TOKEN`、`ADMIN_EMAILS` に入っているメールアドレス、任意で名前を入力します。トークンの間違い、許可されていないアドレス、セットアップが閉じていることは、それぞれ別のメッセージで知らせます。
 2. **パスキー。** **パスキーを登録** を選びます。ブラウザ、スマートフォン、またはパスワード管理アプリがパスキーを作り、指紋・顔・PIN で確認します。画面には、パスキーが結びつくドメインを表示します。
-3. **完了。** セットアップが閉じ、管理画面が開きます。次回からは `/admin/login` でパスキーを使ってログインします。
+3. **完了。** セットアップが閉じ、管理画面が開きます。次回からは `/admin/login` でパスキーを使ってログインします。シークレットの `SETUP_TOKEN` はもう使わないので、ここで削除してください。
 
 手順 1 のあとで画面を離れても、`/admin/setup` をもう一度開けば手順 2 から続けられます。
 
@@ -33,4 +71,4 @@ description: 最初の管理者は、シークレットの SETUP_TOKEN と、ADM
 
 デプロイしたばかりのサイトは、持ち主がログインする前からインターネットに公開されています。セットアップ画面に最初に来た人が管理者になれるなら、先にサイトを見つけた知らない人に乗っ取られるおそれがあります。持ち主だけが知っているシークレットと、許可したメールアドレスの両方を求めることで、このすき間をふさぎます。作成後にセットアップを閉じるので、`SETUP_TOKEN` が漏れても、後から管理者を増やされることはありません。
 
-Cloudflare Access で管理画面のパスを守っていれば、Access を通った人しかセットアップ画面にたどり着けません。
+Cloudflare Access で `/admin/*`、`/api/setup`、`/api/auth/*` を守っていれば、Access を通った人しかセットアップにたどり着けません。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すれば、Worker も `/api/setup` で Access のトークンを確認します。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。

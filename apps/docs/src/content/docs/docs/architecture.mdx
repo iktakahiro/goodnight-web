@@ -13,18 +13,18 @@ description: One Worker with Static Assets and one D1 database serve the site, t
 
 ## The parts
 
-| Part                         | Role                                                                                                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker                       | One Worker per site. It serves the static pages and runs the API.                                                                                       |
-| Static Assets                | The Astro build (`/`, `/blog/`, `/contact/`, and so on). Cloudflare serves these files without running Worker code.                                     |
-| Hono app                     | Created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*`, `/admin`, and `/admin/*` reach it, through `run_worker_first`. |
-| D1                           | One SQLite database: inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                           |
-| Turnstile                    | Cloudflare's bot check on the contact form. The Worker verifies each token on the server.                                                               |
-| Rate Limiting binding        | A Workers binding that limits contact submissions per `ip_hash`. It works on the free plan.                                                             |
-| Better Auth with passkeys    | Admin sign-in. Passkeys only; email and password sign-in is turned off.                                                                                 |
-| Admin UI                     | A React app (TanStack Router, Form, and Table) built with Vite. It ships prebuilt in `@goodnight-web/server`, and the Worker serves it.                 |
-| Slack webhook (optional)     | A short "new inquiry" message, with no personal data.                                                                                                   |
-| Cloudflare Access (optional) | An extra sign-in layer in front of `/admin/*` and `/api/admin/*`. Recommended, not required.                                                            |
+| Part                         | Role                                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker                       | One Worker per site. It serves the static pages and runs the API.                                                                                                                                                   |
+| Static Assets                | The Astro build (`/`, `/blog/`, `/contact/`, and so on). Cloudflare serves these files without running Worker code.                                                                                                 |
+| Hono app                     | Created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*`, `/admin`, and `/admin/*` reach it, through `run_worker_first`.                                                             |
+| D1                           | One SQLite database: inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                                                                                       |
+| Turnstile                    | Cloudflare's bot check on the contact form. The Worker verifies each token on the server.                                                                                                                           |
+| Rate Limiting binding        | A Workers binding that limits contact submissions per `ip_hash`. It works on the free plan.                                                                                                                         |
+| Better Auth with passkeys    | Admin sign-in. Passkeys only; email and password sign-in is turned off.                                                                                                                                             |
+| Admin UI                     | A React app (TanStack Router, Form, and Table) built with Vite. It ships prebuilt in `@goodnight-web/server`, and the Worker serves it.                                                                             |
+| Slack webhook (optional)     | A short "new inquiry" message, with no personal data.                                                                                                                                                               |
+| Cloudflare Access (optional) | An extra sign-in layer in front of `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. Recommended, not required. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. |
 
 Constraints that shape the design:
 
@@ -48,31 +48,35 @@ Constraints that shape the design:
 `POST /api/contact` runs these steps in this order:
 
 1. **Origin and size.** The request must come from the site's own origin, use the expected `Content-Type`, and be small (about 16 KB). Anything else is rejected before the body is parsed.
-2. **Honeypot.** The form has a field that people cannot see. If it is filled in, the submission is saved with status `held` and the reply is a normal success, so the bot learns nothing.
+2. **Honeypot.** The form has a field that people cannot see. If it is filled in, nothing is saved, the request is counted against the rate limit, and the reply is a normal success, so the bot learns nothing. The honeypot runs before Turnstile, so storing the submission would let a bot write to D1 without passing Turnstile.
 3. **Turnstile.** The Worker sends the token to Turnstile siteverify and checks `success`, `hostname`, and `action`. If the check fails, the reply is 400 and nothing is saved.
 4. **Rate limit.** The Rate Limiting binding counts requests per `ip_hash`. Over the limit, the reply is 429.
 5. **Validation and spam score.** zod checks the fields. Simple rules add to a spam score. Above the threshold, the status becomes `held` instead of `new`.
 6. **Save, then reply.** The row is inserted into D1. Only after the insert succeeds does the visitor get a 200 reply. Nothing after this step can change the reply.
 7. **After the reply, in `ctx.waitUntil`:**
    - If the status is `new` and a Slack webhook is set, post "1 new inquiry, category, admin URL" and record `notified_at`.
-   - If the last cleanup was more than an hour ago, delete inquiries older than the retention period (180 days by default).
+   - If the last cleanup was more than an hour ago, delete inquiries older than the retention period (180 days by default) and expired passkey challenges.
 
 If `TURNSTILE_SECRET` is not set, the endpoint returns 503 and the form says it is not available yet. See [Set up Turnstile](/docs/setup/turnstile/).
 
 ## Secrets and bindings
 
-| Name                 | Kind                  | Purpose                                                  |
-| -------------------- | --------------------- | -------------------------------------------------------- |
-| `DB`                 | D1 binding            | All stored data                                          |
-| rate limit binding   | Rate Limiting binding | Limits contact submissions per `ip_hash`                 |
-| `SETUP_TOKEN`        | Secret                | Required to create the first admin                       |
-| `ADMIN_EMAILS`       | Secret or variable    | Addresses that may become admins                         |
-| `BETTER_AUTH_SECRET` | Secret                | Better Auth signing secret                               |
-| `IP_HASH_SECRET`     | Secret                | Key for `HMAC-SHA256(ip, IP_HASH_SECRET)`                |
-| `TURNSTILE_SECRET`   | Secret                | Turnstile siteverify. Without it the contact API is off. |
-| `SLACK_WEBHOOK_URL`  | Secret, optional      | New-inquiry notification                                 |
+| Name                 | Kind                  | Purpose                                                                             |
+| -------------------- | --------------------- | ----------------------------------------------------------------------------------- |
+| `DB`                 | D1 binding            | All stored data                                                                     |
+| rate limit binding   | Rate Limiting binding | Limits contact submissions per `ip_hash`                                            |
+| `SETUP_TOKEN`        | Secret                | Required to create the first admin. At least 32 characters. Delete it after setup.  |
+| `ADMIN_EMAILS`       | Secret or variable    | Addresses that may become admins                                                    |
+| `BETTER_AUTH_SECRET` | Secret                | Better Auth signing secret. At least 32 characters.                                 |
+| `IP_HASH_SECRET`     | Secret                | Key for `HMAC-SHA256(ip, IP_HASH_SECRET)`. At least 32 characters.                  |
+| `TURNSTILE_SECRET`   | Secret                | Turnstile siteverify. Without it the contact API is off.                            |
+| `SLACK_WEBHOOK_URL`  | Secret, optional      | New-inquiry notification                                                            |
+| `ACCESS_AUD`         | Variable, optional    | Cloudflare Access application audience tag. Set together with `ACCESS_TEAM_DOMAIN`. |
+| `ACCESS_TEAM_DOMAIN` | Variable, optional    | Cloudflare Access team domain, such as `your-team.cloudflareaccess.com`.            |
 
-Secrets stay in the Worker. They are never sent to the browser or written to D1.
+A secret shorter than 32 characters turns its features off, the same as a missing one. Secrets stay in the Worker. They are never sent to the browser or written to D1.
+
+`/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` work only over `https://` (except on `localhost`). See [Security model](/docs/security/#https).
 
 ## Related pages
 

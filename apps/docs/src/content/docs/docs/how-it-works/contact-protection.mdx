@@ -11,20 +11,20 @@ description: The contact API checks origin and size, a honeypot field, Turnstile
 
 `POST /api/contact` applies these checks in order. Each check is cheaper than the next, so most junk is stopped early.
 
-| Check                                                                                                 | On failure                                                 |
-| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `Origin` is the site's own origin, `Content-Type` is as expected, and the body is at most about 16 KB | Rejected before the body is parsed                         |
-| The hidden honeypot field is empty                                                                    | Saved with status `held`; the reply still says success     |
-| Turnstile siteverify: `success`, `hostname`, and `action` match                                       | 400, nothing saved                                         |
-| Rate Limiting binding, keyed by `ip_hash` (for example 5 requests per 60 seconds)                     | 429                                                        |
-| zod validation of the fields, then a spam score                                                       | Invalid input is rejected; a high score sets status `held` |
+| Check                                                                                                 | On failure                                                                  |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `Origin` is the site's own origin, `Content-Type` is as expected, and the body is at most about 16 KB | Rejected before the body is parsed                                          |
+| The hidden honeypot field is empty                                                                    | Nothing saved; counted against the rate limit; the reply still says success |
+| Turnstile siteverify: `success`, `hostname`, and `action` match                                       | 400, nothing saved                                                          |
+| Rate Limiting binding, keyed by `ip_hash` (for example 5 requests per 60 seconds)                     | 429                                                                         |
+| zod validation of the fields, then a spam score                                                       | Invalid input is rejected; a high score sets status `held`                  |
 
 After the checks, the submission is inserted into D1, and only then does the API reply with 200.
 
 ## Why it is built this way
 
 - **Turnstile is verified on the server.** The widget in the page only produces a token. Without the siteverify call, a bot could skip the widget. Checking `hostname` and `action` stops a token made for another site or another form from being reused here.
-- **The honeypot pretends to succeed.** A bot that gets an error tries again with changes. A bot that gets a success moves on. The submission is kept as `held`, so a person can still find it if the honeypot catches a real visitor by mistake.
+- **The honeypot pretends to succeed and stores nothing.** A bot that gets an error tries again with changes. A bot that gets a success moves on. The honeypot check runs before Turnstile, so storing the submission would let a bot write to D1 without passing Turnstile. The request still counts against the rate limit, so the same address cannot follow up with many real-looking submissions. Only a one-line log entry without personal data remains.
 - **Doubtful submissions are held, not dropped.** A missed inquiry costs more than a little spam, so a high spam score moves a submission to `held` instead of deleting it. Held submissions do not trigger a notification.
 - **The rate limit uses Cloudflare's binding.** The Rate Limiting binding is shared across Worker instances and works on the free plan. Better Auth's built-in in-memory limiter does not count across instances, so it is not used for this.
 - **No key in the page.** An API key embedded in the contact page would be readable by anyone, so it would protect nothing. Protection comes from Turnstile and the rate limit.

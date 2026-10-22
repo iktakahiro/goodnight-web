@@ -3,21 +3,59 @@ title: First admin setup
 description: The first admin can be created only with the SETUP_TOKEN secret and an address in ADMIN_EMAILS. Setup closes once the first passkey is registered.
 ---
 
-<Callout type='info'>
-  Code excerpts will be added once the server package lands.
-</Callout>
-
 ## What it does
 
 Right after a deploy, the site has no admin. The setup endpoint `/api/setup` creates the first one, and it accepts a request only if:
 
 - the request comes from the site itself (the `Origin` header is checked),
+- the request uses `https://` (plain HTTP is allowed only on `localhost`),
 - the request includes the correct `SETUP_TOKEN` (compared in constant time), and
 - the email address is in `ADMIN_EMAILS` (upper and lower case do not matter).
 
-Setup attempts are also rate-limited, and setup is turned off when the rate limit cannot run (the Rate Limiting binding or `IP_HASH_SECRET` is missing). The new admin is signed in and then registers a passkey. Once the first passkey is registered, the setup endpoint closes and stays closed, even if every passkey is deleted later. Until then, setup can run again, so a person who left before registering a passkey is not locked out.
+Setup attempts are also rate-limited, and setup is turned off when the rate limit cannot run (the Rate Limiting binding or `IP_HASH_SECRET` is missing). `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters; with a shorter value, setup stays off and the setup screen names the setting. The new admin is signed in and then registers a passkey. Once the first passkey is registered, the setup endpoint closes and stays closed, even if every passkey is deleted later. Until then, setup can run again, so a person who left before registering a passkey is not locked out.
 
 The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session from setup alone is only good for registering the first passkey.
+
+## Sessions [#sessions]
+
+Someone else who had the token earlier could have run setup with the same address and kept the session. These rules make sure such a session never becomes an admin session:
+
+- Running setup again for an address that already has a user deletes that user's earlier sessions.
+- Registering the first passkey deletes every session in the database. Until then, the only sessions are the ones setup created. The setup screen registers the passkey with `createSession`, so you get a new session, created after the passkey, and stay signed in.
+- Once setup is closed, a user without a passkey cannot register one.
+- The admin API rejects (401) a session created before the user's first passkey.
+
+```ts
+// packages/server/src/features/setup/first-passkey.ts
+export const beforePasskeySaved = async (
+  db: D1Database,
+  userId: string,
+): Promise<void> => {
+  const orm = getDatabase(db);
+  const existing = await orm
+    .select({ id: passkey.id })
+    .from(passkey)
+    .where(eq(passkey.userId, userId))
+    .get();
+  if (existing) return;
+  if (await isSetupClosed(db)) {
+    throw new APIError('FORBIDDEN', { message: 'setup closed' });
+  }
+  await orm.delete(session);
+};
+
+// packages/server/src/features/auth/require-admin.ts
+const first = await getDatabase(c.env.DB)
+  .select({ createdAt: passkey.createdAt })
+  .from(passkey)
+  .where(and(eq(passkey.userId, user.id), isNotNull(passkey.createdAt)))
+  .orderBy(asc(passkey.createdAt))
+  .get();
+if (!first?.createdAt) return apiError(c, 403, 'passkey_required');
+if (session.createdAt.getTime() < first.createdAt.getTime()) {
+  return apiError(c, 401, 'unauthorized');
+}
+```
 
 ## The setup screen
 
@@ -25,7 +63,7 @@ Opening `/admin/` on a site without an admin shows the setup screen at `/admin/s
 
 1. **Setup token.** Enter the `SETUP_TOKEN`, an address from `ADMIN_EMAILS`, and optionally your name. A wrong token, an address that is not allowed, and a closed setup each get their own message.
 2. **Passkey.** Select **Register a passkey**. Your browser, phone, or password manager creates the passkey and asks for your fingerprint, face, or PIN. The screen shows the domain the passkey belongs to.
-3. **Done.** Setup is now closed, and the admin screen opens. Next time, sign in at `/admin/login` with the passkey.
+3. **Done.** Setup is now closed, and the admin screen opens. Next time, sign in at `/admin/login` with the passkey. Delete the `SETUP_TOKEN` secret now; it is not needed again.
 
 If you leave after step 1, opening `/admin/setup` again continues at step 2.
 
@@ -33,4 +71,4 @@ If you leave after step 1, opening `/admin/setup` again continues at step 2.
 
 A newly deployed site is public on the internet before its owner has signed in. If the first visitor to the setup page became the admin, a stranger who found the site first could take it over. Requiring both a secret that only the owner knows and an allowed address closes that gap. Closing setup afterwards means that a leaked `SETUP_TOKEN` cannot create more admins later.
 
-If Cloudflare Access protects the admin paths, only people who pass Access can reach the setup screen at all.
+If Cloudflare Access protects `/admin/*`, `/api/setup`, and `/api/auth/*`, only people who pass Access can reach setup at all. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token on `/api/setup` itself. See [Security model](/docs/security/#cloudflare-access).

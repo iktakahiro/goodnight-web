@@ -70,18 +70,24 @@ is not yet. Design decisions are recorded in
 | `DB`                   | D1 binding         | All persistent data                                        | Worker cannot run              |
 | `ASSETS`               | Static Assets      | The site's pages                                           | non-API paths return 404       |
 | `CONTACT_RATE_LIMITER` | Rate Limiting      | Contact, setup, and passkey sign-in requests per `ip_hash` | contact, setup, sign-in 503    |
-| `SETUP_TOKEN`          | secret             | Required to create the first admin                         | setup 503                      |
+| `SETUP_TOKEN`          | secret             | Required to create the first admin, 32 characters or more  | setup 503                      |
 | `ADMIN_EMAILS`         | secret or variable | Comma-separated addresses that may be admins               | setup 503, admin API 403       |
 | `BETTER_AUTH_SECRET`   | secret             | Better Auth signing secret, 32 characters or more          | auth, setup, and admin API 503 |
-| `IP_HASH_SECRET`       | secret             | HMAC key for `ip_hash`                                     | contact, setup, sign-in 503    |
+| `IP_HASH_SECRET`       | secret             | HMAC key for `ip_hash`, 32 characters or more              | contact, setup, sign-in 503    |
 | `TURNSTILE_SECRET`     | secret             | Turnstile siteverify                                       | contact API 503                |
 | `TURNSTILE_SITE_KEY`   | variable (public)  | Turnstile widget; the form reads it from the config API    | contact API 503                |
 | `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification                |
+| `ACCESS_AUD`           | variable, optional | Cloudflare Access audience tag(s), comma-separated         | no Access token check          |
+| `ACCESS_TEAM_DOMAIN`   | variable, optional | Cloudflare Access team domain                              | no Access token check          |
 
 The Rate Limiting binding name is fixed
-([0003](decisions/0003-rate-limit-binding.md)). The admin API reports which
-contact settings are missing (names only, never values) in
-`GET /api/admin/status`.
+([0003](decisions/0003-rate-limit-binding.md)). `SETUP_TOKEN`,
+`BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` shorter than 32 characters
+(`MIN_SECRET_LENGTH` in `src/shared/secret-length.ts`) count as missing. The
+admin API reports which contact settings are missing or too short (names
+only, never values) in `GET /api/admin/status` (`contactMissing`,
+`contactTooShort`). `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` must be set
+together; with only one, the admin areas answer 503.
 
 ## Contact flow
 
@@ -101,10 +107,11 @@ When `available` is `false`, the form shows that it is not available yet.
    `Content-Length` and again while reading, so a chunked body cannot bypass
    it. Errors: 403, 415, 413, then 400 for bad JSON. The form is served by the
    same Worker, so the API is same-origin only and sends no CORS headers.
-2. If the honeypot field is filled, save the submission with status `held` and
-   return success, so a bot learns nothing. This path also counts against the
-   rate limit; over the limit it still returns success but saves nothing, so a
-   bot cannot fill the database.
+2. If the honeypot field is filled, count the request against the rate limit,
+   log one line without personal data, store nothing, and return success, so a
+   bot learns nothing. This step runs before Turnstile, so storing a row here
+   would let a bot write to D1 without passing Turnstile
+   ([0007](decisions/0007-honeypot-not-stored.md)).
 3. Verify the Turnstile token with siteverify (secret, token, `remoteip`),
    and check that `hostname` is the request's hostname (or one of
    `options.contact.turnstileHostnames`) and that `action` is `contact`. On
@@ -141,17 +148,20 @@ typed results instead of throwing.
 `scoreSubmission()` in `spam-score.ts`. The rules only hold a submission for
 review; nothing is thrown away.
 
-| Rule           | Points                    | Condition                                            |
-| -------------- | ------------------------- | ---------------------------------------------------- |
-| `links:N`      | N, at most 3              | links (`http://`, `https://`, `www.`) in the message |
-| `link_in_name` | 3                         | a link in the name or company                        |
-| `too_fast`     | 3                         | sent less than 3 seconds after the form was shown    |
-| `honeypot`     | always `held`, not scored | the hidden `website` field is filled                 |
+| Rule           | Points       | Condition                                            |
+| -------------- | ------------ | ---------------------------------------------------- |
+| `links:N`      | N, at most 3 | links (`http://`, `https://`, `www.`) in the message |
+| `link_in_name` | 3            | a link in the name or company                        |
+| `too_fast`     | 3            | sent less than 3 seconds after the form was shown    |
+
+A filled honeypot field is not scored: the submission is not stored at all
+(step 2 above).
 
 ### Retention without Cron
 
 `pruneIfDue()` deletes submissions older than `settings.retention_days`
-(180 by default) at most once an hour. It claims the run with one conditional
+(180 by default), and Better Auth `verification` rows past `expires_at`
+(abandoned passkey challenges), at most once an hour. It claims the run with one conditional
 upsert of `settings.last_cleanup_at`, so two requests at the same time do not
 both delete. It runs in `ctx.waitUntil` after each submission and after each
 admin list request, so old rows are removed even when no new inquiries
@@ -165,8 +175,10 @@ arrive.
 (`packages/server/src/features/setup/`):
 
 1. 503 without `BETTER_AUTH_SECRET`, `SETUP_TOKEN`, `ADMIN_EMAILS`,
-   `IP_HASH_SECRET`, or the `CONTACT_RATE_LIMITER` binding. Setup never runs
-   without its attempt limit.
+   `IP_HASH_SECRET`, or the `CONTACT_RATE_LIMITER` binding, or when one of
+   the three secrets is shorter than 32 characters. Setup never runs without
+   its attempt limit. (Before this, the app-wide checks below require HTTPS
+   and, when configured, a Cloudflare Access token.)
 2. 403 unless `Origin` is the Worker's origin. Better Auth skips its own
    origin check for server-side calls, so the route checks it.
 3. 429 over the rate limit (`setup:<ip_hash>` on the same binding).
@@ -175,33 +187,52 @@ arrive.
    (constant-time compare).
 6. 403 `email_not_allowed` unless the address is in `ADMIN_EMAILS`
    (case-insensitive).
-7. A server-only Better Auth plugin endpoint creates the user (or reuses it)
-   and sets the session cookie. It is not reachable under `/api/auth/*`.
+7. A server-only Better Auth plugin endpoint creates the user (or reuses it,
+   deleting that user's earlier sessions first) and sets the session cookie.
+   It is not reachable under `/api/auth/*`.
 
 The browser then registers a passkey with the Better Auth passkey client.
 Setup closes when the first passkey is registered, so a person who left before
 registering one can run setup again. A trigger on the `passkey` table records
 `settings.setup_closed_at` in the same transaction, so setup stays closed even
-if every passkey is deleted later (migration `0002_setup_closed_trigger.sql`). `GET /api/setup` returns `{ configured, open }`.
+if every passkey is deleted later (migration `0002_setup_closed_trigger.sql`). `GET /api/setup` returns `{ configured, open, problems }`;
+`problems` lists the settings that keep setup off (`{ name, issue }`, issue
+`missing` or `too_short`) and is empty once setup is closed.
+
+Session rules ([0006](decisions/0006-admin-sessions-and-setup-closure.md)):
+the passkey plugin's `registration.afterVerification` calls
+`beforePasskeySaved()` (`src/features/setup/first-passkey.ts`). A user who
+already has a passkey may add another. For a user without one it refuses
+(403) when setup is closed; otherwise this passkey closes setup, so it
+deletes every session first. The setup UI registers with
+`createSession: true`, so the browser gets a session created after the
+passkey.
 
 ### Admin API
 
 Every `/api/admin/*` route requires a Better Auth session whose user is still
-in `ADMIN_EMAILS` and has at least one passkey. The session from setup alone
-only allows registering the first passkey. State-changing requests also need
+in `ADMIN_EMAILS` (read from `env` on every request) and has at least one
+passkey, and the session must have been created at or after the user's first
+passkey (otherwise 401). The session from setup alone only allows registering
+the first passkey. State-changing requests also need
 the Worker's own `Origin` (CSRF). There is no development bypass.
 
-| Route                                             | Result                                                                                                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/admin/me`                               | the signed-in admin                                                                                                                                          |
-| `GET /api/admin/status`                           | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`, `categories` (`{ value, label }`) |
-| `GET /api/admin/submissions?status=&page=&limit=` | `limit` per page (1–100, default 50), newest first, `total` and `unreadCount`; runs pruning. Invalid `status`, `page`, or `limit` is 400                     |
-| `GET /api/admin/submissions/:id`                  | one submission; a `new` one becomes `read`                                                                                                                   |
-| `PATCH /api/admin/submissions/:id`                | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                       |
-| `DELETE /api/admin/submissions/:id`               | deletes the row                                                                                                                                              |
-| `GET /api/admin/submissions.csv?status=`          | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                                                            |
+| Route                                             | Result                                                                                                                                                                                            |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/admin/me`                               | the signed-in admin                                                                                                                                                                               |
+| `GET /api/admin/status`                           | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`, `categories` (`{ value, label }`)                   |
+| `GET /api/admin/submissions?status=&page=&limit=` | `limit` per page (1–100, default 50), newest first, `total` and `unreadCount`; runs pruning. Invalid `status`, `page`, or `limit` is 400                                                          |
+| `GET /api/admin/submissions/:id`                  | one submission; a `new` one becomes `read`                                                                                                                                                        |
+| `PATCH /api/admin/submissions/:id`                | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                                                            |
+| `DELETE /api/admin/submissions/:id`               | deletes the row                                                                                                                                                                                   |
+| `GET /api/admin/submissions.csv?status=`          | CSV with a UTF-8 BOM, streamed in batches of 200 rows (keyset on `created_at`, `id`); a cell whose first non-whitespace character is `= + - @`, or that starts with tab or CR, gets a leading `'` |
 
 `ip_hash` is never returned by the admin API.
+
+Removing an address from `ADMIN_EMAILS` locks its sessions out at the next
+request, but the user, sessions, and passkeys stay in D1 and work again if
+the address is added back. The docs site's security page gives the
+`wrangler d1 execute` command that deletes them.
 
 ### Admin UI
 
@@ -284,9 +315,31 @@ The UI does not use TanStack Start; the Worker serves the static build.
   304s. The SPA shell loads without a session, but every data request needs
   one.
 
+### HTTPS and Cloudflare Access
+
+Two app-wide middlewares run before the routes, for the admin areas
+(`/admin*`, `/api/admin/*`, `/api/setup`, `/api/auth/*`):
+
+- `requireHttps` (`src/features/https-only/`): over `http://`, `GET` and
+  `HEAD` get a 308 to `https://`, other methods 403 `https_required`.
+  `localhost`, `127.0.0.1`, and `[::1]` are exempt. The contact API and the
+  site are not affected.
+- `requireAccess` (`src/features/cloudflare-access/`): off unless
+  `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` are set. Then `Cf-Access-Jwt-Assertion`
+  must be an RS256 JWT signed by a key from
+  `https://<team>/cdn-cgi/access/certs` (cached per isolate for an hour; an
+  unknown `kid` refetches at most every 30 seconds), with `iss` equal to the
+  team origin, an `aud` in `ACCESS_AUD`, a future `exp`, and `nbf` not in the
+  future. Missing or invalid: 403 `access_denied`. One setting only, or the
+  certs cannot be fetched: 503 `access_unavailable`.
+
 ### Security headers
 
-Responses from `/api/*` and `/admin/*` get `X-Content-Type-Options`,
+The area of a request is taken from Hono's routed path first, then from the
+normalized raw pathname (percent-decoded, backslashes and repeated slashes
+collapsed, dot segments resolved, lowercased; `src/shared/request-path.ts`),
+so `/%61dmin`, `//admin`, and `/admin/..%2f` get the same headers and checks
+as `/admin`. Responses from `/api/*` and `/admin/*` get `X-Content-Type-Options`,
 `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
 `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, a
 `Permissions-Policy`, and HSTS on HTTPS. API responses get
@@ -295,11 +348,11 @@ are not changed.
 
 ## Database
 
-| Table                                                   | Contents                                                                                   |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `submissions`                                           | contact submissions; `status` is checked against the five statuses; `ip_hash`, never an IP |
-| `settings`                                              | `retention_days`, `last_cleanup_at`, `setup_closed_at`                                     |
-| `user`, `session`, `account`, `verification`, `passkey` | Better Auth, generated by the Better Auth CLI for the Drizzle adapter                      |
+| Table                                                   | Contents                                                                                                                                                   |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submissions`                                           | contact submissions; `status` is checked against the five statuses; `ip_hash`, never an IP                                                                 |
+| `settings`                                              | `retention_days`, `last_cleanup_at`, `setup_closed_at`                                                                                                     |
+| `user`, `session`, `account`, `verification`, `passkey` | Better Auth, generated by the Better Auth CLI for the Drizzle adapter (`bun run auth:schema <file>` in `packages/server`, the pinned `auth` devDependency) |
 
 - **Queries.** `getDatabase(env.DB)` (`src/db/database.ts`) returns the
   Drizzle database. App code never calls D1's `prepare()`; raw SQL appears

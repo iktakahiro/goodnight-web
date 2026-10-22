@@ -12,18 +12,18 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 
 ## 部品
 
-| 部品                      | 役割                                                                                                                                                     |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker                    | サイトごとに 1 つ。静的なページを配信し、API を動かします。                                                                                              |
-| Static Assets             | Astro のビルド結果（`/`、`/blog/`、`/contact/` など）。Cloudflare が Worker のコードを動かさずに配信します。                                             |
-| Hono アプリ               | `@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけがここに届きます。 |
-| D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを入れます。マイグレーションは npm パッケージに入っています。                        |
-| Turnstile                 | 問い合わせフォームのボット対策（Cloudflare 製）。Worker がトークンをサーバー側で検証します。                                                             |
-| Rate Limiting binding     | `ip_hash` ごとに問い合わせの送信回数を制限する Workers の binding。無料プランで使えます。                                                                |
-| Better Auth とパスキー    | 管理者のログイン。パスキーだけを使い、メールとパスワードでのログインは無効にします。                                                                     |
-| 管理画面                  | React と TanStack Router、Form、Table で作り、Vite でビルドしたアプリ。ビルド済みで `@goodnight-web/server` に入っていて、Worker が配信します。          |
-| Slack Webhook（任意）     | 「新しい問い合わせ」の短い通知。個人情報は含めません。                                                                                                   |
-| Cloudflare Access（任意） | `/admin/*` と `/api/admin/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。                                                             |
+| 部品                      | 役割                                                                                                                                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker                    | サイトごとに 1 つ。静的なページを配信し、API を動かします。                                                                                                                                                         |
+| Static Assets             | Astro のビルド結果（`/`、`/blog/`、`/contact/` など）。Cloudflare が Worker のコードを動かさずに配信します。                                                                                                        |
+| Hono アプリ               | `@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけがここに届きます。                                                            |
+| D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを入れます。マイグレーションは npm パッケージに入っています。                                                                                   |
+| Turnstile                 | 問い合わせフォームのボット対策（Cloudflare 製）。Worker がトークンをサーバー側で検証します。                                                                                                                        |
+| Rate Limiting binding     | `ip_hash` ごとに問い合わせの送信回数を制限する Workers の binding。無料プランで使えます。                                                                                                                           |
+| Better Auth とパスキー    | 管理者のログイン。パスキーだけを使い、メールとパスワードでのログインは無効にします。                                                                                                                                |
+| 管理画面                  | React と TanStack Router、Form、Table で作り、Vite でビルドしたアプリ。ビルド済みで `@goodnight-web/server` に入っていて、Worker が配信します。                                                                     |
+| Slack Webhook（任意）     | 「新しい問い合わせ」の短い通知。個人情報は含めません。                                                                                                                                                              |
+| Cloudflare Access（任意） | `/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すると、Worker も Access のトークンを確認します。 |
 
 設計を決めている制約:
 
@@ -47,31 +47,35 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 `POST /api/contact` は次の順に処理します。
 
 1. **Origin とサイズ。** サイト自身のオリジンからのリクエストで、`Content-Type` が想定どおりで、小さい（16 KB 程度まで）ことを確認します。それ以外は本文を読む前に拒否します。
-2. **honeypot。** フォームには人には見えない欄があります。ここが埋まっていたら、状態を `held`（保留）にして保存し、通常どおり成功を返します。ボットには何も伝えません。
+2. **honeypot。** フォームには人には見えない欄があります。ここが埋まっていたら、何も保存せず、回数制限には数え、通常どおり成功を返します。ボットには何も伝えません。honeypot の確認は Turnstile より前なので、保存するとボットが Turnstile を通らずに D1 へ書き込めてしまいます。
 3. **Turnstile。** Worker がトークンを Turnstile の siteverify に送り、`success`、`hostname`、`action` を確認します。失敗したら 400 を返し、何も保存しません。
 4. **回数制限。** Rate Limiting binding が `ip_hash` ごとにリクエストを数えます。上限を超えたら 429 を返します。
 5. **入力の検証とスパムスコア。** zod で各項目を確認します。簡単なルールでスパムスコアを加点し、しきい値を超えたら状態を `new` ではなく `held` にします。
 6. **保存してから応答。** D1 に行を INSERT します。INSERT が成功してから、訪問者に 200 を返します。この後の処理が応答を変えることはありません。
 7. **応答の後、`ctx.waitUntil` の中で:**
    - 状態が `new` で Slack Webhook が設定されていれば、「新しい問い合わせ 1 件・種別・管理画面の URL」を送り、`notified_at` を記録します。
-   - 前回の削除から 1 時間以上たっていれば、保持期間（既定は 180 日）を過ぎた問い合わせを削除します。
+   - 前回の削除から 1 時間以上たっていれば、保持期間（既定は 180 日）を過ぎた問い合わせと、期限切れのパスキーのチャレンジを削除します。
 
 `TURNSTILE_SECRET` が設定されていなければ、この API は 503 を返し、フォームには「まだ利用できません」と表示します。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
 
 ## シークレットと binding
 
-| 名前                 | 種類                   | 用途                                                         |
-| -------------------- | ---------------------- | ------------------------------------------------------------ |
-| `DB`                 | D1 binding             | 保存するデータのすべて                                       |
-| rate limit binding   | Rate Limiting binding  | `ip_hash` ごとの問い合わせの回数制限                         |
-| `SETUP_TOKEN`        | シークレット           | 最初の管理者を作るときに必要                                 |
-| `ADMIN_EMAILS`       | シークレットまたは変数 | 管理者になれるメールアドレス                                 |
-| `BETTER_AUTH_SECRET` | シークレット           | Better Auth の署名用                                         |
-| `IP_HASH_SECRET`     | シークレット           | `HMAC-SHA256(ip, IP_HASH_SECRET)` の鍵                       |
-| `TURNSTILE_SECRET`   | シークレット           | Turnstile の siteverify。ないと問い合わせ API は止まります。 |
-| `SLACK_WEBHOOK_URL`  | シークレット（任意）   | 新しい問い合わせの通知                                       |
+| 名前                 | 種類                   | 用途                                                                                     |
+| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
+| `DB`                 | D1 binding             | 保存するデータのすべて                                                                   |
+| rate limit binding   | Rate Limiting binding  | `ip_hash` ごとの問い合わせの回数制限                                                     |
+| `SETUP_TOKEN`        | シークレット           | 最初の管理者を作るときに必要。32 文字以上。セットアップ後に削除します。                  |
+| `ADMIN_EMAILS`       | シークレットまたは変数 | 管理者になれるメールアドレス                                                             |
+| `BETTER_AUTH_SECRET` | シークレット           | Better Auth の署名用。32 文字以上。                                                      |
+| `IP_HASH_SECRET`     | シークレット           | `HMAC-SHA256(ip, IP_HASH_SECRET)` の鍵。32 文字以上。                                    |
+| `TURNSTILE_SECRET`   | シークレット           | Turnstile の siteverify。ないと問い合わせ API は止まります。                             |
+| `SLACK_WEBHOOK_URL`  | シークレット（任意）   | 新しい問い合わせの通知                                                                   |
+| `ACCESS_AUD`         | 変数（任意）           | Cloudflare Access アプリケーションの AUD タグ。`ACCESS_TEAM_DOMAIN` と一緒に設定します。 |
+| `ACCESS_TEAM_DOMAIN` | 変数（任意）           | Cloudflare Access のチームドメイン。たとえば `your-team.cloudflareaccess.com`。          |
 
-シークレットは Worker の中にとどめます。ブラウザに返すことも、D1 に書くこともありません。
+32 文字より短いシークレットは、ないのと同じ扱いで機能を止めます。シークレットは Worker の中にとどめます。ブラウザに返すことも、D1 に書くこともありません。
+
+`/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` は `https://` でだけ動きます（`localhost` を除きます）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
 
 ## 関連ページ
 

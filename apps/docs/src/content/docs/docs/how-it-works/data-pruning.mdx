@@ -13,7 +13,8 @@ description: Inquiries older than the retention period (180 days by default) are
 - After a new inquiry is saved, the Worker checks `settings.last_cleanup_at` inside `ctx.waitUntil`. If the last cleanup was more than an hour ago, it deletes inquiries older than the retention period and updates `last_cleanup_at`.
 - Opening the inquiry list in the admin screen runs the same cleanup, so old inquiries are deleted even when no new ones arrive.
 - An index on `created_at` keeps the delete fast.
-- Admins can also delete an inquiry by hand and export inquiries as CSV.
+- The same cleanup deletes expired rows in Better Auth's `verification` table. Each passkey sign-in attempt writes a challenge there; a used challenge is deleted at once, but an abandoned one would stay forever. Challenges expire after a few minutes and sign-in is rate-limited, so the table stays small without an index.
+- Admins can also delete an inquiry by hand and export inquiries as CSV. The export reads 200 rows per query and streams them, so it works the same for a large table.
 
 ## Why it is built this way
 
