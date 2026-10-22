@@ -201,8 +201,10 @@ What costs CPU:
   `database: env.DB` and email and password disabled. Keep `nodejs_compat`.
 - Create the first admin with a Better Auth plugin endpoint as tested above.
   `/api/setup` forwards to it. It checks `Origin`, compares `SETUP_TOKEN` in
-  constant time, checks `ADMIN_EMAILS` case-insensitively, and closes once any
-  passkey exists. The browser then calls `passkey.addPasskey()`.
+  constant time, checks `ADMIN_EMAILS` case-insensitively, and closes once the
+  first passkey is registered. A `passkey` insert trigger records
+  `settings.setup_closed_at`, so deleting every passkey later does not reopen
+  setup. The browser then calls `passkey.addPasskey()`.
 - The admin API requires a session whose user has at least one passkey. The
   session from setup is only useful for registering the first passkey.
 - Ask for resident keys and user verification at registration, and reject
@@ -229,3 +231,21 @@ What costs CPU:
   custom domain are enabled, each hostname gets its own passkeys. Decide
   whether to pin the admin origin with a variable.
 - Passkey recovery (lost device) is still open (PRD #2).
+
+## Update (2026-10-22): cache the auth instance per isolate
+
+Decided by the dev lead after the spike review, for the second open issue
+above. Building `betterAuth()` on every request cost about 5 ms of CPU
+locally, which is too close to the free plan's 10 ms limit.
+
+- `@goodnight-web/server` builds the Better Auth instance from the env
+  bindings and caches it per isolate, in a `WeakMap` keyed by the `env`
+  object, with one instance per request origin (the passkey `rpID` and
+  `origin` come from it). If the runtime passes a different `env` object, a
+  new instance is built, so changed bindings or secrets are picked up.
+- Nothing is built at module top level, and no secret is read outside a
+  request.
+- `AGENTS.md` now states this rule instead of "create per request".
+- The instance also sets `advanced.ipAddress.disableIpTracking: true`, so
+  Better Auth does not write the client IP into `session.ipAddress` (the "no
+  raw IP" rule), and `telemetry.enabled: false`.

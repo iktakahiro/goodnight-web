@@ -133,3 +133,10 @@ We added a field to `user` and got one line:
   plan.
 - `wrangler d1 migrations create DB` would write into `node_modules`. The
   starter's `AGENTS.md` should say not to run it.
+
+## Update (2026-10-22)
+
+- `bunfig.toml` now pins `linker = "isolated"` (first open issue above).
+- The package ships `migrations/0001_better_auth.sql` (generated as described
+  above; `packages/server/scripts/auth-schema.config.ts` is the CLI config)
+  and `migrations/0002_submissions_settings.sql`.

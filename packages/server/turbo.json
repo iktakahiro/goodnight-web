@@ -1,0 +1,10 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": ["admin-placeholder/**", "scripts/build-admin-module.ts"],
+      "outputs": ["src/features/admin-ui/admin-files.gen.ts"]
+    }
+  }
+}

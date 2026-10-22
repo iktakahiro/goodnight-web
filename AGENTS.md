@@ -94,8 +94,10 @@ test easier.
   thrown errors. The packages are a public interface, so the documentation is
   part of it.
 - Use other comments only for intent or constraints the code cannot show.
-- Create Better Auth and other per-request objects from the request's env
-  bindings. Do not keep them in module scope.
+- Build Better Auth and other objects that need bindings or secrets from the
+  request's `env`, never at module top level. Better Auth may be cached per
+  isolate, keyed by the `env` object (and origin), so a new `env` gets a new
+  instance (see docs/decisions/0001).
 
 ## Validation
 

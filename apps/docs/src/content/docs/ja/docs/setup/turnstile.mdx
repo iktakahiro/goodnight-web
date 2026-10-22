@@ -1,0 +1,69 @@
+---
+title: Turnstile を設定する
+description: Turnstile のウィジェットを作り、サイトキーとシークレットキーを goodnight-web に渡します。両方を設定するまで、問い合わせフォームは送信を受け付けません。
+---
+
+Turnstile は、訪問者がボットではなく人であることを確かめる Cloudflare の仕組みです。goodnight-web の問い合わせフォームには Turnstile が必要です。無料で使えます。
+
+## 設定するまでフォームが止まっている理由
+
+goodnight-web は安全側に倒します。Turnstile がないと、問い合わせ API はボットが送るものを何でも受け付けてしまうので、代わりに受け付けを止めます。
+
+- `POST /api/contact` は 503 を返します。
+- 問い合わせページには、フォームがまだ利用できないと表示します。
+- 管理画面には、問い合わせフォームが送信を受け付けていないというお知らせと、このページへのリンクを表示します。
+
+動いているように見えて実は届かないフォームではなく、このお知らせが訪問者に見えます。両方のキーを設定すれば、ほかに何も変えなくてもフォームが動き始めます。
+
+## ウィジェットを作る
+
+1. Cloudflare のダッシュボードで **Turnstile** を開き、**Add widget** を選びます。
+2. **Widget name:** 見分けやすい名前なら何でも構いません。たとえば会社名です。
+3. **Hostnames:** サイトのドメイン。たとえば `example.com` です。試している間 `workers.dev` のアドレスも使うなら、それも追加し、そのアドレスを無効にするときに外します。
+4. **Widget mode:** 迷ったら **Managed** にします。ほとんどの訪問者には短い確認が表示されるだけで、一部の人にはクリックを求めます。
+5. **Create** を選びます。
+
+すると Cloudflare が 2 つの値を表示します（[Cloudflare: ダッシュボードでウィジェットを作る](https://developers.cloudflare.com/turnstile/get-started/widget-management/dashboard/)）。
+
+- **サイトキー（Site key）。** 公開してよい値です。問い合わせページがウィジェットを表示するのに使います。
+- **シークレットキー（Secret key）。** 秘密の値です。Worker が Turnstile の siteverify で送信内容を検証するのに使います。
+
+## キーを置く場所
+
+| キー             | 置く場所                                 | 公開してよいか                                                    |
+| ---------------- | ---------------------------------------- | ----------------------------------------------------------------- |
+| シークレットキー | Worker のシークレット `TURNSTILE_SECRET` | いいえ。コミットしたり、ページに入れたりしないでください。        |
+| サイトキー       | Worker の変数 `TURNSTILE_SITE_KEY`       | はい。問い合わせページが `/api/contact/config` から読み取ります。 |
+
+シークレットを設定するには、Cloudflare のダッシュボードで Worker を開き、変数とシークレットに `TURNSTILE_SECRET` を追加します。プロジェクトのフォルダーでターミナルを使うなら、次のコマンドでも同じことができます。
+
+```sh
+npx wrangler secret put TURNSTILE_SECRET
+```
+
+<Callout type='warn' title='下書き / 未検証'>
+  サーバーはサイトキーを `TURNSTILE_SITE_KEY` から読みます。starter
+  はまだ書いていないので、starter のどこで設定するか（たとえば `wrangler.jsonc`
+  の `vars`）は、starter ができたら確かめて書きます。
+</Callout>
+
+## Worker が確認すること
+
+Worker は送信のたびに、フォームから届いたトークンを siteverify に送り、次をすべて満たすときだけ受け付けます。
+
+- `success` が true である。
+- `hostname` があなたのサイトのホスト名である。
+- `action` が問い合わせフォームで設定した action である。
+
+トークンの有効期限は 300 秒で、検証できるのは 1 回だけです（[Cloudflare: サーバー側の検証](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)）。確認に失敗したら 400 を返し、何も保存しません。ほかの確認については[問い合わせフォームの保護](/ja/docs/how-it-works/contact-protection/)で説明しています。
+
+## ローカルでの開発
+
+`wrangler dev` では、本物のキーではなく Cloudflare のテスト用キーを使います（[Cloudflare: テスト](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）。次の組み合わせは必ず成功します。
+
+```txt
+site key:   1x00000000000000000000AA
+secret key: 1x0000000000000000000000000000000AA
+```
+
+テスト用キーは本番のサイトで使わないでください。すべてのリクエストを通してしまいます。

@@ -1,0 +1,12 @@
+{
+  "title": "しくみの詳細",
+  "icon": "Wrench",
+  "pages": [
+    "contact-protection",
+    "passkeys",
+    "first-admin",
+    "data-pruning",
+    "notifications",
+    "ip-hashing"
+  ]
+}

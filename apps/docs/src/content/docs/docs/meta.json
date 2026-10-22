@@ -1,0 +1,16 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "---Start here---",
+    "getting-started",
+    "setup",
+    "---Concepts---",
+    "architecture",
+    "distribution",
+    "how-it-works",
+    "---Reference---",
+    "security",
+    "privacy"
+  ]
+}

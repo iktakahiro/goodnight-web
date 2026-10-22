@@ -1,0 +1,64 @@
+---
+title: Overview
+description: goodnight-web is a template for a company website with a blog and a contact form. It runs on one Cloudflare Worker and one D1 database.
+hero:
+  title: A company website, a blog, and a contact form on Cloudflare
+  tagline: One Worker serves the pages, receives inquiries, and runs a small admin screen. One D1 database stores the inquiries. There is no server or runtime for you to patch.
+---
+
+<Callout type='warn'>
+  **Work in progress (M1).** Nothing is published yet: no npm package, no
+  starter repository, no Deploy button. These pages describe the planned design.
+  Pages and sections that have not been tested end to end are marked **Draft /
+  not verified yet**.
+</Callout>
+
+## What it is
+
+goodnight-web gives a small company the three things most company sites need:
+
+- **Pages and a blog.** An Astro site with a home page, company profile, services, news, blog, contact page, and privacy policy, in Japanese and English. Blog posts are Markdown files in the repository.
+- **A contact form.** Submissions are checked with Turnstile, rate limited, and saved to D1 before the visitor sees a reply.
+- **An admin screen for inquiries.** Admins sign in with a passkey, read inquiries, change their status, delete them, and export them as CSV.
+
+Everything runs on Cloudflare: one Worker with Static Assets and one D1 database. The only other service is GitHub, where your copy of the site lives. A Slack notification is optional.
+
+## Who it is for
+
+- A developer or a small web agency that sets up and hands over sites for clients.
+- A person at a small company or startup who looks after the company site, often without an engineering background, and edits it with AI tools.
+
+You do not need to write server code. The contact API and the admin screen come from an npm package that you do not edit.
+
+## What you still maintain
+
+goodnight-web removes server and runtime maintenance. Some maintenance remains, and you should plan for it:
+
+- **Review and merge dependency update pull requests.** Fixes to goodnight-web arrive as Dependabot pull requests in your repository. Nobody merges them for you.
+- **Update the site's own dependencies**, such as Astro and Tailwind CSS. These also arrive as Dependabot pull requests.
+- **Follow Cloudflare changes**, such as a new `compatibility_date` or a change to a free plan limit.
+- **Keep your repository private** and your Worker secrets safe.
+- **Check your privacy policy** with a professional before you publish it.
+
+## Where to go next
+
+<Cards>
+  <Card icon={<Layers />} title='Architecture' href='/docs/architecture/'>
+    The Worker, D1, and the services around them, and what happens when someone
+    sends the form.
+  </Card>
+  <Card
+    icon={<Package />}
+    title='Distribution and updates'
+    href='/docs/distribution/'
+  >
+    What you own, what comes from the npm package, and how updates reach you.
+  </Card>
+  <Card icon={<Rocket />} title='Getting started' href='/docs/getting-started/'>
+    The planned setup with the Deploy to Cloudflare button (draft).
+  </Card>
+  <Card icon={<ShieldCheck />} title='Security model' href='/docs/security/'>
+    How the admin screen and the contact form are protected, and what is out of
+    scope.
+  </Card>
+</Cards>
