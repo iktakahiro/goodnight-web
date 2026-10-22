@@ -86,7 +86,7 @@ export const SetupNotices = ({
               href={docsUrl(locale, '/docs/how-it-works/notifications/')}
               target='_blank'
               rel='noreferrer'
-              className='rounded-sm font-medium text-link underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
+              className='rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
             >
               {t('notice.slackLink')}
             </a>

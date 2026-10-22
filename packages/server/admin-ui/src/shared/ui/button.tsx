@@ -19,7 +19,7 @@ export const buttonVariants = cva(
           'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive-hover',
         'destructive-outline':
           'border border-destructive/30 bg-card text-destructive hover:bg-destructive-soft',
-        link: 'h-auto rounded-sm px-0 text-link underline-offset-4 hover:underline',
+        link: 'h-auto rounded-sm px-0 text-primary underline-offset-4 hover:underline',
       },
       size: {
         sm: 'h-9 px-3.5 text-sm',

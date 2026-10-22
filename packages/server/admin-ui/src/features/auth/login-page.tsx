@@ -170,7 +170,7 @@ export const LoginPage = () => {
                   {t('login.setupOpen')}{' '}
                   <Link
                     to='/setup'
-                    className='rounded-sm font-semibold text-link underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring'
+                    className='rounded-sm font-semibold text-primary underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring'
                   >
                     {t('login.setupLink')}
                   </Link>
