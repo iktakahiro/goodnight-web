@@ -144,6 +144,7 @@ const en = {
   'list.columnsLabel': 'Choose the columns to show',
   'list.col.receivedAt': 'Received',
   'list.col.status': 'Status',
+  'list.tableRegion': 'Inquiry table. Scroll sideways to see every column.',
   'list.sortToggle': 'Received: {order}. Select to show {next}.',
   'list.versionFilter': 'Form version',
   'list.allVersions': 'All versions',
@@ -426,6 +427,8 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'list.columnsLabel': '一覧に表示する列を選ぶ',
   'list.col.receivedAt': '受信日時',
   'list.col.status': '状態',
+  'list.tableRegion':
+    'お問い合わせの表。横にスクロールするとすべての列を表示できます。',
   'list.sortToggle': '受信日時: {order}。選ぶと{next}にします。',
   'list.versionFilter': 'フォームのバージョン',
   'list.allVersions': 'すべてのバージョン',
