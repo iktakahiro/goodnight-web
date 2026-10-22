@@ -4,7 +4,7 @@ icon: Database
 description: D1 のテーブル、クエリの書き方、マイグレーションの配布と適用、スキーマの変更がサイトに届く流れです。
 ---
 
-このページでは、D1 データベースに何が入っているか、マイグレーションがいつ適用されるか、適用を取り消す方法がわかります。
+このページでは、D1 データベースに何が入っているか、クエリをどう書くか、マイグレーション（テーブルを作ったり変えたりする SQL ファイル）がいつ適用されるか、適用を取り消す方法がわかります。
 
 ## テーブル
 
@@ -19,7 +19,7 @@ description: D1 のテーブル、クエリの書き方、マイグレーショ�
 
 時刻は Unix ミリ秒で保存します。
 
-Better Auth のテーブルは、Better Auth の CLI で Drizzle アダプター用に生成しています。Better Auth もサーバーのほかの部分も、同じスキーマと同じマイグレーションの履歴を使います。
+管理者のログインに使う Better Auth のテーブルは、Better Auth の CLI で Drizzle アダプター用に生成しています。Better Auth もサーバーのほかの部分も、同じスキーマと同じマイグレーションの履歴を使います。
 
 ### 状態とスパムの疑い
 
@@ -39,7 +39,7 @@ suspectedSpam: integer('suspected_spam', { mode: 'boolean' })
   .default(false),
 ```
 
-CHECK 制約があるので、データベースもこの 2 つの値しか受け付けません。インデックスは、未読の件数と、管理画面の「未読」「既読」のタブで使います。
+`status` 列には CHECK 制約があるので、データベースも `unread` と `read` しか受け付けません。インデックスは、未読の件数と、管理画面の「未読」「既読」のタブで使います。
 
 ```ts title="packages/server/src/db/schema.ts"
 // Unread count and the unread and read views.
@@ -91,7 +91,7 @@ const [rows, [counted]] = await orm.batch([
 ]);
 ```
 
-この書き方は CI で確かめます。`bun run check:sql`（`bun run validate` に含まれます）は `packages/server` を調べます。テスト用のヘルパー以外で次の書き方が見つかると、失敗します。
+この書き方は CI で確かめます。`bun run check:sql`（`bun run validate` に含まれます）は `packages/server` を調べ、テスト用のヘルパー以外で次の書き方が見つかると失敗します。
 
 ```ts title="scripts/check-sql.ts"
 export const SQL_RULES: readonly SqlRule[] = [
@@ -113,7 +113,7 @@ export const SQL_RULES: readonly SqlRule[] = [
 ];
 ```
 
-入力の確認と、D1 が受け取る SQL は、[セキュリティモデルの「SQL インジェクション」](/ja/docs/security/#sql-injection)で説明しています。
+入力の確認と、D1 が受け取る SQL は、[セキュリティモデルの「SQL インジェクション」](/ja/docs/security/#sql-injection)を参照してください。
 
 ## マイグレーションの配布と適用
 
@@ -142,7 +142,7 @@ wrangler はファイルを名前順に適用し、適用したファイルを�
 
 ファイルの途中で失敗すると、D1 はそのファイルを取り消します。デプロイは `wrangler deploy` の前で止まります。
 
-`wrangler d1 migrations create` は実行しないでください。`node_modules` の中にファイルを作ってしまいます。
+`wrangler d1 migrations create` は実行しないでください。`node_modules` の中にファイルを作ってしまいます。`node_modules` はリポジトリに入らず、パッケージを入れ直すと消えます。
 
 ## スキーマの変更がサイトに届くまで [#how-a-schema-change-reaches-your-site]
 
@@ -150,7 +150,7 @@ wrangler はファイルを名前順に適用し、適用したファイルを�
 2. Dependabot が、あなたのリポジトリに `@goodnight-web/server` を更新する PR を作ります。[配布と更新のしくみ](/ja/docs/distribution/)を参照してください。
 3. あなたがマージします。`deploy` スクリプトが `0007_add_note.sql` を適用し、それから新しいコードを公開します。
 
-2 つのコマンドの間は、古いバージョンの Worker が新しいスキーマで動きます。スキーマの変更は追加（新しいテーブルと列）だけで、クエリは列名を指定しています。そのため、この間も古いバージョンは動き続けます。
+マイグレーションを適用してから `wrangler deploy` が終わるまでの間は、古いバージョンの Worker が新しいスキーマで動きます。スキーマの変更は追加（新しいテーブルと列）だけで、クエリは列名を指定しています。そのため、この間も古いバージョンは動き続けます。
 
 PR のプレビュービルドは `deploy` スクリプトを実行しません。プレビューは、新しいマイグレーションを適用していないデータベースを使います。新しいスキーマが必要な画面は、プレビューでは失敗することがあります。
 
@@ -187,7 +187,7 @@ node_modules/@goodnight-web/server/migrations/
 `0003` から `0005` は、問い合わせの項目を、列からフォームの定義に移しました。
 
 1. `0003_form_definitions.sql` は `form_definitions` を作り、`submissions` に `locale`、`fields`、`form_version` を足します。
-2. `0004_form_definition_seed.sql` は手で書いたマイグレーションです。次の 3 つを行います。
+2. `0004_form_definition_seed.sql` は手で書いたマイグレーションです。次の 3 つをします。
    - それまでの項目（`f_name`、`f_company`、`f_phone`、`f_category`、`f_message`）で、フォームのバージョン 1 を保存します。
    - 既存の送信内容の `name`、`company`、`phone`、`category`、`body` を、この ID をキーにして `fields` に写します。
    - 追記だけにするトリガーを作ります。

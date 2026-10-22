@@ -6,23 +6,23 @@ description: goodnight-web を用意して使うための手順と、しくみ�
 
 <Callout type='warn'>
   goodnight-web
-  は開発中（M1）で、まだ公開していません。以下のページは、リポジトリにあるコードを説明しています。コードは手元でテストしています。
+  は開発中（M1）で、まだ公開していません。以下のページは、リポジトリにあるコードを説明しています。コードはローカル環境でテストしています。
 </Callout>
 
 ## はじめに
 
-- [はじめかた](/ja/docs/getting-started/): Deploy to Cloudflare ボタンでコピーを作り、シークレットを入力し、最初の管理者を作ります。
-- [Turnstile を設定する](/ja/docs/setup/turnstile/): Turnstile のウィジェットを作ります。設定するまで、問い合わせフォームは送信を受け付けません。
+- [はじめかた](/ja/docs/getting-started/): Deploy to Cloudflare ボタンでWebサイトのコピーを作り、シークレット（Worker に保存する秘密の値）を入力して、最初の管理者を作ります。
+- [Turnstile を設定する](/ja/docs/setup/turnstile/): Turnstile（Cloudflare のボット対策）のウィジェットを作ります。設定するまで、問い合わせフォームは送信を受け付けません。
 - [お問い合わせフォームの項目を変える](/ja/docs/contact-form/): 管理画面で項目を編集します。バージョンと履歴、問い合わせ一覧、CSV の書き出しも説明します。
 
 ## 考え方
 
-- [構成](/ja/docs/architecture/): 1 つのサイトを構成する部品と、問い合わせが送信されたときの流れ。
-- [データベース](/ja/docs/database/): D1 のテーブル、クエリの書き方、マイグレーションがサイトに届いて適用される流れ。
-- [配布と更新のしくみ](/ja/docs/distribution/): npm パッケージ、自分で持つ starter、Dependabot での更新、リポジトリを private にする理由。
-- [しくみの詳細](/ja/docs/how-it-works/): パスキーや、Cron を使わない古いデータの削除など、設計の判断ごとのページ。
+- [構成](/ja/docs/architecture/): 1 つのWebサイトを構成する部品と、問い合わせが送信されたときの流れを説明します。
+- [データベース](/ja/docs/database/): D1 のテーブルとクエリの書き方、マイグレーションがWebサイトに届いて適用される流れを説明します。
+- [配布と更新のしくみ](/ja/docs/distribution/): npm パッケージと自分で持つ starter の分け方、Dependabot での更新、リポジトリを private にする理由を説明します。
+- [しくみの詳細](/ja/docs/how-it-works/): パスキーでのログインや、Cron を使わない古いデータの削除など、しくみごとに動きと設計の理由を説明します。
 
 ## リファレンス
 
-- [セキュリティモデル](/ja/docs/security/): 管理画面と問い合わせフォームを守るものと、goodnight-web では守れないもの。
-- [プライバシーについて](/ja/docs/privacy/): データの保存場所、削除したデータを復元できる期間、プライバシーポリシーの雛形の内容。
+- [セキュリティモデル](/ja/docs/security/): 管理画面と問い合わせフォームを守るしくみと、goodnight-web では守れない範囲をまとめます。
+- [プライバシーについて](/ja/docs/privacy/): データの保存場所、削除したデータを復元できる期間、プライバシーポリシーの雛形の内容をまとめます。
