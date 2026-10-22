@@ -5,20 +5,21 @@ import {
   useRouter,
 } from '@tanstack/react-router';
 import {
+  Archive,
   ArrowLeft,
-  Building2,
   CalendarClock,
   FileText,
   Globe,
+  Languages,
+  ListChecks,
   Mail,
-  Phone,
   Reply,
   ShieldAlert,
-  Tag,
   Trash2,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import type { AdminSubmission } from '../../../../src/features/admin-api/admin-routes.ts';
+import type { AdminFieldEntry } from '../../../../src/features/admin-api/admin-view.ts';
 import {
   SUBMISSION_STATUSES,
   isSubmissionStatus,
@@ -57,7 +58,7 @@ import {
 } from '../auth/admin-session.tsx';
 import { MessageCard, PageError } from '../layout/page-states.tsx';
 import { SetupNotices } from '../layout/setup-notices.tsx';
-import { categoryLabel } from './category-label.ts';
+import { fieldValueText, labelText } from './field-value.ts';
 import {
   deleteInquiry,
   fetchInquiry,
@@ -150,6 +151,78 @@ const StatusControl = ({
   );
 };
 
+/**
+ * The heading of an inquiry: the first filled-in one-line text field (usually
+ * the name), or the email address.
+ */
+export const inquiryTitle = (inquiry: AdminSubmission): string => {
+  const entry = inquiry.entries.find(
+    (candidate) =>
+      candidate.type === 'text' && candidate.value?.kind === 'text',
+  );
+  return entry?.value?.kind === 'text' && entry.value.text
+    ? entry.value.text
+    : inquiry.email;
+};
+
+const AnswerRow = ({
+  entry,
+  version,
+}: {
+  entry: AdminFieldEntry;
+  version: number;
+}) => {
+  const { locale, t } = useI18n();
+  if (!entry.value) return null;
+  const text = fieldValueText(entry.value, locale);
+  const long = entry.type === 'textarea';
+  return (
+    <div
+      data-testid='inquiry-answer'
+      data-field-id={entry.id}
+      className='flex flex-col gap-1.5 py-4'
+    >
+      <dt className='flex flex-wrap items-center gap-2 text-sm font-semibold text-muted-foreground'>
+        {labelText(entry.label, locale, entry.id)}
+        {entry.inCurrentForm ? null : (
+          <Badge tone='slate'>
+            <Archive aria-hidden='true' />
+            {t('detail.archivedField', { version })}
+          </Badge>
+        )}
+      </dt>
+      <dd
+        className={
+          long
+            ? 'rounded-xl bg-muted/70 px-5 py-4 text-[0.98rem] leading-[1.9] break-words whitespace-pre-wrap'
+            : 'text-[0.98rem] break-words whitespace-pre-wrap'
+        }
+        data-testid={long ? 'inquiry-body' : undefined}
+      >
+        {entry.type === 'url' && /^https?:\/\//i.test(text) ? (
+          <a
+            href={text}
+            target='_blank'
+            rel='noopener noreferrer nofollow'
+            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+          >
+            {text}
+          </a>
+        ) : entry.type === 'tel' ? (
+          <a
+            href={`tel:${text}`}
+            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+          >
+            {text}
+          </a>
+        ) : (
+          text
+        )}
+      </dd>
+    </div>
+  );
+};
+
 const DeleteControl = ({ inquiry }: { inquiry: AdminSubmission }) => {
   const { t } = useI18n();
   const { refreshStatus } = useAdminSession();
@@ -190,7 +263,7 @@ const DeleteControl = ({ inquiry }: { inquiry: AdminSubmission }) => {
           <div className='flex flex-col gap-1.5'>
             <AlertDialogTitle>{t('detail.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('detail.deleteBody', { name: inquiry.name })}
+              {t('detail.deleteBody', { name: inquiryTitle(inquiry) })}
             </AlertDialogDescription>
           </div>
         </div>
@@ -233,7 +306,7 @@ const DetailSkeleton = () => {
  */
 export const InquiryDetailPage = ({ id }: { id: string }) => {
   const { locale, t } = useI18n();
-  const { status, refreshStatus } = useAdminSession();
+  const { refreshStatus } = useAdminSession();
   const inquiry = useAsync(async () => {
     const result = await fetchInquiry(id);
     // Opening a new inquiry marks it read: update the header count.
@@ -298,9 +371,8 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
 
   const item = inquiry.data;
   const received = formatDateTime(item.createdAt, locale);
-  const category = item.category
-    ? categoryLabel(item.category, status?.categories, locale)
-    : null;
+  const answers = item.entries.filter((entry) => entry.value !== null);
+  const oldVersion = item.formVersion !== item.currentFormVersion;
   return (
     <div className='flex flex-col gap-5'>
       <SetupNotices />
@@ -310,10 +382,9 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
           <div className='flex flex-col gap-3 border-b border-border/70 bg-gradient-to-b from-accent/50 to-card px-6 pt-6 pb-5 sm:px-8 sm:pt-8'>
             <div className='flex flex-wrap items-center gap-2'>
               <StatusBadge status={item.status} />
-              {category ? <Badge tone='outline'>{category}</Badge> : null}
             </div>
             <h1 className='text-2xl leading-snug font-bold tracking-tight break-words'>
-              {item.name}
+              {inquiryTitle(item)}
             </h1>
             <p className='flex items-center gap-1.5 text-sm text-muted-foreground'>
               <CalendarClock aria-hidden='true' className='size-4' />
@@ -324,21 +395,35 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
             </p>
           </div>
           <section
-            aria-labelledby='message-heading'
-            className='flex flex-col gap-3 px-6 py-6 sm:px-8 sm:py-7'
+            aria-labelledby='answers-heading'
+            className='flex flex-col px-6 pt-5 pb-3 sm:px-8 sm:pt-6'
           >
             <h2
-              id='message-heading'
+              id='answers-heading'
               className='text-sm font-semibold text-muted-foreground'
             >
-              {t('detail.message')}
+              {t('detail.answers')}
             </h2>
-            <div
-              data-testid='inquiry-body'
-              className='rounded-xl bg-muted/70 px-5 py-4 text-[0.98rem] leading-[1.9] break-words whitespace-pre-wrap'
-            >
-              {item.body}
-            </div>
+            {oldVersion ? (
+              <p className='mt-2 rounded-xl bg-muted/70 px-4 py-2.5 text-[0.8125rem] leading-relaxed text-muted-foreground'>
+                {t('detail.oldVersion', { version: item.formVersion })}
+              </p>
+            ) : null}
+            {answers.length > 0 ? (
+              <dl className='divide-y divide-border/60'>
+                {answers.map((entry) => (
+                  <AnswerRow
+                    key={entry.id}
+                    entry={entry}
+                    version={item.formVersion}
+                  />
+                ))}
+              </dl>
+            ) : (
+              <p className='py-4 text-sm text-muted-foreground'>
+                {t('detail.noAnswers')}
+              </p>
+            )}
           </section>
           <section
             aria-labelledby='contact-heading'
@@ -357,38 +442,26 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
               >
                 <a
                   href={`mailto:${item.email}`}
-                  className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+                  data-testid='inquiry-email'
+                  className='rounded-sm break-all text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
                 >
                   {item.email}
                 </a>
               </InfoRow>
-              {item.company ? (
+              <InfoRow
+                icon={<ListChecks aria-hidden='true' />}
+                label={t('detail.formVersion')}
+              >
+                <span data-testid='inquiry-form-version'>
+                  {t('form.version', { version: item.formVersion })}
+                </span>
+              </InfoRow>
+              {item.locale ? (
                 <InfoRow
-                  icon={<Building2 aria-hidden='true' />}
-                  label={t('field.company')}
+                  icon={<Languages aria-hidden='true' />}
+                  label={t('detail.locale')}
                 >
-                  {item.company}
-                </InfoRow>
-              ) : null}
-              {item.phone ? (
-                <InfoRow
-                  icon={<Phone aria-hidden='true' />}
-                  label={t('field.phone')}
-                >
-                  <a
-                    href={`tel:${item.phone}`}
-                    className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
-                  >
-                    {item.phone}
-                  </a>
-                </InfoRow>
-              ) : null}
-              {category ? (
-                <InfoRow
-                  icon={<Tag aria-hidden='true' />}
-                  label={t('field.category')}
-                >
-                  {category}
+                  {t(`language.${item.locale}`)}
                 </InfoRow>
               ) : null}
               {item.pagePath ? (

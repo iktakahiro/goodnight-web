@@ -31,7 +31,7 @@ import { safeErrorMessage } from './shared/log-error.ts';
  *
  * Routes:
  *
- * - `GET /api/contact/config`, `POST /api/contact`
+ * - `GET /api/contact/form`, `POST /api/contact`
  * - `GET /api/setup`, `POST /api/setup`
  * - `GET|POST /api/auth/*` (Better Auth)
  * - `/api/admin/*` (admin session with a passkey required)

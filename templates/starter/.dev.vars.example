@@ -40,8 +40,9 @@ IP_HASH_SECRET=
 TURNSTILE_SECRET=
 
 # Optional. A Slack incoming webhook URL (https://hooks.slack.com/...). Slack
-# gets "1 new inquiry", the topic, and a link to the admin screen; never the
-# name, email address, or message. Leave it empty for no notifications.
+# gets "1 new inquiry", the received time, and a link to the admin screen;
+# never the name, email address, or anything typed in the form. Leave it
+# empty for no notifications.
 SLACK_WEBHOOK_URL=
 
 # Optional. Cloudflare Access in front of /admin, /api/admin, /api/setup, and

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { singleLine } from '../contact-form/form-values-schema.ts';
 
 /** Turnstile `action` the contact widget must use. The server checks it. */
 export const CONTACT_TURNSTILE_ACTION = 'contact';
@@ -10,100 +11,52 @@ export const CONTACT_TURNSTILE_ACTION = 'contact';
  */
 export const CONTACT_HONEYPOT_FIELD = 'website';
 
-/** Largest accepted request body for `POST /api/contact`, in bytes. */
-export const CONTACT_MAX_BODY_BYTES = 16 * 1024;
+/**
+ * Largest accepted request body for `POST /api/contact`, in bytes. The stored
+ * field values have their own, smaller limit (`FORM_LIMITS.valuesBytes`).
+ */
+export const CONTACT_MAX_BODY_BYTES = 32 * 1024;
 
-/** Maximum lengths of the contact fields, in characters. */
+/** Maximum lengths of the fixed contact fields, in characters. */
 export const CONTACT_FIELD_LIMITS = {
-  name: 100,
   email: 254,
-  company: 200,
-  phone: 40,
-  category: 100,
-  message: 5000,
   pagePath: 300,
 } as const;
 
-// C0 and C1 control characters, DEL, and Unicode line/paragraph separators.
-// Multi-line fields keep tab and line feed.
-// oxlint-disable-next-line no-control-regex
-const SINGLE_LINE_CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
-// oxlint-disable-next-line no-control-regex
-const MULTI_LINE_CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
-
-const singleLine = (value: string): string =>
-  value.replace(SINGLE_LINE_CONTROLS, ' ').trim();
-
-const multiLine = (value: string): string =>
-  value
-    .replace(/\r\n?/g, '\n')
-    .replace(/[\u2028\u2029]/g, '\n')
-    .replace(MULTI_LINE_CONTROLS, '')
-    .trim();
-
-const requiredLine = (max: number) =>
-  z.string().transform(singleLine).pipe(z.string().min(1).max(max));
-
-const optionalLine = (max: number) =>
-  z
-    .string()
-    .optional()
-    .transform((value) => {
-      const cleaned = value === undefined ? '' : singleLine(value);
-      return cleaned === '' ? undefined : cleaned;
-    })
-    .pipe(z.string().max(max).optional());
-
 /**
- * The fields a visitor fills in. Use it for client-side validation in the
- * contact form; the server runs the same schema.
+ * The JSON body of `POST /api/contact`. Only the fixed parts are checked
+ * here; `fields` is checked against the current form definition with
+ * `buildFieldValuesSchema()`.
  *
- * Strings are cleaned before the checks: control characters are removed (line
- * breaks are kept only in `message`) and whitespace is trimmed. Empty optional
- * fields become `undefined`. `phone` is NFKC-normalized, so full-width digits
- * are accepted.
- */
-export const contactFieldsSchema = z.object({
-  name: requiredLine(CONTACT_FIELD_LIMITS.name),
-  email: z
-    .string()
-    .transform(singleLine)
-    .pipe(z.email().max(CONTACT_FIELD_LIMITS.email)),
-  company: optionalLine(CONTACT_FIELD_LIMITS.company),
-  phone: z
-    .string()
-    .optional()
-    .transform((value) => {
-      const cleaned =
-        value === undefined ? '' : singleLine(value.normalize('NFKC'));
-      return cleaned === '' ? undefined : cleaned;
-    })
-    .pipe(
-      z
-        .string()
-        .max(CONTACT_FIELD_LIMITS.phone)
-        .regex(/^[0-9+\-() ]+$/)
-        .optional(),
-    ),
-  category: optionalLine(CONTACT_FIELD_LIMITS.category),
-  message: z
-    .string()
-    .transform(multiLine)
-    .pipe(z.string().min(1).max(CONTACT_FIELD_LIMITS.message)),
-  consent: z.literal(true),
-});
-
-/**
- * The JSON body of `POST /api/contact`: the visitor's fields plus the
- * Turnstile token and form metadata.
- *
+ * - `email`: the visitor's address. Always on the form and required.
+ * - `consent`: privacy policy consent. Must be `true`.
+ * - `fields`: values of the form fields, keyed by field id.
+ * - `formVersion`: the version of the form the visitor saw. When it is not
+ *   the current version, the API answers 409 `form_outdated`.
+ * - `locale`: the language of the page (`ja` or `en`).
  * - `turnstileToken`: the token from the Turnstile widget.
  * - `website`: the honeypot field ({@link CONTACT_HONEYPOT_FIELD}).
  * - `elapsedMs`: milliseconds between showing the form and submitting it.
  *   Used for the spam score.
  * - `pagePath`: the path of the page that holds the form.
+ *
+ * Any other top-level key is rejected. The email is cleaned before the
+ * check: control characters are removed and whitespace is trimmed.
  */
-export const contactRequestSchema = contactFieldsSchema.extend({
+export const contactRequestSchema = z.strictObject({
+  email: z
+    .string()
+    .transform(singleLine)
+    .pipe(z.email().max(CONTACT_FIELD_LIMITS.email)),
+  consent: z.literal(true),
+  // Checked against the form definition later. Kept as parsed, so no key
+  // (such as `__proto__`) is lost by copying.
+  fields: z.custom<Record<string, unknown>>(
+    (value) =>
+      typeof value === 'object' && value !== null && !Array.isArray(value),
+  ),
+  formVersion: z.number().int().min(1).optional(),
+  locale: z.enum(['ja', 'en']).optional(),
   turnstileToken: z.string().min(1).max(2048),
   website: z.string().max(500).optional(),
   elapsedMs: z.number().int().min(0).optional(),
@@ -114,17 +67,26 @@ export const contactRequestSchema = contactFieldsSchema.extend({
     .optional(),
 });
 
-/** Contact fields before validation (what the form collects). */
-export type ContactFieldsInput = z.input<typeof contactFieldsSchema>;
-
-/** Contact fields after validation and cleaning. */
-export type ContactFields = z.output<typeof contactFieldsSchema>;
-
-/** The `POST /api/contact` body before validation. */
-export type ContactRequestInput = z.input<typeof contactRequestSchema>;
-
-/** The `POST /api/contact` body after validation and cleaning. */
+/** The `POST /api/contact` body after validation of the fixed parts. */
 export type ContactRequest = z.output<typeof contactRequestSchema>;
+
+/**
+ * The `POST /api/contact` body as the contact form sends it. `fields` holds
+ * strings for text, date, select, and radio fields, a number or a numeric
+ * string for number fields, and a list of option values for checkbox fields.
+ */
+export interface ContactRequestInput {
+  email: string;
+  /** Send the real state: the server rejects `false`. */
+  consent: boolean;
+  fields: Record<string, string | number | string[]>;
+  formVersion?: number;
+  locale?: 'ja' | 'en';
+  turnstileToken: string;
+  website?: string;
+  elapsedMs?: number;
+  pagePath?: string;
+}
 
 /**
  * Per-field error code: `required` (missing or empty), `too_long`, or
@@ -132,33 +94,54 @@ export type ContactRequest = z.output<typeof contactRequestSchema>;
  */
 export type ContactFieldErrorCode = 'required' | 'too_long' | 'invalid';
 
+const isEmpty = (value: unknown): boolean =>
+  value === undefined ||
+  value === null ||
+  (typeof value === 'string' && value.trim() === '') ||
+  (Array.isArray(value) && value.length === 0);
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
 /**
- * Turns a zod error from {@link contactFieldsSchema} or
- * {@link contactRequestSchema} into one error code per top-level field.
+ * Turns zod errors into one error code per field. Fixed fields use their
+ * name (`email`, `consent`); form fields use their id. Unknown keys in
+ * `fields` are reported as `fields: invalid`. Unknown top-level keys get no
+ * entry, so a key the client chose is never echoed back.
  *
+ * @param error - From {@link contactRequestSchema}, or from the field values
+ *   schema with `prefix` set to `fields`.
  * @param input - The value that was parsed, used to tell a missing field
  *   (`required`) from a value of the wrong type (`invalid`).
+ * @param prefix - Path segment that holds the form fields, if any.
  */
 export const contactFieldErrors = (
   error: z.ZodError,
   input: unknown,
+  prefix?: 'fields',
 ): Record<string, ContactFieldErrorCode> => {
-  const raw: Record<string, unknown> =
-    typeof input === 'object' && input !== null
-      ? (input as Record<string, unknown>)
-      : {};
+  const raw = asRecord(input);
   const fields: Record<string, ContactFieldErrorCode> = {};
   for (const issue of error.issues) {
-    const field = issue.path[0];
-    if (typeof field !== 'string' || field in fields) continue;
-    if (issue.code === 'too_big') fields[field] = 'too_long';
+    const path = prefix ? [prefix, ...issue.path] : issue.path;
+    let key = path[0];
+    let value: unknown = typeof key === 'string' ? raw[key] : undefined;
+    if (key === 'fields' && typeof path[1] === 'string') {
+      key = path[1];
+      value = asRecord(raw.fields)[key];
+    }
+    if (typeof key !== 'string' || key in fields) continue;
+    if (issue.code === 'unrecognized_keys') fields[key] = 'invalid';
+    else if (issue.code === 'too_big') fields[key] = 'too_long';
     else if (
+      isEmpty(value) ||
       issue.code === 'too_small' ||
-      (issue.code === 'invalid_type' && raw[field] == null) ||
-      (field === 'consent' && issue.code === 'invalid_value')
+      (key === 'consent' && issue.code === 'invalid_value')
     ) {
-      fields[field] = 'required';
-    } else fields[field] = 'invalid';
+      fields[key] = 'required';
+    } else fields[key] = 'invalid';
   }
   return fields;
 };

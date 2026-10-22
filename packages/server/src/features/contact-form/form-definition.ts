@@ -1,0 +1,332 @@
+import * as z from 'zod';
+import type { Locale } from '../../shared/messages.ts';
+
+/**
+ * The contact form definition: the fields a visitor fills in besides the
+ * fixed email address and privacy consent. Admins edit it in the admin UI;
+ * every save is a new, append-only version in the `form_definitions` table.
+ *
+ * Each field has an immutable id (`f_` and lowercase letters or digits) that
+ * the server generates when the field is created. Submissions store values
+ * by field id, so a renamed label keeps its data, and a new field with the
+ * label of a removed one gets a new id and its own column.
+ */
+
+/** Types a form field can have. */
+export const FORM_FIELD_TYPES = [
+  'text',
+  'textarea',
+  'tel',
+  'url',
+  'number',
+  'select',
+  'radio',
+  'checkbox',
+  'date',
+] as const;
+
+/** Type of a form field. */
+export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
+
+/** Field types whose value is free text with a `maxLength`. */
+export const TEXT_FIELD_TYPES = ['text', 'textarea', 'tel', 'url'] as const;
+
+/** Field types whose value is one or more of the field's `options`. */
+export const CHOICE_FIELD_TYPES = ['select', 'radio', 'checkbox'] as const;
+
+/** A field type with free text. */
+export type TextFieldType = (typeof TEXT_FIELD_TYPES)[number];
+
+/** A field type with options. */
+export type ChoiceFieldType = (typeof CHOICE_FIELD_TYPES)[number];
+
+/** Returns whether `type` takes free text and a `maxLength`. */
+export const isTextFieldType = (type: FormFieldType): type is TextFieldType =>
+  (TEXT_FIELD_TYPES as readonly string[]).includes(type);
+
+/** Returns whether `type` takes `options`. */
+export const isChoiceFieldType = (
+  type: FormFieldType,
+): type is ChoiceFieldType =>
+  (CHOICE_FIELD_TYPES as readonly string[]).includes(type);
+
+/**
+ * The shape of a stored value: text types store a string, `select` and
+ * `radio` one option value, `checkbox` a list of option values, `number` a
+ * number, and `date` a `YYYY-MM-DD` string. A field's type can change only
+ * within its shape, so the values stored under one field id always have the
+ * same shape.
+ */
+export const valueShape = (
+  type: FormFieldType,
+): 'text' | 'choice' | 'choices' | 'number' | 'date' => {
+  if (isTextFieldType(type)) return 'text';
+  if (type === 'select' || type === 'radio') return 'choice';
+  if (type === 'checkbox') return 'choices';
+  return type;
+};
+
+/** Limits of the form definition and of submitted values. */
+export const FORM_LIMITS = {
+  /** Fields in one version, not counting the fixed email and consent. */
+  fields: 30,
+  /** Options of one select, radio, or checkbox field. */
+  options: 50,
+  /** Characters of a field label or an option label, per language. */
+  label: 100,
+  /** Characters of a placeholder, per language. */
+  placeholder: 100,
+  /** Characters of a hint under the field, per language. */
+  hint: 200,
+  /** Largest `maxLength` of `text`, `tel`, and `url` fields. */
+  maxLength: 2000,
+  /** Largest `maxLength` of `textarea` fields. */
+  textareaMaxLength: 10_000,
+  /** Largest stored `fields` JSON of one submission, in UTF-8 bytes. */
+  valuesBytes: 16 * 1024,
+} as const;
+
+/** `maxLength` of a text field when the definition does not set one. */
+export const DEFAULT_MAX_LENGTH: Readonly<Record<TextFieldType, number>> = {
+  text: 200,
+  textarea: 5000,
+  tel: 40,
+  url: 2000,
+};
+
+/**
+ * Field ids: `f_` followed by 1 to 32 lowercase letters or digits. The id is
+ * also the key of the value in `submissions.fields` and the JSON path of the
+ * admin list filter, so nothing else is ever accepted.
+ */
+export const FIELD_ID_PATTERN = /^f_[a-z0-9]{1,32}$/;
+
+/** Option values: lowercase letters, digits, `_`, and `-`, up to 64. */
+export const OPTION_VALUE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/** Returns whether `value` is a well-formed field id. */
+export const isFieldId = (value: unknown): value is string =>
+  typeof value === 'string' && FIELD_ID_PATTERN.test(value);
+
+const randomToken = (length: number): string => {
+  const alphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
+  let token = '';
+  for (const byte of crypto.getRandomValues(new Uint8Array(length))) {
+    token += alphabet.charAt(byte % alphabet.length);
+  }
+  return token;
+};
+
+/** A new random field id, such as `f_k3v9q2m8x1b7c4d6`. */
+export const newFieldId = (): string => `f_${randomToken(16)}`;
+
+/** A new random option value, such as `o_p4n8w2k6c1`. */
+export const newOptionValue = (): string => `o_${randomToken(10)}`;
+
+/** A text in Japanese and English. One of the two may be empty. */
+export interface LocalizedText {
+  ja: string;
+  en: string;
+}
+
+/**
+ * The text of `value` in `locale`, or in the other language when that one
+ * is empty.
+ */
+export const localizedText = (value: LocalizedText, locale: Locale): string =>
+  value[locale] || value[locale === 'ja' ? 'en' : 'ja'];
+
+/** One choice of a select, radio, or checkbox field. */
+export interface FormFieldOption {
+  /** Stored in submissions. Generated by the server; never edited. */
+  value: string;
+  label: LocalizedText;
+}
+
+/** A field of the contact form. */
+export interface FormField {
+  /** Immutable id, generated by the server. Matches {@link FIELD_ID_PATTERN}. */
+  id: string;
+  type: FormFieldType;
+  label: LocalizedText;
+  placeholder?: LocalizedText;
+  /** Help text shown under the field. */
+  hint?: LocalizedText;
+  required: boolean;
+  /** Text types only. Defaults to {@link DEFAULT_MAX_LENGTH}. */
+  maxLength?: number;
+  /** Choice types only: 1 to {@link FORM_LIMITS}.options entries. */
+  options?: FormFieldOption[];
+  /** Shown as a column in the admin list by default. */
+  showInList: boolean;
+}
+
+/**
+ * A field that was removed from the form. It stays in every later version,
+ * so its id is never reused and old values keep their label.
+ */
+export interface ArchivedFormField extends FormField {
+  /** The last version in which the field was on the form. */
+  lastVersion: number;
+}
+
+/** The stored definition of one version. */
+export interface FormDefinition {
+  /** The fields on the form, in order. */
+  fields: FormField[];
+  /** Fields removed in this or an earlier version, newest removal first. */
+  archived: ArchivedFormField[];
+}
+
+/** The resolved `maxLength` of a text field. */
+export const fieldMaxLength = (field: FormField): number =>
+  isTextFieldType(field.type)
+    ? (field.maxLength ?? DEFAULT_MAX_LENGTH[field.type])
+    : 0;
+
+// C0 and C1 control characters, DEL, and line/paragraph separators.
+// oxlint-disable-next-line no-control-regex
+const CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
+
+const cleanText = (max: number) =>
+  z
+    .string()
+    .max(max * 2)
+    .transform((value) => value.replace(CONTROLS, ' ').trim())
+    .pipe(z.string().max(max));
+
+const localizedSchema = (max: number) =>
+  z.strictObject({ ja: cleanText(max), en: cleanText(max) });
+
+const labelSchema = localizedSchema(FORM_LIMITS.label).refine(
+  (label) => label.ja !== '' || label.en !== '',
+  { message: 'label_required' },
+);
+
+const optionalLocalized = (max: number) =>
+  localizedSchema(max)
+    .optional()
+    .transform((value) =>
+      value && (value.ja !== '' || value.en !== '') ? value : undefined,
+    );
+
+const optionInputSchema = z.strictObject({
+  /** Omit for a new option; the server generates the value. */
+  value: z.string().regex(OPTION_VALUE_PATTERN).optional(),
+  label: labelSchema,
+});
+
+/**
+ * One field in `PUT /api/admin/form`. Omit `id` for a new field; the server
+ * generates it. `maxLength` is kept only for text types and `options` only
+ * for choice types.
+ */
+export const formFieldInputSchema = z
+  .strictObject({
+    id: z.string().regex(FIELD_ID_PATTERN).optional(),
+    type: z.enum(FORM_FIELD_TYPES),
+    label: labelSchema,
+    placeholder: optionalLocalized(FORM_LIMITS.placeholder),
+    hint: optionalLocalized(FORM_LIMITS.hint),
+    required: z.boolean(),
+    maxLength: z
+      .number()
+      .int()
+      .min(1)
+      .max(FORM_LIMITS.textareaMaxLength)
+      .optional(),
+    options: z.array(optionInputSchema).max(FORM_LIMITS.options).optional(),
+    showInList: z.boolean().default(false),
+  })
+  .superRefine((field, ctx) => {
+    if (
+      field.maxLength !== undefined &&
+      field.type !== 'textarea' &&
+      field.maxLength > FORM_LIMITS.maxLength
+    ) {
+      ctx.addIssue({
+        code: 'too_big',
+        origin: 'number',
+        maximum: FORM_LIMITS.maxLength,
+        inclusive: true,
+        path: ['maxLength'],
+        message: 'max_length_too_big',
+      });
+    }
+    if (isChoiceFieldType(field.type)) {
+      const options = field.options ?? [];
+      if (options.length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['options'],
+          message: 'options_required',
+        });
+      }
+      const values = options.flatMap((option) =>
+        option.value ? [option.value] : [],
+      );
+      if (new Set(values).size !== values.length) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['options'],
+          message: 'duplicate_option',
+        });
+      }
+    }
+  })
+  .transform((field) => ({
+    ...field,
+    maxLength: isTextFieldType(field.type) ? field.maxLength : undefined,
+    options: isChoiceFieldType(field.type) ? field.options : undefined,
+  }));
+
+/** A field from the editor before the server assigns ids. */
+export type FormFieldInput = z.output<typeof formFieldInputSchema>;
+
+/**
+ * Body of `PUT /api/admin/form`: the version the editor started from and
+ * the new list of fields. Field ids must be unique.
+ */
+export const formUpdateSchema = z.strictObject({
+  baseVersion: z.number().int().min(1),
+  fields: z
+    .array(formFieldInputSchema)
+    .max(FORM_LIMITS.fields)
+    .superRefine((fields, ctx) => {
+      const ids = fields.flatMap((field) => (field.id ? [field.id] : []));
+      if (new Set(ids).size !== ids.length) {
+        ctx.addIssue({ code: 'custom', message: 'duplicate_field' });
+      }
+    }),
+});
+
+/** Body of `PUT /api/admin/form` after validation. */
+export type FormUpdate = z.output<typeof formUpdateSchema>;
+
+const storedFieldSchema = z.object({
+  id: z.string().regex(FIELD_ID_PATTERN),
+  type: z.enum(FORM_FIELD_TYPES),
+  label: z.object({ ja: z.string(), en: z.string() }),
+  placeholder: z.object({ ja: z.string(), en: z.string() }).optional(),
+  hint: z.object({ ja: z.string(), en: z.string() }).optional(),
+  required: z.boolean(),
+  maxLength: z.number().int().optional(),
+  options: z
+    .array(
+      z.object({
+        value: z.string().regex(OPTION_VALUE_PATTERN),
+        label: z.object({ ja: z.string(), en: z.string() }),
+      }),
+    )
+    .optional(),
+  showInList: z.boolean(),
+});
+
+/**
+ * Reads a definition from D1. Rows are written only after validation, so a
+ * row that does not match is a bug or a manual edit; it throws then.
+ */
+export const storedFormDefinitionSchema = z.object({
+  fields: z.array(storedFieldSchema),
+  archived: z.array(storedFieldSchema.extend({ lastVersion: z.number() })),
+});

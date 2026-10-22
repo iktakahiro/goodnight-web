@@ -1,6 +1,6 @@
 import type { ApiErrorBody, ApiErrorCode } from '../../shared/api-error.ts';
 import { translate, type Locale } from '../../shared/messages.ts';
-import type { ContactConfig } from './contact-routes.ts';
+import type { PublicContactForm } from './contact-routes.ts';
 import type { ContactRequestInput } from './contact-schema.ts';
 
 /** Path of the contact API on the site's Worker. */
@@ -40,22 +40,26 @@ const isApiErrorBody = (value: unknown): value is ApiErrorBody =>
   typeof (value as { error: { code?: unknown } }).error?.code === 'string';
 
 /**
- * Reads `GET /api/contact/config`. Show the form only when `available` is
- * `true`; otherwise show that it is not available yet.
+ * Reads `GET /api/contact/form`: the current form fields and whether the
+ * form is available. Render the fields in order and show the form only when
+ * `available` is `true`; otherwise show that it is not available yet.
+ *
+ * Pass `fresh: true` after a `form_outdated` error to skip the browser cache.
  *
  * @returns `null` when the request fails.
  */
-export const getContactConfig = async (
-  options: ContactClientOptions = {},
-): Promise<ContactConfig | null> => {
+export const getContactForm = async (
+  options: ContactClientOptions & { fresh?: boolean } = {},
+): Promise<PublicContactForm | null> => {
   const doFetch = options.fetch ?? fetch;
   try {
-    const response = await doFetch(`${CONTACT_API_PATH}/config`, {
+    const response = await doFetch(`${CONTACT_API_PATH}/form`, {
       signal: options.signal,
       headers: { accept: 'application/json' },
+      ...(options.fresh ? { cache: 'no-cache' as const } : {}),
     });
     if (!response.ok) return null;
-    return (await response.json()) as ContactConfig;
+    return (await response.json()) as PublicContactForm;
   } catch {
     return null;
   }
@@ -64,12 +68,14 @@ export const getContactConfig = async (
 /**
  * Sends the contact form to `POST /api/contact`.
  *
- * Pass the Turnstile token as `turnstileToken`, the honeypot input as
- * `website`, and `elapsedMs` (time since the form was shown) for the spam
+ * Pass the field values in `fields` by field id, the form's `version` as
+ * `formVersion`, the Turnstile token as `turnstileToken`, the honeypot input
+ * as `website`, and `elapsedMs` (time since the form was shown) for the spam
  * score. A honeypot submission also returns `{ ok: true }`.
  *
- * Get a new Turnstile token before retrying after `turnstile_failed`: tokens
- * are single-use.
+ * Get a new Turnstile token before retrying after any error: tokens are
+ * single-use. After `form_outdated`, read the form again with
+ * {@link getContactForm} and `fresh: true`.
  */
 export const submitContact = async (
   input: ContactRequestInput,

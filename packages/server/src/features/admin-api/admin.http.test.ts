@@ -10,6 +10,7 @@ import {
   ORIGIN,
   type TestWorker,
 } from '../../testing/test-worker.ts';
+import { testSubmission } from '../../testing/submissions.ts';
 import {
   EXPORT_BATCH_SIZE,
   insertSubmission,
@@ -33,24 +34,14 @@ const seed = async (
     body?: string;
   } = {},
 ) =>
-  insertSubmission(worker.env.DB, {
-    id,
-    createdAt,
-    name,
-    email: `${id}@example.org`,
-    company: null,
-    phone: null,
-    category: 'sales',
-    body,
-    status,
-    spamScore: 0,
-    spamReasons: [],
-    ipHash: 'hash',
-    userAgent: null,
-    country: 'JP',
-    pagePath: '/contact',
-    consentAt: createdAt,
-  });
+  insertSubmission(
+    worker.env.DB,
+    testSubmission(id, {
+      status,
+      createdAt,
+      fields: { f_name: name, f_category: 'sales', f_message: body },
+    }),
+  );
 
 const ENDPOINTS: [string, string][] = [
   ['GET', '/api/admin/me'],
@@ -60,7 +51,20 @@ const ENDPOINTS: [string, string][] = [
   ['PATCH', '/api/admin/submissions/abc'],
   ['DELETE', '/api/admin/submissions/abc'],
   ['GET', '/api/admin/submissions.csv'],
+  ['GET', '/api/admin/form'],
+  ['PUT', '/api/admin/form'],
+  ['GET', '/api/admin/form/versions/1'],
+  ['POST', '/api/admin/form/versions/1/restore'],
 ];
+
+const requestBody = (method: string) =>
+  method === 'PATCH'
+    ? JSON.stringify({ status: 'done' })
+    : method === 'PUT'
+      ? JSON.stringify({ baseVersion: 1, fields: [] })
+      : method === 'POST'
+        ? JSON.stringify({ baseVersion: 1 })
+        : undefined;
 
 describe('admin API without a valid admin session', () => {
   test.each(ENDPOINTS)(
@@ -71,8 +75,7 @@ describe('admin API without a valid admin session', () => {
       const response = await worker.fetch(path, {
         method,
         headers: { origin: ORIGIN, 'content-type': 'application/json' },
-        body:
-          method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+        body: requestBody(method),
       });
       expect(response.status).toBe(401);
       expect((await response.json()).error.code).toBe('unauthorized');
@@ -122,8 +125,7 @@ describe('admin API without a valid admin session', () => {
             origin: ORIGIN,
             'content-type': 'application/json',
           },
-          body:
-            method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+          body: requestBody(method),
         });
       expect(
         (await worker.fetch('/api/admin/me', { headers: { cookie } })).status,
@@ -137,6 +139,9 @@ describe('admin API without a valid admin session', () => {
           .query("SELECT status FROM submissions WHERE id = 'abc'")
           .get(),
       ).toEqual({ status: 'new' });
+      expect(
+        worker.sqlite.query('SELECT COUNT(*) AS n FROM form_definitions').get(),
+      ).toEqual({ n: 1 });
     },
   );
 
@@ -290,6 +295,18 @@ describe('admin API with an admin session', () => {
     ['page', ' 1'],
     ['page', 'abc'],
     ['page', ''],
+    ['version', "1' OR '1'='1"],
+    ['version', '0'],
+    ['version', '1.5'],
+    ['sort', 'name'],
+    ['sort', 'f_name'],
+    ['sort', 'created_at; DROP TABLE submissions'],
+    ['dir', 'sideways'],
+    ['field', 'f_category'],
+    ['value', 'sales'],
+    ['q', 'Taro'],
+    ['search', 'Taro'],
+    ['keyword', 'Taro'],
   ];
 
   test.each(MALICIOUS_QUERIES)(
@@ -316,9 +333,24 @@ describe('admin API with an admin session', () => {
   test('the detail view marks a new submission as read', async () => {
     await seed(worker, 'abc');
     const detail = await (await get('/api/admin/submissions/abc')).json();
-    expect(detail).toMatchObject({ id: 'abc', status: 'read', body: 'Hello' });
+    expect(detail).toMatchObject({
+      id: 'abc',
+      status: 'read',
+      formVersion: 1,
+      currentFormVersion: 1,
+    });
+    expect(
+      detail.entries.find((entry: { id: string }) => entry.id === 'f_message'),
+    ).toEqual({
+      id: 'f_message',
+      type: 'textarea',
+      label: { ja: 'お問い合わせ内容', en: 'Message' },
+      value: { kind: 'text', text: 'Hello' },
+      inCurrentForm: true,
+    });
     expect(detail.readAt).toBeNumber();
     expect(detail).not.toHaveProperty('ipHash');
+    expect(detail).not.toHaveProperty('fields');
     const list = await (await get('/api/admin/submissions')).json();
     expect(list.unreadCount).toBe(0);
     expect((await get('/api/admin/submissions/missing')).status).toBe(404);
@@ -387,7 +419,9 @@ describe('admin API with an admin session', () => {
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const text = new TextDecoder().decode(bytes);
-    expect(text.startsWith('"id","created_at"')).toBe(true);
+    expect(text.split('\r\n')[0]).toBe(
+      '"id","received_at","status","email","locale","form_version","page_path","country","spam_score","spam_reasons","Name","Company or organization","Phone","Category","Message"',
+    );
     expect(text).toContain(
       '"\'=HYPERLINK(""https://evil.example"",""click"")"',
     );
@@ -456,29 +490,10 @@ describe('admin API with an admin session', () => {
     });
   });
 
-  test('GET /status lists no categories when none are configured', async () => {
-    expect((await (await get('/api/admin/status')).json()).categories).toEqual(
-      [],
+  test('GET /status lists no categories', async () => {
+    expect(await (await get('/api/admin/status')).json()).not.toHaveProperty(
+      'categories',
     );
-  });
-
-  test('GET /status lists the configured categories with labels', async () => {
-    worker = createTestWorker({
-      options: {
-        contact: {
-          categories: [
-            { value: 'sales', label: { ja: '営業', en: 'Sales' } },
-            'other',
-          ],
-        },
-      },
-    });
-    cookie = await signInAsAdmin(worker);
-    const status = await (await get('/api/admin/status')).json();
-    expect(status.categories).toEqual([
-      { value: 'sales', label: { ja: '営業', en: 'Sales' } },
-      { value: 'other', label: null },
-    ]);
   });
 
   test('listing prunes rows past the retention period', async () => {
@@ -503,8 +518,7 @@ describe('admin API database errors', () => {
       const response = await worker.fetch(path, {
         method,
         headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
-        body:
-          method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+        body: requestBody(method),
       });
       return { response, logged: logs.text() };
     } finally {

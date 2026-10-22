@@ -12,6 +12,10 @@ const en = {
     'This request came from a page that is not allowed.',
   'error.unsupported_media_type': 'Send the request as JSON.',
   'error.payload_too_large': 'The message is too long.',
+  'error.form_outdated':
+    'The form was updated while you were filling it in. Check the fields and send again.',
+  'error.form_conflict':
+    'Someone else saved the form in the meantime. Reload to see the latest version.',
   'error.invalid_json': 'The request could not be read.',
   'error.invalid_input': 'Some fields are missing or not valid.',
   'error.turnstile_failed':
@@ -37,12 +41,7 @@ const en = {
     'Cloudflare Access cannot be checked right now. Set both ACCESS_AUD and ACCESS_TEAM_DOMAIN, or neither, and try again.',
 
   // Contact form fields (validation messages shown next to a field).
-  'field.name': 'Name',
   'field.email': 'Email',
-  'field.company': 'Company',
-  'field.phone': 'Phone',
-  'field.category': 'Topic',
-  'field.message': 'Message',
   'field.consent': 'I agree to the privacy policy',
   'field.required': 'Required.',
   'field.invalid': 'Check this field.',
@@ -81,7 +80,7 @@ const en = {
 
   // Slack notification. No personal data and no message body.
   'notify.newInquiry': '1 new inquiry',
-  'notify.category': 'Topic: {category}',
+  'notify.receivedAt': 'Received: {time}',
   'notify.open': 'Open the admin screen',
 } as const;
 
@@ -97,6 +96,10 @@ const ja: MessageCatalog = {
   'error.forbidden_origin': '許可されていないページからの送信です。',
   'error.unsupported_media_type': 'JSON 形式で送信してください。',
   'error.payload_too_large': '送信内容が長すぎます。',
+  'error.form_outdated':
+    '入力中にフォームが更新されました。項目を確認して、もう一度送信してください。',
+  'error.form_conflict':
+    'ほかの人が先にフォームを保存しました。再読み込みして最新の内容を確認してください。',
   'error.invalid_json': '送信内容を読み取れませんでした。',
   'error.invalid_input': '未入力の項目か、正しくない項目があります。',
   'error.turnstile_failed':
@@ -126,12 +129,7 @@ const ja: MessageCatalog = {
   'error.access_unavailable':
     'Cloudflare Access を確認できません。ACCESS_AUD と ACCESS_TEAM_DOMAIN は両方設定するか、両方とも設定しないでください。そのうえで、もう一度お試しください。',
 
-  'field.name': 'お名前',
   'field.email': 'メールアドレス',
-  'field.company': '会社名',
-  'field.phone': '電話番号',
-  'field.category': 'お問い合わせの種類',
-  'field.message': 'お問い合わせ内容',
   'field.consent': 'プライバシーポリシーに同意する',
   'field.required': '入力してください。',
   'field.invalid': '入力内容を確認してください。',
@@ -167,7 +165,7 @@ const ja: MessageCatalog = {
   'admin.language': '言語',
 
   'notify.newInquiry': '新しいお問い合わせが 1 件あります',
-  'notify.category': '種類: {category}',
+  'notify.receivedAt': '受信日時: {time}',
   'notify.open': '管理画面を開く',
 };
 

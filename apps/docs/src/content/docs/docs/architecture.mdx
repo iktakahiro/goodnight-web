@@ -34,27 +34,28 @@ Constraints that shape the design:
 
 ## Routes
 
-| Path                             | Who uses it      | What it does                                                                                                                                              |
-| -------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                        |
-| `POST /api/contact`              | The contact form | Checks, rate limits, and stores a submission.                                                                                                             |
-| `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                             |
-| `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                            |
-| `/api/admin/*`                   | The admin screen | List (50 per page, with the unread count), detail, status change, delete, CSV export, and a status endpoint that reports whether Turnstile is configured. |
-| `/admin/*`                       | Admins           | The prebuilt admin UI (a React app). Every data request needs a session.                                                                                  |
+| Path                             | Who uses it      | What it does                                                                                                                                                                                 |
+| -------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                                                           |
+| `GET /api/contact/form`          | The contact page | The current form fields and whether the form is available. Read-only and public.                                                                                                             |
+| `POST /api/contact`              | The contact form | Checks, rate limits, and stores a submission.                                                                                                                                                |
+| `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                                                                |
+| `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                                                               |
+| `/api/admin/*`                   | The admin screen | List (50 per page, with the unread count), detail, status change, delete, CSV export, the form editor with its versions, and a status endpoint that reports whether Turnstile is configured. |
+| `/admin/*`                       | Admins           | The prebuilt admin UI (a React app). Every data request needs a session.                                                                                                                     |
 
 ## A contact submission, step by step
 
 `POST /api/contact` runs these steps in this order:
 
-1. **Origin and size.** The request must come from the site's own origin, use the expected `Content-Type`, and be small (about 16 KB). Anything else is rejected before the body is parsed.
+1. **Origin and size.** The request must come from the site's own origin, use the expected `Content-Type`, and be small (at most 32 KB). Anything else is rejected before the body is parsed.
 2. **Honeypot.** The form has a field that people cannot see. If it is filled in, nothing is saved, the request is counted against the rate limit, and the reply is a normal success, so the bot learns nothing. The honeypot runs before Turnstile, so storing the submission would let a bot write to D1 without passing Turnstile.
 3. **Turnstile.** The Worker sends the token to Turnstile siteverify and checks `success`, `hostname`, and `action`. If the check fails, the reply is 400 and nothing is saved.
 4. **Rate limit.** The Rate Limiting binding counts requests per `ip_hash`. Over the limit, the reply is 429.
-5. **Validation and spam score.** zod checks the fields. Simple rules add to a spam score. Above the threshold, the status becomes `held` instead of `new`.
+5. **Validation and spam score.** zod checks the email address and consent. The form fields are checked with a zod schema built from the current form definition in D1, not from anything the browser sent; unknown fields and unknown keys in the request body are rejected. If the visitor's page showed an older version of the form, the reply is 409 `form_outdated`. Simple rules add to a spam score. Above the threshold, the status becomes `held` instead of `new`.
 6. **Save, then reply.** The row is inserted into D1. Only after the insert succeeds does the visitor get a 200 reply. Nothing after this step can change the reply.
 7. **After the reply, in `ctx.waitUntil`:**
-   - If the status is `new` and a Slack webhook is set, post "1 new inquiry, category, admin URL" and record `notified_at`.
+   - If the status is `new` and a Slack webhook is set, post "1 new inquiry, received time, admin URL" and record `notified_at`.
    - If the last cleanup was more than an hour ago, delete inquiries older than the retention period (180 days by default) and expired passkey challenges.
 
 If `TURNSTILE_SECRET` is not set, the endpoint returns 503 and the form says it is not available yet. See [Set up Turnstile](/docs/setup/turnstile/).

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { createRecordingD1 } from '../../testing/recording-d1.ts';
+import { testSubmission } from '../../testing/submissions.ts';
 import {
   getSubmission,
   insertSubmission,
@@ -15,25 +16,8 @@ import {
 
 const INJECTION = "new' OR 1=1 --";
 
-const submission = (id: string, overrides: Partial<NewSubmission> = {}) => ({
-  id,
-  createdAt: 1_700_000_000_000,
-  name: 'Taro',
-  email: `${id}@example.org`,
-  company: null,
-  phone: null,
-  category: 'sales',
-  body: 'Hello',
-  status: 'new' as const,
-  spamScore: 0,
-  spamReasons: [],
-  ipHash: 'hash',
-  userAgent: null,
-  country: 'JP',
-  pagePath: '/contact',
-  consentAt: 1_700_000_000_000,
-  ...overrides,
-});
+const submission = (id: string, overrides: Partial<NewSubmission> = {}) =>
+  testSubmission(id, { createdAt: 1_700_000_000_000, ...overrides });
 
 describe('submission store', () => {
   test('binds the status, limit, and offset as parameters', async () => {
@@ -41,7 +25,7 @@ describe('submission store', () => {
     await insertSubmission(d1, submission('a'));
     statements.length = 0;
     const page = await listSubmissions(d1, {
-      status: INJECTION as SubmissionStatus,
+      filter: { status: INJECTION as SubmissionStatus },
       limit: 7,
       offset: 3,
     });
@@ -59,7 +43,7 @@ describe('submission store', () => {
     const run = async (status: string, limit: number, offset: number) => {
       statements.length = 0;
       await listSubmissions(d1, {
-        status: status as SubmissionStatus,
+        filter: { status: status as SubmissionStatus },
         limit,
         offset,
       });
@@ -95,8 +79,14 @@ describe('submission store', () => {
   test('stores SQL-like input as plain text', async () => {
     const { d1, sqlite } = createRecordingD1();
     const name = "Robert'); DROP TABLE submissions; --";
-    await insertSubmission(d1, submission('a', { name }));
-    expect((await getSubmission(d1, 'a'))?.name).toBe(name);
+    await insertSubmission(
+      d1,
+      submission('a', { fields: { f_name: name, f_message: name } }),
+    );
+    expect((await getSubmission(d1, 'a'))?.fields).toEqual({
+      f_name: name,
+      f_message: name,
+    });
     expect(
       sqlite
         .query("SELECT name FROM sqlite_master WHERE name = 'submissions'")
@@ -131,6 +121,109 @@ describe('submission store', () => {
   });
 });
 
+describe('list filters and sorting', () => {
+  test('binds the JSON path and value of a choice filter', async () => {
+    const { d1, statements } = createRecordingD1();
+    await insertSubmission(d1, submission('a'));
+    await insertSubmission(
+      d1,
+      submission('b', { fields: { f_category: 'press' } }),
+    );
+    statements.length = 0;
+    const page = await listSubmissions(d1, {
+      filter: { choice: { fieldId: 'f_category', value: 'press' } },
+      limit: 10,
+      offset: 0,
+    });
+    expect(page.items.map((item) => item.id)).toEqual(['b']);
+    const [select] = statements;
+    expect(select?.sql).toContain('json_extract("submissions"."fields", ?)');
+    expect(select?.sql).not.toContain('f_category');
+    expect(select?.sql).not.toContain('press');
+    expect(select?.params).toContain('$.f_category');
+    expect(select?.params).toContain('press');
+  });
+
+  test('a value with quotes stays a value', async () => {
+    const { d1, statements } = createRecordingD1();
+    await insertSubmission(d1, submission('a'));
+    statements.length = 0;
+    const value = "x') OR 1=1 --";
+    const page = await listSubmissions(d1, {
+      filter: { choice: { fieldId: 'f_category', value } },
+      limit: 10,
+      offset: 0,
+    });
+    expect(page).toEqual({ items: [], total: 0 });
+    expect(statements[0]?.sql).not.toContain(value);
+  });
+
+  test.each(["f_x') OR 1=1 --", '$.f_name', 'f_name"', '__proto__', 'f_NAME'])(
+    'refuses the field id %p before building SQL',
+    async (fieldId) => {
+      const { d1, statements } = createRecordingD1();
+      statements.length = 0;
+      await expect(
+        listSubmissions(d1, {
+          filter: { choice: { fieldId, value: 'sales' } },
+          limit: 10,
+          offset: 0,
+        }),
+      ).rejects.toThrow('invalid field id');
+      expect(statements).toHaveLength(0);
+    },
+  );
+
+  test('filters by form version', async () => {
+    const { d1 } = createRecordingD1();
+    await insertSubmission(d1, submission('a'));
+    await insertSubmission(d1, submission('b', { formVersion: 2 }));
+    const page = await listSubmissions(d1, {
+      filter: { formVersion: 2 },
+      limit: 10,
+      offset: 0,
+    });
+    expect(page.items.map((item) => item.id)).toEqual(['b']);
+  });
+
+  test('sorts by a fixed column in either direction', async () => {
+    const { d1 } = createRecordingD1();
+    await insertSubmission(d1, submission('a', { email: 'b@example.org' }));
+    await insertSubmission(
+      d1,
+      submission('b', { email: 'a@example.org', status: 'done' }),
+    );
+    const ids = async (sort: Parameters<typeof listSubmissions>[1]['sort']) =>
+      (await listSubmissions(d1, { sort, limit: 10, offset: 0 })).items.map(
+        (item) => item.id,
+      );
+    expect(await ids({ column: 'email', direction: 'asc' })).toEqual([
+      'b',
+      'a',
+    ]);
+    expect(await ids({ column: 'email', direction: 'desc' })).toEqual([
+      'a',
+      'b',
+    ]);
+    expect(await ids({ column: 'status', direction: 'asc' })).toEqual([
+      'b',
+      'a',
+    ]);
+  });
+
+  test('reads only well-formed values from the fields JSON', async () => {
+    const { d1, sqlite } = createRecordingD1();
+    await insertSubmission(d1, submission('a'));
+    sqlite.exec(
+      `UPDATE submissions SET fields = '{"f_name":"Taro","bad key":"x","f_obj":{"a":1},"f_list":["a",1],"f_n":3}'`,
+    );
+    expect((await getSubmission(d1, 'a'))?.fields).toEqual({
+      f_name: 'Taro',
+      f_n: 3,
+    });
+  });
+});
+
 describe('submissionBatches', () => {
   const collect = async (
     batches: AsyncGenerator<{ id: string }[]>,
@@ -151,7 +244,7 @@ describe('submissionBatches', () => {
       );
     }
     statements.length = 0;
-    const batches = await collect(submissionBatches(d1, undefined, 3));
+    const batches = await collect(submissionBatches(d1, {}, 3));
     expect(batches).toEqual([
       ['id6', 'id5', 'id4'],
       ['id3', 'id2', 'id1'],
@@ -170,11 +263,25 @@ describe('submissionBatches', () => {
     await insertSubmission(d1, submission('b'));
     statements.length = 0;
     const batches = await collect(
-      submissionBatches(d1, INJECTION as SubmissionStatus),
+      submissionBatches(d1, { status: INJECTION as SubmissionStatus }),
     );
     expect(batches).toEqual([]);
     expect(statements[0]?.sql).not.toContain(INJECTION);
-    expect(await collect(submissionBatches(d1, 'spam'))).toEqual([['a']]);
+    expect(await collect(submissionBatches(d1, { status: 'spam' }))).toEqual([
+      ['a'],
+    ]);
+  });
+
+  test('leaves out form versions above maxFormVersion and binds it', async () => {
+    const { d1, statements } = createRecordingD1();
+    await insertSubmission(d1, submission('v1', { formVersion: 1 }));
+    await insertSubmission(d1, submission('v2', { formVersion: 2 }));
+    await insertSubmission(d1, submission('v3', { formVersion: 3 }));
+    statements.length = 0;
+    const batches = await collect(submissionBatches(d1, { maxFormVersion: 2 }));
+    expect(batches.flat().sort()).toEqual(['v1', 'v2']);
+    expect(statements[0]?.sql).toContain('"form_version" <= ?');
+    expect(statements[0]?.params).toContain(2);
   });
 
   test('stops after a full last batch with one more empty query', async () => {
@@ -182,9 +289,7 @@ describe('submissionBatches', () => {
     await insertSubmission(d1, submission('a'));
     await insertSubmission(d1, submission('b', { createdAt: 1 }));
     statements.length = 0;
-    expect(await collect(submissionBatches(d1, undefined, 2))).toEqual([
-      ['a', 'b'],
-    ]);
+    expect(await collect(submissionBatches(d1, {}, 2))).toEqual([['a', 'b']]);
     expect(statements).toHaveLength(2);
   });
 });

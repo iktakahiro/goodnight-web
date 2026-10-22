@@ -10,7 +10,9 @@ description: Where inquiries are stored, how long deleted data can still be rest
 
 ## What is stored
 
-A contact submission stores what the visitor typed (name, email address, company, phone number, category, and message), the time they agreed to the privacy policy, the page they sent it from, the user agent, the country that Cloudflare reports, and an `ip_hash`. The raw IP address is not stored. See [No raw IP addresses](/docs/how-it-works/ip-hashing/).
+A contact submission stores what the visitor typed, the time they agreed to the privacy policy, the page they sent it from, the user agent, the country that Cloudflare reports, and an `ip_hash`. The raw IP address is not stored. See [No raw IP addresses](/docs/how-it-works/ip-hashing/).
+
+What the visitor types depends on the form. The email address is always collected. The other fields are defined by your admins in the admin screen (the first version asks for name, company, phone number, category, and message). See [Customizing the contact form](/docs/contact-form/). When you add a field that collects another kind of personal data, update the list of collected items in your privacy policy too.
 
 Inquiries are deleted after the retention period, 180 days by default. See [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/).
 
@@ -25,7 +27,7 @@ D1 Time Travel can restore a database to an earlier point in time: up to 7 days 
 ## Third parties
 
 - **Turnstile.** The contact form uses Cloudflare Turnstile. The template mentions it.
-- **Slack.** If you turn on Slack notifications, the message contains only the count, the category, and a link. No personal data is sent to Slack.
+- **Slack.** If you turn on Slack notifications, the message contains only the count, the time the inquiry was received, and a link. No personal data and no form field values are sent to Slack, whatever fields the form has.
 
 ## The template
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
+import { insertFormVersion } from '../contact-form/form-store.ts';
 import { captureConsole } from '../../testing/console-capture.ts';
 import {
   mockExternalFetch,
@@ -16,14 +17,23 @@ import {
 
 const SLACK_URL = 'https://hooks.slack.com/services/T000/B000/XXXX';
 
-const validBody = (overrides: Record<string, unknown> = {}) => ({
-  name: 'Hanako Yamada',
+const validFields = {
+  f_name: 'Hanako Yamada',
+  f_company: 'Yamada Shoten',
+  f_phone: '03-1234-5678',
+  f_category: 'sales',
+  f_message: 'I would like to know more about your services.',
+};
+
+const validBody = (
+  overrides: Record<string, unknown> = {},
+  fields: Record<string, unknown> = {},
+) => ({
   email: 'hanako@example.org',
-  company: 'Yamada Shoten',
-  phone: '03-1234-5678',
-  category: 'sales',
-  message: 'I would like to know more about your services.',
+  fields: { ...validFields, ...fields },
   consent: true,
+  formVersion: 1,
+  locale: 'ja',
   turnstileToken: 'token-123',
   elapsedMs: 20_000,
   pagePath: '/contact',
@@ -59,24 +69,20 @@ afterEach(() => external.restore());
 
 describe('POST /api/contact', () => {
   test('stores a valid submission and returns 200', async () => {
-    const worker = createTestWorker({
-      options: { contact: { categories: ['sales', 'press'] } },
-    });
+    const worker = createTestWorker();
     const response = await post(worker, validBody());
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     const [row] = rows(worker);
     expect(row).toMatchObject({
-      name: 'Hanako Yamada',
       email: 'hanako@example.org',
-      company: 'Yamada Shoten',
-      phone: '03-1234-5678',
-      category: 'sales',
-      body: 'I would like to know more about your services.',
+      form_version: 1,
+      locale: 'ja',
       status: 'new',
       spam_score: 0,
       page_path: '/contact',
     });
+    expect(JSON.parse(String(row?.fields))).toEqual(validFields);
     expect(row?.consent_at).toBeNumber();
     const [verify] = external.turnstileCalls();
     expect(verify?.form?.get('secret')).toBe(SECRETS.TURNSTILE_SECRET);
@@ -100,11 +106,10 @@ describe('POST /api/contact', () => {
     try {
       response = await post(
         worker,
-        validBody({
-          website: 'https://spam.example',
-          turnstileToken: undefined,
-          message: '=HYPERLINK("https://evil.example")',
-        }),
+        validBody(
+          { website: 'https://spam.example', turnstileToken: undefined },
+          { f_message: '=HYPERLINK("https://evil.example")' },
+        ),
       );
       logged = logs.text();
     } finally {
@@ -206,23 +211,9 @@ describe('POST /api/contact', () => {
     expect((await response.json()).error.code).toBe('contact_unavailable');
     expect(external.calls).toHaveLength(0);
     expect(rows(worker)).toHaveLength(0);
-    const config = await (await worker.fetch('/api/contact/config')).json();
-    expect(config).toMatchObject({ available: false, turnstileSiteKey: null });
-  });
-
-  test('the config endpoint returns the public settings when available', async () => {
-    const worker = createTestWorker({
-      options: { contact: { categories: ['sales'] } },
-    });
-    const config = await (await worker.fetch('/api/contact/config')).json();
-    expect(config).toEqual({
-      available: true,
-      turnstileSiteKey: SECRETS.TURNSTILE_SITE_KEY,
-      turnstileAction: 'contact',
-      honeypotField: 'website',
-      categories: ['sales'],
-    });
-    expect(JSON.stringify(config)).not.toContain(SECRETS.TURNSTILE_SECRET);
+    const form = await (await worker.fetch('/api/contact/form')).json();
+    expect(form).toMatchObject({ available: false, turnstileSiteKey: null });
+    expect(form.fields).toHaveLength(5);
   });
 
   test('rejects a foreign or missing Origin with 403', async () => {
@@ -251,9 +242,11 @@ describe('POST /api/contact', () => {
     expect(rows(worker)).toEqual([]);
   });
 
-  test('rejects a body over 16 KB with 413 before parsing', async () => {
+  test('rejects a body over 32 KB with 413 before parsing', async () => {
     const worker = createTestWorker();
-    const big = JSON.stringify(validBody({ message: 'a'.repeat(17_000) }));
+    const big = JSON.stringify(
+      validBody({}, { f_message: 'a'.repeat(33_000) }),
+    );
     const response = await post(worker, big);
     expect(response.status).toBe(413);
     expect(external.calls).toHaveLength(0);
@@ -285,68 +278,148 @@ describe('POST /api/contact', () => {
 
   test('invalid input returns 400 with field codes and stores nothing', async () => {
     const worker = createTestWorker();
+    const fixed = await post(
+      worker,
+      validBody({ email: 'not-an-email', consent: false }),
+    );
+    expect(fixed.status).toBe(400);
+    expect((await fixed.json()).error.fields).toEqual({
+      email: 'invalid',
+      consent: 'required',
+    });
     const response = await post(
       worker,
-      validBody({
-        name: '   ',
-        email: 'not-an-email',
-        message: undefined,
-        consent: false,
-      }),
+      validBody({}, { f_name: '   ', f_message: undefined }),
     );
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error.code).toBe('invalid_input');
     expect(body.error.fields).toEqual({
-      name: 'required',
-      email: 'invalid',
-      message: 'required',
-      consent: 'required',
+      f_name: 'required',
+      f_message: 'required',
     });
     expect(rows(worker)).toHaveLength(0);
   });
 
-  test('rejects a category outside the configured list', async () => {
-    const worker = createTestWorker({
-      options: { contact: { categories: ['press'] } },
-    });
-    const response = await post(worker, validBody({ category: 'other' }));
+  test('accepts every key the contact form sends', async () => {
+    const worker = createTestWorker();
+    const response = await post(worker, validBody({ website: '' }));
+    expect(response.status).toBe(200);
+    expect(rows(worker)).toHaveLength(1);
+  });
+
+  test.each([
+    ['an unknown key', '{"isAdmin":true}'],
+    ['a misspelled key', '{"formversion":1}'],
+    ['__proto__', '{"__proto__":{"status":"done"}}'],
+    ['constructor', '{"constructor":{"prototype":{}}}'],
+  ])('rejects %s at the top level and stores nothing', async (_name, extra) => {
+    const worker = createTestWorker();
+    const body = `${JSON.stringify(validBody()).slice(0, -1)},${extra.slice(1)}`;
+    const response = await post(worker, body);
+    expect(response.status).toBe(400);
+    const { error } = await response.json();
+    expect(error.code).toBe('invalid_input');
+    expect(error.fields ?? {}).toEqual({});
+    expect(rows(worker)).toHaveLength(0);
+  });
+
+  test('rejects an option value that the field does not have', async () => {
+    const worker = createTestWorker();
+    for (const category of ['営業', 'Business proposal', 'other ', 'nope']) {
+      const response = await post(
+        worker,
+        validBody({}, { f_category: category }),
+      );
+      expect(response.status).toBe(400);
+      expect((await response.json()).error.fields).toEqual({
+        f_category: 'invalid',
+      });
+    }
+    expect(
+      (await post(worker, validBody({}, { f_category: 'other' }))).status,
+    ).toBe(200);
+    expect(rows(worker)).toHaveLength(1);
+  });
+
+  test('rejects too long values with the field id', async () => {
+    const worker = createTestWorker();
+    const response = await post(
+      worker,
+      validBody({}, { f_name: 'a'.repeat(101), f_message: 'b'.repeat(5001) }),
+    );
     expect(response.status).toBe(400);
     expect((await response.json()).error.fields).toEqual({
-      category: 'invalid',
+      f_name: 'too_long',
+      f_message: 'too_long',
     });
   });
 
-  test('validates labeled categories by their values', async () => {
-    const worker = createTestWorker({
-      options: {
-        contact: {
-          categories: [
-            { value: 'sales', label: { ja: '営業', en: 'Sales' } },
-            'other',
-          ],
-        },
+  test.each([
+    ['an unknown id', '{"f_unknown":"x"}'],
+    ['a fixed field name', '{"email":"x@example.org"}'],
+    ['an own __proto__ key', '{"__proto__":{"isAdmin":true}}'],
+    ['constructor', '{"constructor":{"prototype":{"x":1}}}'],
+    ['a SQL-like key', '{"f_name\') OR 1=1 --":"x"}'],
+  ])('rejects %s in fields with 400', async (_name, extra) => {
+    const worker = createTestWorker();
+    const body = JSON.stringify(validBody()).replace(
+      '"fields":{',
+      `"fields":${extra.slice(0, -1)},`,
+    );
+    const response = await post(worker, body);
+    expect(response.status).toBe(400);
+    const error = (await response.json()).error;
+    expect(error.code).toBe('invalid_input');
+    expect(error.fields).toEqual({ fields: 'invalid' });
+    expect(rows(worker)).toHaveLength(0);
+    expect(({} as Record<string, unknown>).isAdmin).toBeUndefined();
+  });
+
+  test('rejects stored values over 16 KB with 413', async () => {
+    const worker = createTestWorker();
+    await insertFormVersion(worker.env.DB, {
+      baseVersion: 1,
+      createdBy: 'admin@example.com',
+      definition: {
+        fields: [
+          {
+            id: 'f_long',
+            type: 'textarea',
+            label: { ja: '詳細', en: 'Details' },
+            required: true,
+            maxLength: 10_000,
+            showInList: false,
+          },
+        ],
+        archived: [],
       },
     });
-    expect((await post(worker, validBody({ category: 'sales' }))).status).toBe(
-      200,
-    );
-    expect((await post(worker, validBody({ category: 'other' }))).status).toBe(
-      200,
-    );
-    for (const category of ['営業', 'Sales']) {
-      const response = await post(worker, validBody({ category }));
-      expect(response.status).toBe(400);
-      expect((await response.json()).error.fields).toEqual({
-        category: 'invalid',
+    const send = (text: string) =>
+      post(worker, {
+        ...validBody({ formVersion: 2 }),
+        fields: { f_long: text },
       });
-    }
-    expect(rows(worker).map((row) => row.category)).toEqual(
-      expect.arrayContaining(['sales', 'other']),
-    );
-    expect(rows(worker)).toHaveLength(2);
-    const config = await (await worker.fetch('/api/contact/config')).json();
-    expect(config.categories).toEqual(['sales', 'other']);
+    // 6,000 three-byte characters: 18 KB of values in a body under 32 KB.
+    const response = await send('あ'.repeat(6000));
+    expect(response.status).toBe(413);
+    expect((await response.json()).error.code).toBe('payload_too_large');
+    expect(rows(worker)).toHaveLength(0);
+    expect((await send('あ'.repeat(5000))).status).toBe(200);
+    expect((await send('a'.repeat(10_000))).status).toBe(200);
+    expect(rows(worker).map((row) => row.form_version)).toEqual([2, 2]);
+  });
+
+  test('a stale formVersion returns 409 and stores nothing', async () => {
+    const worker = createTestWorker();
+    const response = await post(worker, validBody({ formVersion: 7 }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe('form_outdated');
+    expect(rows(worker)).toHaveLength(0);
+    // Without formVersion the current form is used.
+    expect(
+      (await post(worker, validBody({ formVersion: undefined }))).status,
+    ).toBe(200);
   });
 
   test('error messages follow Accept-Language', async () => {
@@ -365,9 +438,13 @@ describe('POST /api/contact', () => {
     const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
     const response = await post(
       worker,
-      validBody({
-        message: 'See https://a.example https://b.example https://c.example',
-      }),
+      validBody(
+        {},
+        {
+          f_message:
+            'See https://a.example https://b.example https://c.example',
+        },
+      ),
     );
     expect(response.status).toBe(200);
     const [row] = rows(worker);
@@ -401,12 +478,79 @@ describe('POST /api/contact', () => {
   });
 });
 
-describe('Slack notification', () => {
-  test('contains no personal data and no message body', async () => {
-    const worker = createTestWorker({
-      env: { SLACK_WEBHOOK_URL: SLACK_URL },
-      options: { contact: { categories: ['sales'] } },
+describe('GET /api/contact/form', () => {
+  test('returns the current fields and the public settings', async () => {
+    const worker = createTestWorker();
+    const response = await worker.fetch('/api/contact/form');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('public, max-age=30');
+    const form = await response.json();
+    expect(form).toMatchObject({
+      available: true,
+      turnstileSiteKey: SECRETS.TURNSTILE_SITE_KEY,
+      turnstileAction: 'contact',
+      honeypotField: 'website',
+      version: 1,
+      email: { maxLength: 254 },
     });
+    expect(form.fields.map((field: { id: string }) => field.id)).toEqual([
+      'f_name',
+      'f_company',
+      'f_phone',
+      'f_category',
+      'f_message',
+    ]);
+    expect(form.fields[0]).toEqual({
+      id: 'f_name',
+      type: 'text',
+      label: { ja: 'お名前', en: 'Name' },
+      placeholder: { ja: '山田 太郎', en: 'Taro Yamada' },
+      required: true,
+      maxLength: 100,
+    });
+    expect(form.fields[3].options[0]).toEqual({
+      value: 'service',
+      label: { ja: 'サービスについて', en: 'Services' },
+    });
+    // Admin-only settings are not public.
+    expect(JSON.stringify(form)).not.toContain('showInList');
+    expect(JSON.stringify(form)).not.toContain('archived');
+    for (const secret of [
+      SECRETS.TURNSTILE_SECRET,
+      SECRETS.IP_HASH_SECRET,
+      SECRETS.BETTER_AUTH_SECRET,
+      SECRETS.SETUP_TOKEN,
+    ]) {
+      expect(JSON.stringify(form)).not.toContain(secret);
+    }
+  });
+
+  test('other API responses stay no-store', async () => {
+    const worker = createTestWorker();
+    const post = await worker.fetch('/api/contact', { method: 'POST' });
+    expect(post.headers.get('cache-control')).toBe('no-store');
+    const missing = await worker.fetch('/api/contact/nope');
+    expect(missing.headers.get('cache-control')).toBe('no-store');
+  });
+
+  test('an error is no-store', async () => {
+    const worker = createTestWorker();
+    worker.sqlite.exec('DROP TRIGGER form_definitions_no_delete');
+    worker.sqlite.exec('DELETE FROM form_definitions');
+    const logs = captureConsole();
+    try {
+      const response = await worker.fetch('/api/contact/form');
+      expect(response.status).toBe(500);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    } finally {
+      logs.restore();
+    }
+  });
+});
+
+describe('Slack notification', () => {
+  test('contains no personal data and no field values', async () => {
+    const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
     const body = validBody();
     expect((await post(worker, body)).status).toBe(200);
     const [call] = external.slackCalls();
@@ -414,44 +558,27 @@ describe('Slack notification', () => {
     const payload = JSON.parse(call?.body ?? '{}');
     expect(Object.keys(payload)).toEqual(['text']);
     for (const value of [
-      body.name,
       body.email,
-      body.company,
-      body.phone,
-      body.message,
+      ...Object.values(validFields),
       'Hanako',
       'hanako',
+      'Yamada',
+      'Business proposal',
       CLIENT_IP,
     ]) {
       expect(call?.body).not.toContain(value);
     }
     const [row] = rows(worker);
-    expect(payload.text).toContain('1 new inquiry');
-    expect(payload.text).toContain('sales');
-    expect(payload.text).toContain(`${ORIGIN}/admin/inquiries/${row?.id}`);
+    const lines = String(payload.text).split('\n');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe('1 new inquiry');
+    expect(lines[1]).toMatch(
+      /^Received: <!date\^\d+\^\{date_short_pretty\} \{time\}\|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z>$/,
+    );
+    expect(lines[2]).toBe(
+      `<${ORIGIN}/admin/inquiries/${row?.id}|Open the admin screen>`,
+    );
     expect(row?.notified_at).toBeNumber();
-  });
-
-  test('shows a category only when it is in the configured list', async () => {
-    const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
-    await post(worker, validBody({ category: 'Call me at 090-1111-2222' }));
-    expect(external.slackCalls()[0]?.body).not.toContain('090-1111-2222');
-  });
-
-  test('shows the value of a labeled category, not its label', async () => {
-    const worker = createTestWorker({
-      env: { SLACK_WEBHOOK_URL: SLACK_URL },
-      options: {
-        locale: 'ja',
-        contact: {
-          categories: [{ value: 'press', label: { ja: '取材', en: 'Press' } }],
-        },
-      },
-    });
-    await post(worker, validBody({ category: 'press' }));
-    const payload = JSON.parse(external.slackCalls()[0]?.body ?? '{}');
-    expect(payload.text).toContain('種類: press');
-    expect(payload.text).not.toContain('取材');
   });
 
   test('uses the configured locale', async () => {
@@ -459,8 +586,11 @@ describe('Slack notification', () => {
       env: { SLACK_WEBHOOK_URL: SLACK_URL },
       options: { locale: 'ja' },
     });
-    await post(worker, validBody({ category: undefined }));
-    expect(external.slackCalls()[0]?.body).toContain('新しいお問い合わせ');
+    await post(worker, validBody());
+    const body = external.slackCalls()[0]?.body ?? '';
+    expect(body).toContain('新しいお問い合わせ');
+    expect(body).toContain('受信日時');
+    expect(body).not.toContain('お名前');
   });
 
   test('a failing webhook does not change the response', async () => {

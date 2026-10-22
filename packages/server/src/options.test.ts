@@ -2,36 +2,22 @@ import { describe, expect, test } from 'bun:test';
 import { resolveOptions } from './options.ts';
 
 describe('resolveOptions', () => {
-  test('accepts plain category values', () => {
-    const { contact } = resolveOptions({
-      contact: { categories: ['sales', 'press'] },
+  test('defaults to English and the request hostname', () => {
+    expect(resolveOptions()).toEqual({
+      locale: 'en',
+      contact: { turnstileHostnames: undefined },
     });
-    expect(contact.categories).toEqual(['sales', 'press']);
-    expect(contact.categoryLabels).toEqual([
-      { value: 'sales', label: null },
-      { value: 'press', label: null },
-    ]);
   });
 
-  test('accepts labeled categories and keeps the order', () => {
-    const { contact } = resolveOptions({
-      contact: {
-        categories: [
-          { value: 'press', label: { ja: '取材', en: 'Press' } },
-          'other',
-        ],
-      },
+  test('keeps the locale and Turnstile hostnames', () => {
+    expect(
+      resolveOptions({
+        locale: 'ja',
+        contact: { turnstileHostnames: ['www.example.com'] },
+      }),
+    ).toEqual({
+      locale: 'ja',
+      contact: { turnstileHostnames: ['www.example.com'] },
     });
-    expect(contact.categories).toEqual(['press', 'other']);
-    expect(contact.categoryLabels).toEqual([
-      { value: 'press', label: { ja: '取材', en: 'Press' } },
-      { value: 'other', label: null },
-    ]);
-  });
-
-  test('accepts any category when none are configured', () => {
-    const { contact } = resolveOptions();
-    expect(contact.categories).toBeUndefined();
-    expect(contact.categoryLabels).toEqual([]);
   });
 });

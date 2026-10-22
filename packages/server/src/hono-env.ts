@@ -8,5 +8,10 @@ export interface HonoEnv {
     options: ResolvedOptions;
     /** Set by the admin auth middleware for authenticated admin routes. */
     admin: { userId: string; email: string; name: string };
+    /**
+     * `Cache-Control` for a public, cacheable API response. Without it, API
+     * responses get `no-store` (the `securityHeaders` middleware).
+     */
+    cacheControl: string;
   };
 }

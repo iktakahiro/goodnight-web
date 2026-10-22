@@ -17,6 +17,7 @@ import {
 } from './features/auth/admin-session.tsx';
 import { LoginPage } from './features/auth/login-page.tsx';
 import { loginSearchSchema } from './features/auth/login-search.ts';
+import { FormEditorPage } from './features/form-editor/form-editor-page.tsx';
 import { InquiryDetailPage } from './features/inquiries/inquiry-detail-page.tsx';
 import { InquiryListPage } from './features/inquiries/inquiry-list-page.tsx';
 import { listSearchSchema } from './features/inquiries/list-search.ts';
@@ -151,10 +152,17 @@ const detailRoute = createRoute({
   component: DetailRoute,
 });
 
+/** `/admin/form`: the contact form editor. */
+const formRoute = createRoute({
+  getParentRoute: () => signedInRoute,
+  path: '/form',
+  component: FormEditorPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   setupRoute,
-  signedInRoute.addChildren([listRoute, detailRoute]),
+  signedInRoute.addChildren([listRoute, detailRoute, formRoute]),
 ]);
 
 /**

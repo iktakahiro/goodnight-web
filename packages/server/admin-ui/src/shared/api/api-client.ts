@@ -6,22 +6,34 @@
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Per-field codes of an `invalid_input` error, when the API sent them. */
+  readonly fields: Readonly<Record<string, string>> | undefined;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fields?: Readonly<Record<string, string>>,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.fields = fields;
   }
 }
 
 /**
- * Reads `{ error: { code, message } }` from an error response body. Returns
- * `null` for anything else.
+ * Reads `{ error: { code, message, fields? } }` from an error response
+ * body. Returns `null` for anything else. Only string field codes are kept.
  */
 export const parseErrorBody = (
   body: unknown,
-): { code: string; message: string } | null => {
+): {
+  code: string;
+  message: string;
+  fields?: Record<string, string>;
+} | null => {
   if (typeof body !== 'object' || body === null || !('error' in body)) {
     return null;
   }
@@ -30,7 +42,18 @@ export const parseErrorBody = (
   const code = 'code' in error ? error.code : undefined;
   const message = 'message' in error ? error.message : undefined;
   if (typeof code !== 'string') return null;
-  return { code, message: typeof message === 'string' ? message : code };
+  const rawFields = 'fields' in error ? error.fields : undefined;
+  const fields: Record<string, string> = {};
+  if (typeof rawFields === 'object' && rawFields !== null) {
+    for (const [key, value] of Object.entries(rawFields)) {
+      if (typeof value === 'string') fields[key] = value;
+    }
+  }
+  return {
+    code,
+    message: typeof message === 'string' ? message : code,
+    ...(Object.keys(fields).length > 0 ? { fields } : {}),
+  };
 };
 
 /**
@@ -72,6 +95,7 @@ export const apiFetch = async <T>(
       response.status,
       error?.code ?? 'server_error',
       error?.message ?? `HTTP ${response.status}`,
+      error?.fields,
     );
   }
   if (body === null) {

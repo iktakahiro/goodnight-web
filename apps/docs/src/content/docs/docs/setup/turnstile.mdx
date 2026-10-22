@@ -30,10 +30,10 @@ Cloudflare then shows two values ([Cloudflare: create a widget in the dashboard]
 
 ## Put the keys in place
 
-| Key        | Where it goes                            | Public?                                                    |
-| ---------- | ---------------------------------------- | ---------------------------------------------------------- |
-| Secret key | The Worker secret `TURNSTILE_SECRET`     | No. Never commit it or put it in a page.                   |
-| Site key   | The Worker variable `TURNSTILE_SITE_KEY` | Yes. The contact page reads it from `/api/contact/config`. |
+| Key        | Where it goes                            | Public?                                                  |
+| ---------- | ---------------------------------------- | -------------------------------------------------------- |
+| Secret key | The Worker secret `TURNSTILE_SECRET`     | No. Never commit it or put it in a page.                 |
+| Site key   | The Worker variable `TURNSTILE_SITE_KEY` | Yes. The contact page reads it from `/api/contact/form`. |
 
 To set the secret, open the Worker in the Cloudflare dashboard and add `TURNSTILE_SECRET` under variables and secrets. From a terminal in your project, this does the same:
 

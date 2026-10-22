@@ -167,15 +167,23 @@ const insertSamples = async () => {
   const now = Date.now();
   const rows = samples.map((s) => {
     const created = now - s.minutesAgo * 60_000;
+    // Values of version 1 of the form, keyed by its field ids.
+    const fields = Object.fromEntries(
+      Object.entries({
+        f_name: s.name,
+        f_company: s.company,
+        f_phone: s.phone,
+        f_category: s.category,
+        f_message: s.body,
+      }).filter(([, value]) => value !== null),
+    );
     return `(${[
       sql(s.id),
       sql(created),
-      sql(s.name),
       sql(s.email),
-      sql(s.company),
-      sql(s.phone),
-      sql(s.category),
-      sql(s.body),
+      sql(JSON.stringify(fields)),
+      sql(1),
+      sql(s.email.endsWith('.jp') ? 'ja' : 'en'),
       sql(s.status),
       sql(s.spamScore ?? 0),
       sql(JSON.stringify(s.spamReasons ?? [])),
@@ -187,8 +195,45 @@ const insertSamples = async () => {
   });
   await queryDatabase(
     stateDir,
-    `INSERT INTO submissions (id, created_at, name, email, company, phone, category, body, status, spam_score, spam_reasons, page_path, country, consent_at, read_at) VALUES ${rows.join(', ')}`,
+    `INSERT INTO submissions (id, created_at, email, fields, form_version, locale, status, spam_score, spam_reasons, page_path, country, consent_at, read_at) VALUES ${rows.join(', ')}`,
   );
+};
+
+/** A submission sent with version 2, which has the "Budget" field. */
+const insertCustomFieldSample = async (): Promise<string> => {
+  const [row] = await queryDatabase(
+    stateDir,
+    "SELECT json_extract(value, '$.id') AS id FROM form_definitions, json_each(form_definitions.definition, '$.fields') WHERE version = 2 AND json_extract(value, '$.label.en') = 'Budget'",
+  );
+  const budgetId = String(row?.id);
+  const id = '01JSAMPLE0000000000000011';
+  const fields = {
+    f_name: '小林 葵',
+    f_company: '株式会社あさひ製作所',
+    f_category: 'service',
+    f_message:
+      '工場の休憩室に置くテーブルと椅子を 12 席分、入れ替えたいと考えています。\n\n現地を見ていただいたうえで、お見積もりをお願いできますか。',
+    [budgetId]: '80 万円前後',
+  };
+  const now = Date.now();
+  await queryDatabase(
+    stateDir,
+    `INSERT INTO submissions (id, created_at, email, fields, form_version, locale, status, spam_score, spam_reasons, page_path, country, consent_at) VALUES (${[
+      sql(id),
+      sql(now - 5 * 60_000),
+      sql('aoi.kobayashi@example.jp'),
+      sql(JSON.stringify(fields)),
+      sql(2),
+      sql('ja'),
+      sql('new'),
+      sql(0),
+      sql('[]'),
+      sql('/contact'),
+      sql('JP'),
+      sql(now),
+    ].join(', ')})`,
+  );
+  return id;
 };
 
 const shoot = async (page: Page, name: string) => {
@@ -197,6 +242,28 @@ const shoot = async (page: Page, name: string) => {
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(outDir, name), fullPage: false });
   console.log(`wrote ${join(outDir, name)}`);
+};
+
+const shootFull = async (page: Page, path: string) => {
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path, fullPage: true });
+  console.log(`wrote ${path}`);
+};
+
+/**
+ * Switches the admin UI to dark mode when it has a theme switch.
+ *
+ * @returns `false` when the admin UI has no dark mode.
+ */
+const setDarkMode = async (page: Page): Promise<boolean> => {
+  const switched = await page.evaluate(() => {
+    if (!document.querySelector('[data-testid="theme-switch"]')) return false;
+    localStorage.setItem('goodnight-web.admin.theme', 'dark');
+    return true;
+  });
+  if (switched) await page.reload();
+  return switched;
 };
 
 const setLocale = async (page: Page, locale: 'ja' | 'en') => {
@@ -280,6 +347,43 @@ const main = async () => {
     await page.goto(`${base}/admin/inquiries/${samples[0]?.id}`);
     await page.getByTestId('inquiry-body').waitFor();
     await shoot(page, 'admin-detail-ja.png');
+
+    // The form editor: add a "Budget" field and save it as version 2.
+    const formDir = join(outDir, 'form-editor');
+    await mkdir(formDir, { recursive: true });
+    await page.goto(`${base}/admin/form`);
+    await page.getByTestId('form-add-field').waitFor();
+    await page.getByTestId('form-add-field').click();
+    await page.getByLabel(ui('ja', 'form.labelJa')).last().fill('ご予算');
+    await page.getByLabel(ui('ja', 'form.labelEn')).last().fill('Budget');
+    await page.getByTestId('form-save').click();
+    await page.getByText(ui('ja', 'form.saved', { version: 2 })).waitFor();
+    await page.waitForTimeout(4500); // Let the toast close.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await shootFull(page, join(formDir, 'editor-ja-light.png'));
+    // A tall viewport, so the sticky header does not cover the card.
+    await page.setViewportSize({ width: 1280, height: 2200 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByTestId('form-preview-card').screenshot({
+      path: join(formDir, 'editor-preview-ja.png'),
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    console.log(`wrote ${join(formDir, 'editor-preview-ja.png')}`);
+    const customId = await insertCustomFieldSample();
+    await page.goto(`${base}/admin/inquiries/${customId}`);
+    await page.getByText('80 万円前後').waitFor();
+    await shootFull(page, join(formDir, 'detail-custom-field-ja.png'));
+    await page.goto(`${base}/admin`);
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-v2-ja.png');
+    if (await setDarkMode(page)) {
+      await page.goto(`${base}/admin/form`);
+      await page.getByTestId('form-add-field').waitFor();
+      await shootFull(page, join(formDir, 'editor-ja-dark.png'));
+      await page.goto(`${base}/admin/inquiries/${customId}`);
+      await page.getByText('80 万円前後').waitFor();
+      await shootFull(page, join(formDir, 'detail-custom-field-ja-dark.png'));
+    }
 
     // Restart without TURNSTILE_SECRET: the contact form closes and the
     // admin UI shows the setup notice.

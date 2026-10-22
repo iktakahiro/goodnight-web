@@ -148,7 +148,7 @@ export const startDevServer = async ({
   };
   for (let i = 0; i < 120; i++) {
     try {
-      const response = await fetch(`${base}/api/contact/config`);
+      const response = await fetch(`${base}/api/contact/form`);
       if (response.ok) return { base, stop };
     } catch {
       // Not up yet.
