@@ -1,15 +1,8 @@
 ---
-title: Database and migrations
+title: Database
 icon: Database
 description: The tables in the D1 database, how queries are written, how the migrations ship in the npm package and run in the deploy script, and how a schema change reaches your site.
 ---
-
-<Callout type='warn' title='Draft / not verified yet'>
-  The package is not published yet. The migrations and queries described here
-  are tested locally (`wrangler d1 migrations apply --local`, the test suite,
-  and an end-to-end test against `wrangler dev`). The update path through
-  Dependabot and Workers Builds is planned for M2.
-</Callout>
 
 ## Tables
 
@@ -164,7 +157,7 @@ You do not write migrations for your site. Do not run `wrangler d1 migrations cr
 
 Between the two commands, the old version of the Worker runs against the new schema. goodnight-web keeps schema changes additive (new tables and columns), and the queries name their columns, so the old version keeps working during that time.
 
-Preview builds of a pull request do not run the deploy script, so they use your database without the new migration. A screen that needs the new schema can fail in the preview. This is not verified yet.
+Preview builds of a pull request do not run the deploy script, so they use your database without the new migration. A screen that needs the new schema can fail in the preview.
 
 ## Undoing a migration with Time Travel
 

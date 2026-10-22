@@ -1,69 +1,189 @@
+/* The layout follows the width of the content column, not the viewport:
+   narrow columns stack the Worker parts and put the services in two rows. */
 .architecture-diagram {
+  --ad-line: color-mix(in oklab, var(--color-fd-primary) 65%, transparent);
+  --ad-worker-pad: 0.875rem;
+  --ad-columns: minmax(0, 1fr) minmax(0, 1fr);
+  container-type: inline-size;
   margin-block: 1.5rem 2rem;
-}
-.architecture-diagram svg {
-  display: block;
-  width: 100%;
-  height: auto;
   font-family: var(--font-sans);
+  word-break: auto-phrase;
+  overflow-wrap: anywhere;
 }
 .architecture-diagram figcaption {
-  margin-top: 0.75rem;
+  margin-top: 1rem;
   color: var(--color-fd-muted-foreground);
   font-size: 0.875rem;
   text-align: center;
 }
+.ad-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .ad-box {
-  fill: var(--color-fd-card);
-  stroke: var(--color-fd-border);
-  stroke-width: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.875rem;
+  border: 1.5px solid var(--color-fd-border);
+  border-radius: 0.75rem;
+  background: var(--color-fd-card);
+  text-align: center;
 }
 .ad-accent {
-  fill: color-mix(in oklab, var(--color-fd-primary) 8%, var(--color-fd-card));
-  stroke: color-mix(in oklab, var(--color-fd-primary) 40%, transparent);
+  border-color: color-mix(in oklab, var(--color-fd-primary) 40%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-fd-primary) 8%,
+    var(--color-fd-card)
+  );
 }
 .ad-optional {
-  stroke-dasharray: 6 5;
-}
-rect.ad-optional {
-  fill: var(--color-fd-background);
-}
-.ad-worker {
-  fill: color-mix(in oklab, var(--color-fd-primary) 4%, transparent);
-  stroke: color-mix(in oklab, var(--color-fd-primary) 55%, transparent);
-  stroke-width: 2;
-}
-.ad-worker-label {
-  fill: var(--color-fd-primary);
-  font-size: 14px;
-  font-weight: 600;
+  border-style: dashed;
+  background: var(--color-fd-background);
 }
 .ad-title {
-  fill: var(--color-fd-foreground);
-  font-size: 15px;
+  color: var(--color-fd-foreground);
+  font-size: 0.9375rem;
   font-weight: 600;
-  text-anchor: middle;
+  line-height: 1.35;
+  text-wrap: balance;
 }
 .ad-sub {
-  fill: var(--color-fd-muted-foreground);
-  font-size: 12px;
-  text-anchor: middle;
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-wrap: balance;
 }
-.ad-route {
-  fill: var(--color-fd-foreground);
+.ad-note,
+.ad-routes code {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 .ad-note {
-  fill: var(--color-fd-muted-foreground);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  color: var(--color-fd-muted-foreground);
 }
-.ad-line {
-  stroke: color-mix(in oklab, var(--color-fd-primary) 60%, transparent);
-  stroke-width: 1.75;
-  marker-end: url(#ad-arrow);
+
+.ad-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+  width: 10px;
+  min-height: 1.75rem;
+  padding-block: 2px;
 }
-.ad-arrowhead {
-  fill: color-mix(in oklab, var(--color-fd-primary) 70%, transparent);
+.ad-arrow::before {
+  content: '';
+  flex: 1;
+  width: 2px;
+  background: var(--ad-line);
+}
+.ad-arrow::after {
+  content: '';
+  border-inline: 5px solid transparent;
+  border-top: 7px solid var(--ad-line);
+}
+
+.ad-clients,
+.ad-uses {
+  display: grid;
+  grid-template-columns: var(--ad-columns);
+  column-gap: 0.75rem;
+  padding-inline: var(--ad-worker-pad);
+}
+.ad-lane {
+  display: flex;
+  flex-direction: column;
+}
+.ad-lane > .ad-arrow:last-child {
+  flex-grow: 1;
+}
+.ad-uses > .ad-arrow {
+  grid-column: -2;
+}
+
+.ad-worker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.625rem var(--ad-worker-pad) var(--ad-worker-pad);
+  border: 2px solid
+    color-mix(in oklab, var(--color-fd-primary) 55%, transparent);
+  border-radius: 1.25rem;
+  background: color-mix(in oklab, var(--color-fd-primary) 4%, transparent);
+}
+.ad-worker-label {
+  color: var(--color-fd-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.ad-worker-parts {
+  display: grid;
+  gap: 0.75rem;
+}
+.ad-worker-parts > .ad-box {
+  justify-content: center;
+}
+
+.ad-routes {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.375rem 0.75rem;
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-align: start;
+}
+.ad-routes dt {
+  color: var(--color-fd-foreground);
+}
+.ad-routes dd {
+  color: var(--color-fd-muted-foreground);
+}
+
+.ad-services {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1.5px solid var(--color-fd-border);
+  border-radius: 1rem;
+}
+.ad-services > .ad-box {
+  justify-content: center;
+}
+
+@container (min-width: 34rem) {
+  .architecture-diagram > * {
+    --ad-columns: minmax(0, 2fr) minmax(0, 3fr);
+    --ad-worker-pad: 1rem;
+  }
+  .ad-worker-parts {
+    grid-template-columns: var(--ad-columns);
+  }
+}
+@container (min-width: 40rem) {
+  .ad-services {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@container (max-width: 22rem) {
+  .ad-routes {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+  .ad-routes dd + dt {
+    margin-top: 0.375rem;
+  }
 }

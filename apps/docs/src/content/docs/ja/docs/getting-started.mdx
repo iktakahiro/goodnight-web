@@ -1,14 +1,8 @@
 ---
 title: はじめかた
 icon: Rocket
-description: Deploy to Cloudflare ボタンを使う予定の手順です。starter の private なコピーを作り、シークレットを入力し、Turnstile を設定し、ドメインを追加して、最初の管理者を作ります。
+description: Deploy to Cloudflare ボタンを使う手順です。starter の private なコピーを作り、シークレットを入力し、Turnstile を設定し、ドメインを追加して、最初の管理者を作ります。
 ---
-
-<Callout type='warn' title='下書き / 未検証'>
-  予定している手順です。starter リポジトリと Deploy
-  ボタンはまだなく、この手順を最後まで試した人はいません。M2
-  で試します。画面や項目の名前は、実際と違うことがあります。
-</Callout>
 
 ## 必要なもの
 
@@ -25,15 +19,6 @@ description: Deploy to Cloudflare ボタンを使う予定の手順です。star
 ボタンは、サイトのひな形である starter リポジトリの README にあります。Cloudflare が GitHub との連携を求めた後、starter をあなたのアカウントの新しいリポジトリにコピーし、D1 データベースを作り、Workers Builds で Worker をビルドしてデプロイします（[Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)）。
 
 設定フォームでは **「Create private Git repository」にチェックを入れてください**。リポジトリは private にする必要があります。理由は[配布と更新のしくみ](/ja/docs/distribution/#private-repository)で説明しています。
-
-<Callout type='warn' title='未検証'>
-  Cloudflare
-  のドキュメントには、リポジトリ名を変えられることは書かれていますが、リポジトリの公開範囲については何も書かれていません。「Create
-  private Git
-  repository」というチェックボックスの名前と、最初はチェックが外れていることがある（外れたままだと
-  public
-  で作られる）という話は、第三者のガイドによるものです。まだ確認していません。
-</Callout>
 
 public で作られてしまった場合は、GitHub で private に変えてください。**Settings > General > Danger Zone > Change visibility** を開き、private を選びます。private にするまで、starter の公開範囲チェックのワークフローは push のたびに失敗します。
 
@@ -108,7 +93,7 @@ Cloudflare Access を使うと、もう 1 段のログインを置けます。�
 
 Access のアプリケーションは `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` に設定します。`/api/contact` は公開したままにしてください。訪問者は問い合わせフォームからここに送信します。
 
-Worker にも Access のトークンを確認させるには、変数を 2 つ追加します。`ACCESS_AUD`（アプリケーションの **Application Audience (AUD) Tag**）と `ACCESS_TEAM_DOMAIN`（たとえば `your-team.cloudflareaccess.com`）です。両方設定するか、両方とも設定しないでください。片方だけだと、管理用のパスは 503 を返します。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。この手順は、実際の Access アプリケーションではまだ試していません。
+Worker にも Access のトークンを確認させるには、変数を 2 つ追加します。`ACCESS_AUD`（アプリケーションの **Application Audience (AUD) Tag**）と `ACCESS_TEAM_DOMAIN`（たとえば `your-team.cloudflareaccess.com`）です。両方設定するか、両方とも設定しないでください。片方だけだと、管理用のパスは 503 を返します。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。
 
 </Step>
 

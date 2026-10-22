@@ -4,12 +4,6 @@ icon: ListChecks
 description: Admins add, remove, and reorder contact form fields in the admin screen. The definition is stored in D1 with versions, so a change needs no deploy and old inquiries keep their own labels.
 ---
 
-<Callout type='warn' title='Draft / not verified yet'>
-  The package is not published yet. What this page describes is covered by the
-  test suite and the end-to-end tests against `wrangler dev`, not by a real
-  deployment.
-</Callout>
-
 ## Editing the form
 
 Sign in to the admin screen and open **Form** (フォーム in Japanese). The page, titled **Contact form**, shows the fields in order. You can:
@@ -309,4 +303,4 @@ return z
   .pipe(z.strictObject(shape))
 ```
 
-Each inquiry stores its values as JSON in `submissions.fields`, keyed by field id, and the version in `submissions.form_version`. See [Database and migrations](/docs/database/).
+Each inquiry stores its values as JSON in `submissions.fields`, keyed by field id, and the version in `submissions.form_version`. See [Database](/docs/database/).

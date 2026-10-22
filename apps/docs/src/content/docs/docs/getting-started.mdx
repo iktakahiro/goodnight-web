@@ -1,14 +1,8 @@
 ---
 title: Getting started
 icon: Rocket
-description: The planned setup with the Deploy to Cloudflare button. Create a private copy of the starter, enter the secrets, set up Turnstile, add your domain, and create the first admin.
+description: Set up your site with the Deploy to Cloudflare button. Create a private copy of the starter, enter the secrets, set up Turnstile, add your domain, and create the first admin.
 ---
-
-<Callout type='warn' title='Draft / not verified yet'>
-  This guide describes the planned setup. The starter repository and the Deploy
-  button do not exist yet, and nobody has run these steps end to end. They will
-  be tested in M2. Screen and field names may differ from what you see.
-</Callout>
 
 ## What you need
 
@@ -25,14 +19,6 @@ description: The planned setup with the Deploy to Cloudflare button. Create a pr
 The button is in the starter's README. Cloudflare asks you to connect GitHub, then copies the starter into a new repository in your account, creates the D1 database, and builds and deploys the Worker with Workers Builds ([Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)).
 
 In the setup form, **tick "Create private Git repository"**. Your repository must be private; [Distribution and updates](/docs/distribution/#private-repository) explains why.
-
-<Callout type='warn' title='Not verified yet'>
-  Cloudflare's documentation says that you can choose the repository name, but
-  it does not say anything about repository visibility. The checkbox name
-  "Create private Git repository", and the report that it may start unticked
-  (which creates a public repository), come from a third-party guide. We have
-  not confirmed them yet.
-</Callout>
 
 If the repository was created as public, make it private in GitHub: **Settings > General > Danger Zone > Change visibility**, then choose private. The starter's visibility check workflow fails on every push until you do.
 
@@ -107,7 +93,7 @@ Cloudflare Access adds a second sign-in, for example with a one-time code sent b
 
 Put the Access application on `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. Keep `/api/contact` public, because visitors send the contact form there.
 
-To have the Worker check the Access token as well, set two more variables: `ACCESS_AUD` (the application's **Application Audience (AUD) Tag**) and `ACCESS_TEAM_DOMAIN` (for example `your-team.cloudflareaccess.com`). Set both or neither; with only one, the admin paths answer 503. See [Security model](/docs/security/#cloudflare-access). These steps have not been tried with a real Access application yet.
+To have the Worker check the Access token as well, set two more variables: `ACCESS_AUD` (the application's **Application Audience (AUD) Tag**) and `ACCESS_TEAM_DOMAIN` (for example `your-team.cloudflareaccess.com`). Set both or neither; with only one, the admin paths answer 503. See [Security model](/docs/security/#cloudflare-access).
 
 </Step>
 
