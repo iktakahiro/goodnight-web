@@ -5,7 +5,7 @@
 
 # goodnight-web
 
-goodnight-web is a template for a company website with a blog and a contact
+goodnight-web is a template for a website with a blog and a contact
 form. It runs on Cloudflare only: one Worker serves the static site, the
 contact API, and an admin screen for reading inquiries, and one D1 database
 stores the inquiries.
