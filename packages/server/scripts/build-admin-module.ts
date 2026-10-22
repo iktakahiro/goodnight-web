@@ -1,6 +1,6 @@
 // Turns the prebuilt admin UI into one TypeScript module that the Worker
-// bundles (docs/decisions/0004, option B). Until the admin SPA exists, the
-// source is admin-placeholder/.
+// bundles (docs/decisions/0004, option B). The source is the Vite build of
+// the admin SPA in admin-ui/dist (`vite build --config admin-ui/vite.config.ts`).
 //
 // Usage: bun scripts/build-admin-module.ts [sourceDir]
 import { createHash } from 'node:crypto';
@@ -8,7 +8,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 
 const packageDir = resolve(import.meta.dir, '..');
-const sourceDir = resolve(packageDir, process.argv[2] ?? 'admin-placeholder');
+const sourceDir = resolve(packageDir, process.argv[2] ?? 'admin-ui/dist');
 const outFile = join(packageDir, 'src/features/admin-ui/admin-files.gen.ts');
 
 const CONTENT_TYPES: Record<string, string> = {

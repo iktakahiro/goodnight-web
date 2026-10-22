@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { createTestWorker } from '../../testing/test-worker.ts';
 import { ADMIN_CSP } from '../security-headers/security-headers.ts';
+import { adminFiles } from './admin-files.gen.ts';
 import { serveAdminFile } from './serve-admin-file.ts';
 
 const files = {
@@ -88,5 +89,24 @@ describe('security headers', () => {
     const response = await worker.fetch('/api/nope');
     expect(response.status).toBe(404);
     expect((await response.json()).error.code).toBe('not_found');
+  });
+});
+
+describe('embedded admin UI build', () => {
+  test('index.html loads hashed files from /admin/assets/', () => {
+    const index = adminFiles['/admin/index.html']?.body ?? '';
+    const assets = [
+      ...index.matchAll(/(?:src|href)="(\/admin\/assets\/[^"]+)"/g),
+    ].map((match) => match[1] ?? '');
+    expect(assets.length).toBeGreaterThanOrEqual(2);
+    for (const path of assets) expect(adminFiles[path]).toBeDefined();
+  });
+
+  test('works under the admin CSP: no inline scripts or styles', () => {
+    const index = adminFiles['/admin/index.html']?.body ?? '';
+    expect(index).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/);
+    expect(index).not.toContain('<style');
+    expect(index).not.toMatch(/\sstyle="/);
+    expect(index).not.toMatch(/\son[a-z]+="/);
   });
 });

@@ -1,0 +1,7 @@
+{
+  "extends": "@goodnight-web/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["bun", "vite/client"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+}
