@@ -228,6 +228,7 @@ describe('verifyAccessJwt', () => {
     ['missing token', async () => null],
     ['malformed token', async () => 'not-a-jwt'],
     ['wrong audience', () => sign({ aud: ['other-app'] })],
+    ['wrong audience', () => sign({ aud: [{ toString: null }, 42] })],
     ['wrong issuer', () => sign({ iss: 'https://evil.cloudflareaccess.com' })],
     ['expired', () => sign({ exp: nowS() - 1 })],
     ['expired', () => sign({ exp: undefined })],

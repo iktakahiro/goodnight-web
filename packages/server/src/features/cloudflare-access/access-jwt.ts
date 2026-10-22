@@ -117,7 +117,7 @@ const decodeJson = (part: string): Record<string, unknown> | null => {
   }
 };
 
-// Allowed clock difference for `nbf` and `iat`, in seconds.
+// Allowed clock difference for `nbf`, in seconds.
 const CLOCK_SKEW_S = 60;
 
 /**
@@ -176,7 +176,11 @@ export const verifyAccessJwt = async (
   if (!valid) return denied('bad signature');
   if (payload.iss !== config.teamOrigin) return denied('wrong issuer');
   const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!audiences.some((aud) => config.audiences.includes(String(aud)))) {
+  if (
+    !audiences.some(
+      (aud) => typeof aud === 'string' && config.audiences.includes(aud),
+    )
+  ) {
     return denied('wrong audience');
   }
   const nowS = now / 1000;
