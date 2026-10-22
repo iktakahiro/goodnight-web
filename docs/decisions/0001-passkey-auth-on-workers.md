@@ -229,3 +229,21 @@ What costs CPU:
   custom domain are enabled, each hostname gets its own passkeys. Decide
   whether to pin the admin origin with a variable.
 - Passkey recovery (lost device) is still open (PRD #2).
+
+## Update (2026-10-22): cache the auth instance per isolate
+
+Decided by the dev lead after the spike review, for the second open issue
+above. Building `betterAuth()` on every request cost about 5 ms of CPU
+locally, which is too close to the free plan's 10 ms limit.
+
+- `@goodnight-web/server` builds the Better Auth instance from the env
+  bindings and caches it per isolate, in a `WeakMap` keyed by the `env`
+  object, with one instance per request origin (the passkey `rpID` and
+  `origin` come from it). If the runtime passes a different `env` object, a
+  new instance is built, so changed bindings or secrets are picked up.
+- Nothing is built at module top level, and no secret is read outside a
+  request.
+- `AGENTS.md` now states this rule instead of "create per request".
+- The instance also sets `advanced.ipAddress.disableIpTracking: true`, so
+  Better Auth does not write the client IP into `session.ipAddress` (the "no
+  raw IP" rule), and `telemetry.enabled: false`.

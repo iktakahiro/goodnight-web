@@ -1,8 +1,9 @@
 # Architecture
 
-This document describes the planned architecture of goodnight-web. Most of it
-is not implemented yet (milestone M1). Decisions that still need a proof of
-concept are marked as open and will be recorded in
+This document describes the architecture of goodnight-web. Milestone M1 is in
+progress: `@goodnight-web/server` (contact API, setup, passkey auth, admin API,
+migrations) is implemented; the admin UI SPA, the starter, and the docs site
+are not yet. Design decisions are recorded in
 [decisions/](decisions/README.md).
 
 ## Constraints
@@ -22,9 +23,9 @@ concept are marked as open and will be recorded in
                  ▼                                     ▼
  ┌──────────────────────────── one Worker ────────────────────────────┐
  │ Static Assets: the Astro build (/, /blog/*, /contact, ...)          │
- │ run_worker_first: /api/* (and /admin/* if the admin UI needs it)    │
+ │ run_worker_first: /api/*, /admin, /admin/*                          │
  │ Hono app from createGoodnightWorker(options)                        │
- │   POST /api/contact   contact form submissions                      │
+ │   /api/contact        form config (GET) and submissions (POST)      │
  │   /api/setup          first admin, closes after use                 │
  │   /api/auth/*         Better Auth, passkeys only                    │
  │   /api/admin/*        list, detail, status, delete, CSV export      │
@@ -36,79 +37,205 @@ concept are marked as open and will be recorded in
 ```
 
 - **Static Assets** serve every public page without running the Worker. Only
-  `/api/*` (and possibly `/admin/*`) reach Hono.
-- **Hono** routes the API. The app factory takes options from the site (for
-  example the contact categories) and reads bindings and secrets from `env`.
-- **Better Auth** is created per request from the env bindings. Email and
-  password sign-in is disabled; admins use passkeys.
+  `/api/*`, `/admin`, and `/admin/*` reach Hono (`run_worker_first`). The
+  bare `/admin` must be listed: `/admin/*` does not match it.
+- **Hono** routes the API. `createGoodnightWorker(options)` takes options
+  from the site (locale, contact categories, extra allowed origins, Turnstile
+  hostnames) and reads bindings and secrets from `env` on every request.
+  Requests it does not handle go to the `ASSETS` binding.
+- **Better Auth** is built from the env bindings and cached per isolate,
+  keyed by the `env` object and the request origin. A new `env` object (new
+  bindings or secrets) gets a new instance. Building it costs about 5 ms of
+  CPU, which is too much to repeat on every request on the free plan
+  ([0001](decisions/0001-passkey-auth-on-workers.md)). Email and password
+  sign-in is disabled; admins use passkeys. IP tracking is off, so the
+  `session.ipAddress` column stays empty.
 - **D1** stores submissions, settings, and the Better Auth tables. The
-  migrations ship inside `@goodnight-web/server`.
+  migrations ship inside `@goodnight-web/server`
+  ([0002](decisions/0002-migrations-from-package.md)).
 
 ### Secrets and bindings
 
-| Name                 | Kind               | Purpose                                             |
-| -------------------- | ------------------ | --------------------------------------------------- |
-| `DB`                 | D1 binding         | All persistent data                                 |
-| rate limit binding   | Rate Limiting      | Limits contact submissions per `ip_hash`            |
-| `SETUP_TOKEN`        | secret             | Required to create the first admin                  |
-| `ADMIN_EMAILS`       | secret or variable | Allowlist of addresses that may become admins       |
-| `BETTER_AUTH_SECRET` | secret             | Better Auth signing secret                          |
-| `IP_HASH_SECRET`     | secret             | HMAC key for `ip_hash`                              |
-| `TURNSTILE_SECRET`   | secret             | Turnstile siteverify; contact API is off without it |
-| `SLACK_WEBHOOK_URL`  | secret, optional   | New-inquiry notification                            |
+| Name                   | Kind               | Purpose                                                    | When missing                   |
+| ---------------------- | ------------------ | ---------------------------------------------------------- | ------------------------------ |
+| `DB`                   | D1 binding         | All persistent data                                        | Worker cannot run              |
+| `ASSETS`               | Static Assets      | The site's pages                                           | non-API paths return 404       |
+| `CONTACT_RATE_LIMITER` | Rate Limiting      | Contact submissions and setup attempts per `ip_hash`       | contact API 503                |
+| `SETUP_TOKEN`          | secret             | Required to create the first admin                         | setup 503                      |
+| `ADMIN_EMAILS`         | secret or variable | Comma-separated addresses that may be admins               | setup 503, admin API 403       |
+| `BETTER_AUTH_SECRET`   | secret             | Better Auth signing secret, 32 characters or more          | auth, setup, and admin API 503 |
+| `IP_HASH_SECRET`       | secret             | HMAC key for `ip_hash`                                     | contact API 503                |
+| `TURNSTILE_SECRET`     | secret             | Turnstile siteverify                                       | contact API 503                |
+| `TURNSTILE_SITE_KEY`   | variable (public)  | Turnstile widget; the form reads it from the config API    | contact API 503                |
+| `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification                |
+
+The Rate Limiting binding name is fixed
+([0003](decisions/0003-rate-limit-binding.md)). The admin API reports which
+contact settings are missing (names only, never values) in
+`GET /api/admin/status`.
 
 ## Contact flow
 
-`POST /api/contact` runs these steps in order:
+The contact form first calls `GET /api/contact/config`. It returns
+`available`, the public Turnstile site key, the Turnstile action
+(`contact`), the honeypot field name (`website`), and the allowed categories.
+When `available` is `false`, the form shows that it is not available yet.
 
-1. Check `Origin`, `Content-Type`, and the body size (about 16 KB). Reject
-   anything else.
+`POST /api/contact` runs these steps in order
+(`packages/server/src/features/contact/contact-routes.ts`):
+
+0. If `TURNSTILE_SECRET`, `TURNSTILE_SITE_KEY`, `IP_HASH_SECRET`, or the
+   `CONTACT_RATE_LIMITER` binding is missing, return 503
+   (`contact_unavailable`) without reading the body.
+1. Check that `Origin` is the Worker's own origin (or one listed in
+   `options.contact.allowedOrigins`), that `Content-Type` is JSON, and that the
+   body is at most 16 KB. The size is checked against `Content-Length` and
+   again while reading, so a chunked body cannot bypass it. Errors: 403, 415,
+   413, then 400 for bad JSON.
 2. If the honeypot field is filled, save the submission with status `held` and
-   return success, so a bot learns nothing.
-3. Verify the Turnstile token with siteverify, including `hostname` and
-   `action`. On failure return 400 and save nothing.
+   return success, so a bot learns nothing. This path also counts against the
+   rate limit; over the limit it still returns success but saves nothing, so a
+   bot cannot fill the database.
+3. Verify the Turnstile token with siteverify (secret, token, `remoteip`),
+   and check that `hostname` is the request's hostname (or one of
+   `options.contact.turnstileHostnames`) and that `action` is `contact`. On
+   failure return 400 (`turnstile_failed`) and save nothing.
 4. Apply the Rate Limiting binding with `ip_hash` as the key. Over the limit
    returns 429.
-5. Validate the input with zod and compute a spam score. A score over the
-   threshold sets the status to `held`.
-6. Insert the row into D1, then return 200. The response does not depend on
-   anything after this step.
+5. Validate the input with the zod schema exported from
+   `@goodnight-web/server/contact` (control characters removed, lengths
+   checked, `consent` must be `true`). A category outside
+   `options.contact.categories` is rejected. Then compute the spam score; a
+   score of 3 or more sets the status to `held`.
+6. Insert the row into D1, then return 200. If the insert fails, return 500.
+   The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:
-   - if the status is `new` and a webhook is configured, post "1 new inquiry,
-     category, admin URL" to Slack and set `notified_at`;
-   - if `settings.last_cleanup_at` is more than one hour old, delete rows older
-     than the retention period (180 days by default) and update
-     `last_cleanup_at`. Opening the admin list runs the same cleanup, so old
-     rows are removed even when no new inquiries arrive.
+   - if the status is `new` and `SLACK_WEBHOOK_URL` is a Slack webhook URL,
+     post "1 new inquiry, category, admin URL" to Slack and set
+     `notified_at`. The category is shown only when it is one of the
+     configured categories, so free text from a visitor never reaches Slack.
+     There is no retry; the unread count in the admin UI covers missed
+     notifications.
+   - prune old rows (see below).
 
-If `TURNSTILE_SECRET` is not set, the endpoint returns 503 and the form shows
-that it is not available yet.
+`ip_hash` is `HMAC-SHA256(ip, IP_HASH_SECRET)` of `CF-Connecting-IP`. The raw
+IP is sent to Turnstile siteverify but never stored or logged.
 
-`ip_hash` is `HMAC-SHA256(ip, IP_HASH_SECRET)`. The raw IP is never stored or
-logged.
+Error responses are `{ "error": { "code", "message", "fields"? } }`. The
+message is Japanese or English depending on `Accept-Language`. The browser
+helper `submitContact()` in `@goodnight-web/server/client` returns these as
+typed results instead of throwing.
+
+### Spam score
+
+`scoreSubmission()` in `spam-score.ts`. The rules only hold a submission for
+review; nothing is thrown away.
+
+| Rule           | Points                    | Condition                                            |
+| -------------- | ------------------------- | ---------------------------------------------------- |
+| `links:N`      | N, at most 3              | links (`http://`, `https://`, `www.`) in the message |
+| `link_in_name` | 3                         | a link in the name or company                        |
+| `too_fast`     | 3                         | sent less than 3 seconds after the form was shown    |
+| `honeypot`     | always `held`, not scored | the hidden `website` field is filled                 |
+
+### Retention without Cron
+
+`pruneIfDue()` deletes submissions older than `settings.retention_days`
+(180 by default) at most once an hour. It claims the run with one conditional
+upsert of `settings.last_cleanup_at`, so two requests at the same time do not
+both delete. It runs in `ctx.waitUntil` after each submission and after each
+admin list request, so old rows are removed even when no new inquiries
+arrive.
 
 ## Admin
 
-- Setup: `/api/setup` accepts a request only with the correct `SETUP_TOKEN` and
-  an email in `ADMIN_EMAILS`. It creates the first admin and registers a
-  passkey, then closes for good.
+### Setup
+
+`POST /api/setup` with `{ token, email, name? }`
+(`packages/server/src/features/setup/`):
+
+1. 503 without `BETTER_AUTH_SECRET`, `SETUP_TOKEN`, or `ADMIN_EMAILS`.
+2. 403 unless `Origin` is the Worker's origin. Better Auth skips its own
+   origin check for server-side calls, so the route checks it.
+3. 429 over the rate limit (`setup:<ip_hash>` on the same binding).
+4. 403 `setup_closed` when any passkey exists.
+5. 403 `invalid_setup_token` unless the token matches `SETUP_TOKEN`
+   (constant-time compare).
+6. 403 `email_not_allowed` unless the address is in `ADMIN_EMAILS`
+   (case-insensitive).
+7. A server-only Better Auth plugin endpoint creates the user (or reuses it)
+   and sets the session cookie. It is not reachable under `/api/auth/*`.
+
+The browser then registers a passkey with the Better Auth passkey client.
+Setup closes when a passkey exists, so a person who left before registering
+one can run setup again. `GET /api/setup` returns `{ configured, open }`.
+
+### Admin API
+
+Every `/api/admin/*` route requires a Better Auth session whose user is still
+in `ADMIN_EMAILS` and has at least one passkey. The session from setup alone
+only allows registering the first passkey. State-changing requests also need
+the Worker's own `Origin` (CSRF). There is no development bypass.
+
+| Route                                      | Result                                                                                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/admin/me`                        | the signed-in admin                                                                                                       |
+| `GET /api/admin/status`                    | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount` |
+| `GET /api/admin/submissions?status=&page=` | 50 per page, newest first, `total` and `unreadCount`; runs pruning                                                        |
+| `GET /api/admin/submissions/:id`           | one submission; a `new` one becomes `read`                                                                                |
+| `PATCH /api/admin/submissions/:id`         | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                    |
+| `DELETE /api/admin/submissions/:id`        | deletes the row                                                                                                           |
+| `GET /api/admin/submissions.csv?status=`   | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                         |
+
+`ip_hash` is never returned by the admin API.
+
+### Admin UI
+
 - Screens: setup, passkey registration, sign-in, inquiry list (50 per page,
-  unread count always in the header), and detail (status change between
-  `new`, `read`, `done`, `held`, `spam`, and delete). CSV export is in the API.
+  unread count always in the header, a notice with a link to the Turnstile
+  setup docs when `turnstileConfigured` is `false`), and detail (status change
+  and delete).
 - The admin UI is a React SPA built with Vite, Base UI, shadcn, and Tailwind
-  v4. It ships prebuilt in `@goodnight-web/server` with Japanese and English
-  strings. The SPA shell may load without a session, but every data request
-  needs one.
-- Open question: deliver the admin UI as static assets copied into the site
-  build (needs `@goodnight-web/astro`), or embed it in the Worker.
+  v4. It ships prebuilt inside `@goodnight-web/server` and is served by the
+  Worker ([0004](decisions/0004-admin-ui-delivery.md)): the package build
+  (`scripts/build-admin-module.ts`) turns the build output into
+  `src/features/admin-ui/admin-files.gen.ts`. Until the SPA lands, the
+  source is `packages/server/admin-placeholder/`.
+- `/admin` and paths without a file extension return `index.html`
+  (`no-cache`); `/admin/assets/*` are immutable; ETags give 304s. Every admin
+  response gets the admin CSP
+  (`default-src 'self'; script-src 'self'; style-src 'self'; ...`).
+- Japanese and English strings shared by the API, the admin UI, and the
+  contact form live in `@goodnight-web/server/messages`. The SPA shell loads
+  without a session, but every data request needs one.
+
+### Security headers
+
+Responses from `/api/*` and `/admin/*` get `X-Content-Type-Options`,
+`X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
+`Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, a
+`Permissions-Policy`, and HSTS on HTTPS. API responses get
+`default-src 'none'` and `Cache-Control: no-store`. Pages from Static Assets
+are not changed.
 
 ## Package and starter
 
 The code is split by who edits it.
 
-**`@goodnight-web/server` (and the optional `@goodnight-web/astro`)** hold the
-parts users should not edit: the Worker factory, the contact API, auth, the
-admin API and UI, security headers, and migrations. They follow semver.
+**`@goodnight-web/server`** holds the parts users should not edit: the Worker
+factory, the contact API, auth, the admin API and UI, security headers, and
+migrations. It follows semver. No `@goodnight-web/astro` package is needed
+for the admin UI ([0004](decisions/0004-admin-ui-delivery.md)).
+
+Entry points (`exports` in `packages/server/package.json`):
+
+| Import                           | Contents                                                               |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| `@goodnight-web/server`          | `createGoodnightWorker`, env and option types, admin API types         |
+| `@goodnight-web/server/contact`  | zod schemas, field limits, Turnstile action, honeypot name, spam rules |
+| `@goodnight-web/server/client`   | `getContactConfig()` and `submitContact()` for the browser (no zod)    |
+| `@goodnight-web/server/messages` | ja/en message catalogs, `translate()`, `pickLocale()`                  |
+| `migrations/`                    | D1 migrations, read through `migrations_dir`                           |
 
 **`templates/starter`** is the part users own: Astro pages, Markdown content in
 Content Collections (ja and en), `site.config.ts`, styles, a `src/worker.ts`
@@ -150,3 +277,28 @@ the Worker a token that can write to GitHub.
   tests, build, and `deploy:check`.
 - Dependencies use exact versions and a 48-hour release-age gate
   (`bunfig.toml`); Dependabot uses a two-day cooldown.
+- `bunfig.toml` pins `linker = "isolated"`, so each workspace gets its own
+  `node_modules` link to `@goodnight-web/server` and the starter's
+  `migrations_dir` path works
+  ([0002](decisions/0002-migrations-from-package.md)).
+
+## Tests
+
+- `bun test` in `packages/server` runs the unit and HTTP tests. HTTP tests
+  call the Hono app with an in-memory D1 stand-in on `bun:sqlite` with the
+  real migrations (`src/testing/sqlite-d1.ts`), a counting stand-in for the
+  Rate Limiting binding, and stubs for Turnstile siteverify and Slack. Better
+  Auth runs for real against the stand-in. The security rules in `AGENTS.md`
+  have tests: fail-closed 503s, Origin and size checks, Turnstile hostname and
+  action, rate limits, no raw IP in any table, no personal data in Slack,
+  setup closing, 401/403 on every admin route, and CSV escaping.
+- `bun run test:e2e` in `packages/server` is the end-to-end test. It applies
+  the migrations to a fresh local D1 (`.wrangler/e2e-state`), starts
+  `wrangler dev` with `e2e/wrangler.jsonc` on port 8790 (`E2E_PORT` to
+  change), and drives Chromium with a CDP virtual authenticator: contact POST
+  and the row in D1, setup, passkey registration, sign-out, passkey sign-in,
+  and the admin API. The test Worker stubs Turnstile siteverify, so it calls
+  no Cloudflare service. It needs `bunx playwright install chromium` and is
+  not run in CI yet.
+- `deploy:check` for the server package runs `wrangler deploy --dry-run` on
+  the e2e Worker to check that the package bundles for Workers.
