@@ -14,7 +14,7 @@
     "format": "bun --bun oxfmt --check .",
     "format:fix": "bun --bun oxfmt .",
     "type-check": "turbo run type-check && tsc -p tsconfig.json",
-    "test": "turbo run test",
+    "test": "turbo run test && bun test ./templates/starter/.github/scripts",
     "validate": "bun run lint && bun run format && bun run type-check && bun run test",
     "fix": "bun run lint:fix && bun run format:fix",
     "deploy:check": "turbo run deploy:check"

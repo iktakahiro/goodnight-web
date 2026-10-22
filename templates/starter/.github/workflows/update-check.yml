@@ -1,0 +1,39 @@
+# Marks pull requests as an official goodnight-web update or not, with one
+# comment in Japanese and English. Merge only pull requests that have the
+# "official goodnight-web update" comment.
+#
+# Security: this workflow uses pull_request_target, so it runs with a token
+# that can write comments. It never checks out or runs code from the pull
+# request. It checks out only .github/scripts from the base branch and reads
+# the pull request through the GitHub API. Keep it that way.
+name: Update check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: update-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the script from the base branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Classify the pull request and comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { run } = require('./.github/scripts/update-check.cjs');
+            await run({ github, context, core });
