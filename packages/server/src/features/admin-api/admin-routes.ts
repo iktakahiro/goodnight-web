@@ -6,10 +6,7 @@ import { apiError } from '../../shared/api-error.ts';
 import { getContactAvailability } from '../contact/contact-availability.ts';
 import { isSlackWebhookUrl } from '../notify/slack.ts';
 import { getRetentionDays, pruneIfDue } from '../retention/prune.ts';
-import {
-  isSubmissionStatus,
-  type SubmissionStatus,
-} from '../submissions/submission-status.ts';
+import { isSubmissionStatus } from '../submissions/submission-status.ts';
 import {
   allSubmissions,
   countUnread,
@@ -21,10 +18,9 @@ import {
   type Submission,
 } from '../submissions/submission-store.ts';
 import { requireAdmin } from '../auth/require-admin.ts';
+import { safeErrorMessage } from '../../shared/log-error.ts';
+import { exportQuerySchema, listQuerySchema } from './admin-query.ts';
 import { toCsv } from './csv.ts';
-
-/** Submissions per page in the admin list. */
-export const ADMIN_PAGE_SIZE = 50;
 
 const EXCERPT_LENGTH = 120;
 
@@ -85,13 +81,6 @@ export interface AdminStatus {
 
 const toAdminSubmission = ({ ipHash: _ipHash, ...rest }: Submission) => rest;
 
-const statusFilter = (
-  value: string | undefined,
-): SubmissionStatus | undefined | false => {
-  if (value === undefined || value === '' || value === 'all') return undefined;
-  return isSubmissionStatus(value) ? value : false;
-};
-
 const isoDate = (ms: number) => new Date(ms).toISOString();
 
 /**
@@ -100,7 +89,8 @@ const isoDate = (ms: number) => new Date(ms).toISOString();
  *
  * - `GET /me`: the signed-in admin.
  * - `GET /status`: {@link AdminStatus}.
- * - `GET /submissions?status=&page=`: {@link AdminSubmissionList}. Also runs
+ * - `GET /submissions?status=&page=&limit=`: {@link AdminSubmissionList}
+ *   (query rules in {@link listQuerySchema}; an invalid value is 400). Also runs
  *   retention pruning (throttled) in the background.
  * - `GET /submissions/:id`: one submission; marks a `new` one as read.
  * - `PATCH /submissions/:id` with `{ status }`: changes the status.
@@ -137,25 +127,19 @@ export const adminRoutes = new Hono<HonoEnv>()
     return c.json(status);
   })
   .get('/submissions', async (c) => {
-    const status = statusFilter(c.req.query('status'));
-    if (status === false) return apiError(c, 400, 'invalid_input');
-    const page = Number(c.req.query('page') ?? '1');
-    if (!Number.isInteger(page) || page < 1 || page > 100_000) {
-      return apiError(c, 400, 'invalid_input');
-    }
+    const query = listQuerySchema.safeParse(c.req.query());
+    if (!query.success) return apiError(c, 400, 'invalid_input');
+    const { status, page, limit } = query.data;
     c.executionCtx.waitUntil(
       pruneIfDue(c.env.DB).catch((error: unknown) => {
-        console.error(
-          'prune failed:',
-          error instanceof Error ? error.message : 'unknown error',
-        );
+        console.error('prune failed:', safeErrorMessage(error));
       }),
     );
     const [{ items, total }, unreadCount] = await Promise.all([
       listSubmissions(c.env.DB, {
         status,
-        limit: ADMIN_PAGE_SIZE,
-        offset: (page - 1) * ADMIN_PAGE_SIZE,
+        limit,
+        offset: (page - 1) * limit,
       }),
       countUnread(c.env.DB),
     ]);
@@ -172,16 +156,16 @@ export const adminRoutes = new Hono<HonoEnv>()
         excerpt: s.body.slice(0, EXCERPT_LENGTH),
       })),
       page,
-      pageSize: ADMIN_PAGE_SIZE,
+      pageSize: limit,
       total,
       unreadCount,
     };
     return c.json(body);
   })
   .get('/submissions.csv', async (c) => {
-    const status = statusFilter(c.req.query('status'));
-    if (status === false) return apiError(c, 400, 'invalid_input');
-    const rows = await allSubmissions(c.env.DB, status);
+    const query = exportQuerySchema.safeParse(c.req.query());
+    if (!query.success) return apiError(c, 400, 'invalid_input');
+    const rows = await allSubmissions(c.env.DB, query.data.status);
     const csv = toCsv(
       [
         'id',
