@@ -50,9 +50,11 @@ added only when a page needs real interactivity.
 
 ## Worker and bindings
 
-- `src/worker.ts` passes `locale: siteConfig.defaultLocale` and the category
-  values from `site.config.ts` to `createGoodnightWorker()`, so the allowed
-  categories are configured in one place.
+- `src/worker.ts` passes `locale: siteConfig.defaultLocale` and
+  `siteConfig.contactCategories` (values with ja/en labels) to
+  `createGoodnightWorker()`. The server accepts only those values, and the
+  admin UI shows the labels in its current language, so the categories are
+  configured in one place.
 - `wrangler.jsonc`: `main: src/worker.ts`, `compatibility_date` 2026-10-15
   with `nodejs_compat` (as in the server's e2e config), assets from `./dist`
   with `binding: ASSETS`, `not_found_handling: 404-page`, and
@@ -175,7 +177,7 @@ has to:
 Node APIs so users can run it with npm) builds the site, applies the
 migrations from `node_modules/@goodnight-web/server/migrations` to a fresh
 local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
-`E2E_PORT` (default 8791). Every secret is passed with `--var`, so a local
+`E2E_PORT` (default 8841). Every secret is passed with `--var`, so a local
 `.dev.vars` does not change the result.
 
 1. `src/worker.ts` without Turnstile keys: the home page in ja and en, the
@@ -193,7 +195,15 @@ local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
    unchanged. The test checks the ja validation messages, waits 3.5 s (the
    server holds faster submissions as `too_fast`), submits, and reads the row
    with `wrangler d1 execute DB --local`: name, email, category, message,
-   `status = new`, `page_path`, and a 64-character hex `ip_hash`.
+   `status = new`, `page_path`, and a 64-character hex `ip_hash`. Then it
+   opens `/admin` in a Japanese browser context with a CDP virtual
+   authenticator (as in `packages/server/e2e`): setup with `SETUP_TOKEN` and
+   an `ADMIN_EMAILS` address, passkey registration (one resident credential,
+   one `passkey` row, `setup_closed_at` set), sign-out (the admin API answers
+   401), passkey sign-in, the submitted inquiry in the list with the Japanese
+   category label from `site.config.ts`, the switch to English (the English
+   label), the detail (marks it read), and a status change to Done that is
+   stored in D1. It fails on any CSP violation or page error in the admin UI.
 
 `E2E_SCREENSHOT_DIR` saves screenshots. The test needs
 `npx playwright install chromium` and network access to

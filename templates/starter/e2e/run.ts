@@ -15,21 +15,31 @@
 //    (siteverify answers with hostname "example.com" and no action) and
 //    stores nothing.
 // 3. e2e/worker.ts with the test keys (see that file): validation messages,
-//    then a submission that is saved to D1.
+//    then a submission that is saved to D1. Then the admin screen in a
+//    Japanese browser with a CDP virtual authenticator: first-admin setup
+//    with SETUP_TOKEN and an ADMIN_EMAILS address -> passkey registration ->
+//    sign-out -> passkey sign-in -> the inquiry in the list with its
+//    category label -> switch to English -> the detail -> status change,
+//    stored in D1.
 //
 // Every secret is passed with --var, so a local .dev.vars does not change the
-// result. Set E2E_PORT to change the port (default 8791) and
+// result. Set E2E_PORT to change the port (default 8841) and
 // E2E_SCREENSHOT_DIR to save screenshots.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { chromium, type Browser, type Page } from 'playwright';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from 'playwright';
 
 const siteDir = resolve(import.meta.dirname, '..');
 const stateDir = join(siteDir, '.wrangler/e2e-state');
 const bin = (name: string) => join(siteDir, 'node_modules/.bin', name);
-const port = Number(process.env.E2E_PORT ?? '8791');
+const port = Number(process.env.E2E_PORT ?? '8841');
 const base = `http://localhost:${port}`;
 const screenshotDir = process.env.E2E_SCREENSHOT_DIR;
 
@@ -38,9 +48,11 @@ const screenshotDir = process.env.E2E_SCREENSHOT_DIR;
 const TEST_SITE_KEY = '1x00000000000000000000AA';
 const TEST_SECRET = '1x0000000000000000000000000000000AA';
 
+const SETUP_TOKEN = 'e2e-setup-token-0123456789';
+const ADMIN_EMAIL = 'admin@example.com';
 const baseVars = {
-  SETUP_TOKEN: 'e2e-setup-token-0123456789',
-  ADMIN_EMAILS: 'admin@example.com',
+  SETUP_TOKEN,
+  ADMIN_EMAILS: `${ADMIN_EMAIL},colleague@example.com`,
   BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
   IP_HASH_SECRET: 'e2e-ip-hash-secret',
   SLACK_WEBHOOK_URL: '',
@@ -56,6 +68,19 @@ function check(name: string, ok: boolean, detail?: unknown): void {
   if (!ok) failures++;
   const suffix = ok || detail === undefined ? '' : ` ${JSON.stringify(detail)}`;
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${suffix}`);
+}
+
+/** Runs a browser step; a timeout or a missing element counts as a failure. */
+async function step(
+  name: string,
+  action: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await action();
+    check(name, true);
+  } catch (error) {
+    check(name, false, error instanceof Error ? error.message : String(error));
+  }
 }
 
 function run(command: string, args: string[]): Promise<string> {
@@ -354,6 +379,171 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
   await page.close();
 }
 
+/**
+ * Adds a CTAP2 platform authenticator with resident keys and user
+ * verification, so passkey prompts complete without a person.
+ */
+async function addVirtualAuthenticator(context: BrowserContext, page: Page) {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  const { authenticatorId } = await cdp.send(
+    'WebAuthn.addVirtualAuthenticator',
+    {
+      options: {
+        protocol: 'ctap2',
+        transport: 'internal',
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    },
+  );
+  return async () =>
+    (await cdp.send('WebAuthn.getCredentials', { authenticatorId }))
+      .credentials;
+}
+
+async function adminFlow(browser: Browser): Promise<void> {
+  // A Japanese browser: the admin screen picks Japanese by itself.
+  const context = await browser.newContext({
+    locale: 'ja-JP',
+    viewport: { width: 1280, height: 800 },
+  });
+  // The virtual authenticator would also answer the sign-in screen's passkey
+  // autofill. Turn autofill off so the test signs in with the button.
+  await context.addInitScript(() => {
+    PublicKeyCredential.isConditionalMediationAvailable = async () => false;
+  });
+  const page = await context.newPage();
+  const credentials = await addVirtualAuthenticator(context, page);
+  const pageErrors: string[] = [];
+  page.on('console', (message) => {
+    if (/content security policy/i.test(message.text())) {
+      pageErrors.push(message.text());
+    }
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  const [submission] = await query('SELECT id FROM submissions');
+  const id = String(submission?.id);
+  const row = page.getByTestId('inquiry-row').filter({ hasText: 'E2E 訪問者' });
+
+  await step('/admin sends a new site to setup (in Japanese)', async () => {
+    await page.goto(`${base}/admin`);
+    await page.waitForURL(`${base}/admin/setup`);
+    await page.getByRole('heading', { name: '最初の管理者を作成' }).waitFor();
+  });
+  await step('setup with SETUP_TOKEN and an ADMIN_EMAILS address', async () => {
+    await page.getByLabel('セットアップトークン').fill(SETUP_TOKEN);
+    await page.getByLabel('メールアドレス').fill(ADMIN_EMAIL);
+    await page.getByLabel('お名前').fill('管理者');
+    await page.getByRole('button', { name: '次へ' }).click();
+    await page.getByRole('button', { name: 'パスキーを登録' }).waitFor();
+  });
+  await step('register a passkey', async () => {
+    await page.getByRole('button', { name: 'パスキーを登録' }).click();
+    await page
+      .getByRole('heading', { name: 'セットアップが完了しました' })
+      .waitFor();
+  });
+  const stored = await credentials();
+  check(
+    'the authenticator holds one resident credential',
+    stored.length === 1 && stored[0]?.isResidentCredential === true,
+    stored.length,
+  );
+  const passkeys = await query('SELECT COUNT(*) AS n FROM passkey');
+  check('one passkey is stored in D1', passkeys[0]?.n === 1, passkeys);
+  const closed = await query(
+    "SELECT 1 AS found FROM settings WHERE key = 'setup_closed_at'",
+  );
+  check('setup is closed in D1', closed.length === 1, closed);
+
+  await step('setup leads to the list with 1 unread', async () => {
+    await page.getByRole('button', { name: 'お問い合わせを開く' }).click();
+    await page.waitForURL(`${base}/admin`);
+    await page.getByTestId('unread-count').getByText('未読 1 件').waitFor();
+  });
+  await step('sign out', async () => {
+    await page.getByRole('button', { name: 'ログアウト' }).click();
+    await page.waitForURL(`${base}/admin/login`);
+    await page.getByRole('heading', { name: '管理画面にログイン' }).waitFor();
+  });
+  const signedOut = await page.evaluate(
+    async () => (await fetch('/api/admin/submissions')).status,
+  );
+  check(
+    'the admin API answers 401 after sign-out',
+    signedOut === 401,
+    signedOut,
+  );
+
+  await step('sign in with the passkey', async () => {
+    await page.getByRole('button', { name: 'パスキーでログイン' }).click();
+    await page.waitForURL(`${base}/admin`);
+  });
+  await step(
+    'the inquiry from the form is in the list with the Japanese category label',
+    async () => {
+      await row.waitFor();
+      await row.getByText('サービスについて', { exact: true }).waitFor();
+      await row.getByText('テーブルの修理について相談したいです。').waitFor();
+      await page.getByTestId('unread-count').getByText('未読 1 件').waitFor();
+    },
+  );
+  if (screenshotDir) {
+    // Let the unread badge finish its color transition.
+    await sleep(500);
+    await screenshot(page, 'starter-admin-list-ja.png');
+  }
+
+  await step('switch the admin screen to English', async () => {
+    await page.getByRole('button', { name: /^言語/ }).click();
+    await page.getByRole('menuitemradio', { name: 'English' }).click();
+    // A radio item keeps the menu open.
+    await page.keyboard.press('Escape');
+    await page.getByRole('menu').waitFor({ state: 'hidden' });
+    await page.getByRole('heading', { name: 'Inquiries' }).waitFor();
+    await row.getByText('Our services', { exact: true }).waitFor();
+  });
+  await step('open the detail, which marks the inquiry read', async () => {
+    await row.click();
+    await page.waitForURL(`${base}/admin/inquiries/${id}`);
+    await page.getByRole('heading', { name: 'E2E 訪問者' }).waitFor();
+    await page
+      .getByTestId('inquiry-body')
+      .getByText('Hello from the end-to-end test.')
+      .waitFor();
+    await page.getByText('Our services', { exact: true }).waitFor();
+    await page.getByTestId('status-select').getByText('Read').waitFor();
+    await page.getByTestId('unread-count').getByText('0 unread').waitFor();
+  });
+  await step('change the status to Done', async () => {
+    await page.getByTestId('status-select').click();
+    await page.getByRole('option', { name: 'Done' }).click();
+    await page.getByText('Status changed to “Done”.').waitFor();
+  });
+  const status = await query(
+    `SELECT status FROM submissions WHERE id = '${id}'`,
+  );
+  check('the new status is stored in D1', status[0]?.status === 'done', status);
+  check(
+    'no CSP violations or page errors in the admin screen',
+    pageErrors.length === 0,
+    pageErrors,
+  );
+  if (screenshotDir) {
+    // Wait for the toast to close so it does not cover the page.
+    await page
+      .getByText('Status changed to “Done”.')
+      .waitFor({ state: 'hidden', timeout: 10_000 })
+      .catch(() => {});
+    await screenshot(page, 'starter-admin-detail-en.png');
+  }
+  await context.close();
+}
+
 async function main(): Promise<void> {
   if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
   await run(bin('astro'), ['build']);
@@ -387,6 +577,7 @@ async function main(): Promise<void> {
     dev = await startDev({ ...baseVars, ...testTurnstile }, 'e2e/worker.ts');
     try {
       await acceptedSubmission(browser);
+      await adminFlow(browser);
     } finally {
       await stopDev(dev);
     }

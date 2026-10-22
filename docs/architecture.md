@@ -366,8 +366,10 @@ the Worker a token that can write to GitHub.
   parameter, list query parsing, and the message catalogs.
 - `bun run test:e2e` in `templates/starter` runs the starter against
   `wrangler dev` with Cloudflare's Turnstile test keys: pages, the
-  not-available state and 503, `/admin`, and a form submission saved to D1.
-  See [starter.md](starter.md#end-to-end-test).
+  not-available state and 503, a form submission saved to D1, then the admin
+  UI in a real browser: setup, passkey registration, sign-out, passkey
+  sign-in, the inquiry in the list with its category label, the detail, and a
+  status change. See [starter.md](starter.md#end-to-end-test).
 - `deploy:check` for the server package runs `wrangler deploy --dry-run` on
   the e2e Worker to check that the package bundles for Workers.
 
