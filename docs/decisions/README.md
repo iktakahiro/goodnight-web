@@ -15,3 +15,4 @@ record; supersede it with a new one and link both ways.
 | [0002](0002-migrations-from-package.md) | Ship D1 migrations inside `@goodnight-web/server`         | accepted |
 | [0003](0003-rate-limit-binding.md)      | Rate-limit the contact API with the Rate Limiting binding | accepted |
 | [0004](0004-admin-ui-delivery.md)       | Deliver the admin UI from the Worker bundle               | accepted |
+| [0005](0005-drizzle-orm.md)             | Drizzle ORM for D1 access and migrations                  | accepted |
