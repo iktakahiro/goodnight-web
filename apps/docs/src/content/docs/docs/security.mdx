@@ -101,12 +101,11 @@ The server never puts input into SQL text.
 
 - Every query uses the [Drizzle ORM](https://orm.drizzle.team/) query builder. Values, including the page size and offset of the admin list, are sent to D1 as bound parameters.
 - Numbers from the URL are checked at the route before they reach a query. `page` must be 1 to 100,000 and `limit` 1 to 100, written with digits only. Values such as `1; DROP TABLE submissions`, `-1`, `1e9`, or `50 OFFSET 0` get a 400 response.
-- Raw SQL is allowed only through Drizzle's `sql` template, which also binds its values. A check in CI fails when the server code calls `sql.raw()` or D1's `prepare()` directly.
+- Raw SQL is allowed only through Drizzle's `sql` template, which also binds its values. A check in CI fails when the server code calls `sql.raw()` or D1's `prepare()` directly, or reaches the D1 binding through Drizzle's `$client` (`bun run check:sql`; see [Database and migrations](/docs/database/#how-queries-are-written)).
 - The email search escapes `%`, `_`, and `\` and sends the pattern as one bound parameter, with `ESCAPE '\'`.
 - Tests send injection strings to the admin list and check the 400 responses, and record the statements sent to the database to check that input appears only in the parameters.
 
-```ts
-// packages/server/src/features/admin-api/admin-query.ts
+```ts title="packages/server/src/features/admin-api/admin-query.ts"
 const boundedInteger = (max: number) =>
   z
     .string()
@@ -114,32 +113,31 @@ const boundedInteger = (max: number) =>
     .regex(/^[1-9][0-9]*$/)
     .transform(Number)
     .pipe(z.number().int().min(1).max(max));
-
-export const listQuerySchema = z.strictObject({
-  view: viewParam, // unread, read, all, or spam
-  q: emailSearchParam, // at most 254 characters
-  dir: z.enum(['asc', 'desc']).default('desc'),
-  page: boundedInteger(ADMIN_MAX_PAGE).default(1),
-  limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
-  // ... and the version and option filters
-});
-
-// packages/server/src/features/submissions/submission-store.ts
-orm
-  .select()
-  .from(submissions)
-  .where(and(viewIs(view), email ? emailContains(email) : undefined))
-  .orderBy(by(submissions.createdAt), by(submissions.id))
-  .limit(limit)
-  .offset(offset);
 ```
 
+```ts title="packages/server/src/features/admin-api/admin-query.ts"
+export const listQuerySchema = z
+  .strictObject({
+    ...filterShape,
+    dir: z.enum(['asc', 'desc']).default('desc'),
+    page: boundedInteger(ADMIN_MAX_PAGE).default(1),
+    limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
+  })
+  .refine(bothOrNeither);
+```
+
+`filterShape` holds `view` (`unread`, `read`, `all`, or `spam`), `q` (the email search, at most 254 characters), and the version and option filters, each with its own zod schema. The store then builds the query with Drizzle (see [Database and migrations](/docs/database/#how-queries-are-written)). For `?view=unread&q=50%_off&page=3`, the test suite's recording D1 shows this statement and these parameters:
+
 ```sql
-select "id", "created_at", ... from "submissions"
+select "id", "created_at", "email", "status", "suspected_spam", ... from "submissions"
 where (("submissions"."status" = ? and "submissions"."suspected_spam" = ?)
   and lower("submissions"."email") like ? escape '\')
 order by "submissions"."created_at" desc, "submissions"."id" desc
 limit ? offset ?
+```
+
+```json
+["unread", 0, "%50\\%\\_off%", 50, 100]
 ```
 
 The SQL text is the same for every search term, page, and page size; only the parameters change. See [Database and migrations](/docs/database/).

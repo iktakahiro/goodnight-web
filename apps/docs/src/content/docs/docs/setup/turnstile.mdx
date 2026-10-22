@@ -56,7 +56,7 @@ Set it only there. The contact page does not contain the key; it reads the key f
 For each submission, the Worker sends the token from the form to siteverify and accepts it only if:
 
 - `success` is true,
-- `hostname` is your site's hostname, and
+- `hostname` is your site's hostname (the hostname the request came to, or one of the hostnames in the `contact.turnstileHostnames` option of `createGoodnightWorker()`), and
 - `action` is the action that the contact form sets.
 
 A token is valid for 300 seconds and can be verified only once ([Cloudflare: server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)). If the check fails, the reply is 400 and nothing is saved. [Contact form protection](/docs/how-it-works/contact-protection/) describes the other checks.

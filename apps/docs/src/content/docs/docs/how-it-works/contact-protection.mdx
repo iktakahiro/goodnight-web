@@ -25,30 +25,81 @@ There are three layers. Turnstile keeps most bots out. The honeypot and the spam
 
 The form has a text field that people cannot see: it is moved off screen, hidden from screen readers (`aria-hidden`), and skipped by the Tab key (`tabindex="-1"`). Some bots fill in every field.
 
-```html title="templates/starter/src/features/contact/contact-form.astro"
-<input
-  id="contact-gnw-hp-x"
-  name="gnw_hp_x"
-  data-contact-honeypot
-  type="text"
-  tabindex="-1"
-  autocomplete="off"
-  data-1p-ignore
-  data-lpignore="true"
-  data-bwignore
-  data-form-type="other"
-/>
+```astro title="templates/starter/src/features/contact/contact-form.astro"
+<div
+  class='absolute -left-[9999px] h-px w-px overflow-hidden'
+  aria-hidden='true'
+>
+  <label for='contact-gnw-hp-x'>{text.honeypot}</label>
+  <input
+    id='contact-gnw-hp-x'
+    name='gnw_hp_x'
+    data-contact-honeypot
+    type='text'
+    tabindex='-1'
+    autocomplete='off'
+    data-1p-ignore
+    data-lpignore='true'
+    data-bwignore
+    data-form-type='other'
+  />
+</div>
 ```
 
 - The field is named `gnw_hp_x`, a name that means nothing to browsers and password managers. A name such as `website` or `url` invites autofill, and an autofilled honeypot would flag a real person's inquiry. `autocomplete="off"` and the `data-*` attributes ask the common password managers (1Password, LastPass, Bitwarden, and others) to leave the field alone.
 - A filled honeypot does not change the response. The submission still needs a valid Turnstile token, counts against the rate limit, and must pass validation, exactly like any other. If it passes, it is saved with the reason `honeypot`. If it does not, the client gets the same error as without the honeypot, and nothing is saved. A bot cannot tell from the response that it hit the trap.
 - The value of the honeypot field itself is never stored.
 
+The server only notes whether the field is filled and carries on:
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+// 2. Honeypot: note it and carry on. A filled honeypot changes nothing
+//    in the response; the submission still needs Turnstile, counts
+//    against the rate limit, and must validate before it is stored as
+//    suspected spam (docs/decisions/0009).
+const honeypotValue = input[CONTACT_HONEYPOT_FIELD];
+const honeypot =
+  typeof honeypotValue === 'string' && honeypotValue.trim() !== '';
+```
+
 ### 2. Turnstile
 
 Cloudflare Turnstile runs in the page and gives the form a token. The Worker sends the token to siteverify and checks `success`, the `hostname` (the site's own host), and the `action` (`contact`). Without this server-side call, a bot could skip the widget. Checking `hostname` and `action` stops a token made for another site or another form from being reused here.
 
-Turnstile fails closed: without `TURNSTILE_SECRET` and `TURNSTILE_SITE_KEY`, the contact API answers 503 and the form says it is not available yet. See [Set up Turnstile](/docs/setup/turnstile/).
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+const turnstile = await verifyTurnstile({
+  secret: turnstileSecret,
+  token,
+  remoteIp: ip,
+  hostnames: options.contact.turnstileHostnames ?? [
+    new URL(c.req.url).hostname,
+  ],
+  action: CONTACT_TURNSTILE_ACTION,
+});
+if (!turnstile.ok) {
+  console.warn(`contact: turnstile rejected (${turnstile.reason})`);
+  return apiError(c, 400, 'turnstile_failed');
+}
+```
+
+By default the only accepted hostname is the one the request came to. A site that serves the form on more than one hostname can list them in the `contact.turnstileHostnames` option of `createGoodnightWorker()`. `verifyTurnstile()` counts a network error, a non-200 answer, or a body it does not expect as a failure, and then checks the three fields:
+
+```ts title="packages/server/src/features/contact/turnstile.ts"
+const result = body as Record<string, unknown>;
+if (result.success !== true) return { ok: false, reason: 'not_success' };
+if (
+  typeof result.hostname !== 'string' ||
+  !expected.hostnames.includes(result.hostname)
+) {
+  return { ok: false, reason: 'hostname_mismatch' };
+}
+if (result.action !== expected.action) {
+  return { ok: false, reason: 'action_mismatch' };
+}
+return { ok: true };
+```
+
+Turnstile fails closed: without `TURNSTILE_SECRET` and `TURNSTILE_SITE_KEY`, the contact API answers 503 and the form says it is not available yet. The same happens when `IP_HASH_SECRET` or the Rate Limiting binding is missing, because the rate limit cannot run without them. See [Set up Turnstile](/docs/setup/turnstile/).
 
 ### 3. Rule-based spam score
 
@@ -60,7 +111,29 @@ After validation, `scoreSubmission()` in `spam-score.ts` adds points with a few 
 | `link_in_field`      | 3                                                     | A link in any one-line `text` field, such as a name or company |
 | `too_fast`           | 3                                                     | Sent less than 3 seconds after the form was shown              |
 
-`url` fields are expected to hold links and are not counted. A score of 3 or more (`SPAM_SUSPECT_THRESHOLD`) flags the submission as suspected spam. One link in a message does not; three links, a link in the name field, or a form sent in under 3 seconds do. The score and the reasons (`spam_reasons`, together with `honeypot` when the trap was hit) are stored and shown in the inquiry detail.
+```ts title="packages/server/src/features/contact/spam-score.ts"
+const links = textOf('textarea').join('\n').match(LINKS)?.length ?? 0;
+if (links > 0) {
+  score += Math.min(links, 3);
+  reasons.push(`links:${links}`);
+}
+if (textOf('text').some((value) => HAS_LINK.test(value))) {
+  score += 3;
+  reasons.push('link_in_field');
+}
+if (elapsedMs !== undefined && elapsedMs < SPAM_MIN_ELAPSED_MS) {
+  score += 3;
+  reasons.push('too_fast');
+}
+return { score, reasons };
+```
+
+`url` fields are expected to hold links and are not counted. A score of 3 or more (`SPAM_SUSPECT_THRESHOLD`) flags the submission as suspected spam. One link in a message does not; three or more links, a link in the name field, or a form sent in under 3 seconds do. The score and the reasons (`spam_reasons`, together with `honeypot` when the trap was hit) are stored and shown in the inquiry detail:
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+const suspectedSpam = honeypot || spam.score >= SPAM_SUSPECT_THRESHOLD;
+const spamReasons = honeypot ? ['honeypot', ...spam.reasons] : spam.reasons;
+```
 
 ## Why it is built this way
 

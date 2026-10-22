@@ -6,18 +6,20 @@ description: Guides and reference for goodnight-web, a company website template 
 
 <Callout type='warn'>
   goodnight-web is in development (M1) and not published yet. The pages below
-  describe the planned design. Anything not tested end to end is marked **Draft
-  / not verified yet**.
+  describe the code in the repository, which is tested locally. Anything not
+  tested on a real Cloudflare deployment is marked **Draft / not verified yet**.
 </Callout>
 
 ## Start here
 
 - [Getting started](/docs/getting-started/): create your copy with the Deploy to Cloudflare button, enter the secrets, and create the first admin (draft).
 - [Set up Turnstile](/docs/setup/turnstile/): create the Turnstile widget. The contact form does not accept submissions until you do.
+- [Customizing the contact form](/docs/contact-form/): editing the fields in the admin screen, versions and history, the inquiry list, and the CSV export.
 
 ## Concepts
 
 - [Architecture](/docs/architecture/): the parts of one site and the path of a contact submission.
+- [Database and migrations](/docs/database/): the D1 tables, how queries are written, and how migrations reach your site and run.
 - [Distribution and updates](/docs/distribution/): the npm package, the starter you own, Dependabot updates, and why your repository must be private.
 - [How it works](/docs/how-it-works/): one page per design decision, such as passkeys and deleting old data without Cron.
 

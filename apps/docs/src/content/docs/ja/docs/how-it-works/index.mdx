@@ -3,11 +3,9 @@ title: しくみの詳細
 description: goodnight-web の部品ごとに、何をするのか、なぜそう作るのかを 1 ページずつ説明します。
 ---
 
-<Callout type='info'>
-  これらのページは、要件定義に書いた設計を説明しています。コードの抜粋は、サーバーのパッケージができたら追加します。
-</Callout>
+どのページも、その部品が何をするか、それを行うコード（抜粋の上にファイルのパスを書いています）、なぜそう作るかを説明します。抜粋は短く、リポジトリからそのまま写したものです。ファイル全体はパスをたどって読んでください。
 
-- [問い合わせフォームの保護](/ja/docs/how-it-works/contact-protection/): サーバー側での Turnstile の検証、honeypot、Rate Limiting binding。
+- [問い合わせフォームの保護](/ja/docs/how-it-works/contact-protection/): サーバー側での Turnstile の検証、honeypot、ルールによるスパムスコア、Rate Limiting binding。
 - [パスキーでのログイン](/ja/docs/how-it-works/passkeys/): 管理者がパスワードではなくパスキーを使う理由。
 - [最初の管理者の作成](/ja/docs/how-it-works/first-admin/): `SETUP_TOKEN` と `ADMIN_EMAILS` で、知らない人が最初の管理者になるのを防ぐしくみ。
 - [Cron を使わない古いデータの削除](/ja/docs/how-it-works/data-pruning/): 定期実行のジョブなしで保持期間を守るしくみ。

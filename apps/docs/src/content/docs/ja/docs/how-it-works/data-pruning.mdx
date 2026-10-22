@@ -3,10 +3,6 @@ title: Cron を使わない古いデータの削除
 description: 保持期間（既定は 180 日）を過ぎた問い合わせは、ふだんのリクエストの中で、多くても 1 時間に 1 回削除します。定期実行のジョブは使いません。
 ---
 
-<Callout type='info'>
-  コードの抜粋は、サーバーのパッケージができたら追加します。
-</Callout>
-
 ## 何をするか
 
 - 問い合わせは保持期間（既定は 180 日）だけ残します。
@@ -15,6 +11,40 @@ description: 保持期間（既定は 180 日）を過ぎた問い合わせは�
 - `created_at` のインデックスがあるので、削除は速く済みます。
 - 同じ削除で、Better Auth の `verification` テーブルにある期限切れの行も消します。パスキーでログインしようとするたびに、ここへチャレンジを書き込みます。使ったチャレンジはすぐ消えますが、途中でやめたものは残り続けてしまいます。チャレンジは数分で期限が切れ、ログインには回数制限があるので、インデックスがなくてもテーブルは小さいままです。
 - 管理者は問い合わせを手動で削除したり、CSV で書き出したりもできます。書き出しは 1 回のクエリで 200 行ずつ読んで順に送り出すので、表が大きくても同じように動きます。
+
+## コードでは
+
+問い合わせ API は、応答を用意したあとで削除を始めます。`runInBackground()` は処理を `ctx.waitUntil` に渡し、失敗してもログに書くだけで応答は変えません。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+runInBackground(c, 'prune', () => pruneIfDue(env.DB, now));
+return c.json({ ok: true });
+```
+
+`pruneIfDue()` は、まず `last_cleanup_at` を条件付きの upsert で 1 回だけ更新し、削除を実行する権利を取ります。保存されている時刻が 1 時間以上前のときだけ更新するので、2 つのリクエストが同時に来ても、削除するのは片方だけです。保持期間は `settings.retention_days` から読みます（1〜3,650 日。ないときや不正な値のときは 180 日）。
+
+```ts title="packages/server/src/features/retention/prune.ts"
+const orm = getDatabase(db);
+const claim = await orm
+  .insert(settings)
+  .values({ key: 'last_cleanup_at', value: String(now) })
+  .onConflictDoUpdate({
+    target: settings.key,
+    set: { value: sql`excluded.value` },
+    setWhere: lte(
+      sql`cast(${settings.value} as integer)`,
+      now - PRUNE_INTERVAL_MS,
+    ),
+  });
+if (claim.meta.changes === 0) return { ran: false };
+const retentionDays = await getRetentionDays(db);
+const result = await orm
+  .delete(submissions)
+  .where(lt(submissions.createdAt, now - retentionDays * DAY_MS));
+const verifications = await orm
+  .delete(verification)
+  .where(lt(verification.expiresAt, new Date(now)));
+```
 
 ## なぜこう作るか
 
