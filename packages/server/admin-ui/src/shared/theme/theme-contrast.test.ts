@@ -71,6 +71,9 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['ring', 'background', UI],
   ['primary', 'accent', TEXT],
   ['logo-moon', 'logo-tile', UI],
+  ['link', 'background', TEXT],
+  ['link', 'card', TEXT],
+  ['link', 'muted', TEXT],
 ];
 
 describe('admin theme contrast (WCAG AA)', () => {

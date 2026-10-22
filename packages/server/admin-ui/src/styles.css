@@ -3,9 +3,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * The admin theme: deep navy-violet on light, soft surfaces. The light values
- * live in @theme; `.dark` on <html> swaps them for the dark values below
- * (public/theme-init.js sets the class before the first paint). Keep every
+ * The admin theme: near-black with a faint indigo tint on neutral, light
+ * surfaces. The light values live in @theme; `.dark` on <html> swaps them for
+ * the dark values below (public/theme-init.js sets the class before the first
+ * paint). Keep every
  * color a 6-digit hex value: theme-contrast.test.ts reads this file and
  * checks the WCAG AA contrast of the main pairs in both modes.
  */
@@ -18,45 +19,46 @@
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
-  --color-background: #f5f6fb;
-  --color-foreground: #1b1f3f;
+  --color-background: #f7f7f9;
+  --color-foreground: #171922;
   --color-card: #ffffff;
-  --color-card-foreground: #1b1f3f;
+  --color-card-foreground: #171922;
   --color-popover: #ffffff;
-  --color-popover-foreground: #1b1f3f;
-  --color-muted: #eef0f7;
-  --color-muted-foreground: #525979;
-  --color-primary: #2f3482;
-  --color-primary-hover: #24286a;
+  --color-popover-foreground: #171922;
+  --color-muted: #f0f1f4;
+  --color-muted-foreground: #5b5e6c;
+  --color-primary: #1a1d2e;
+  --color-primary-hover: #2c3047;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #e8eaf7;
-  --color-secondary-foreground: #262b6b;
-  --color-accent: #e8eaf8;
-  --color-accent-foreground: #23286a;
-  --color-border: #dde0ee;
-  --color-input: #858bb0;
-  --color-ring: #5a60c8;
-  --color-overlay: #0d1030;
-  --color-destructive: #b42343;
-  --color-destructive-hover: #981c37;
+  --color-secondary: #eeeff3;
+  --color-secondary-foreground: #1f2232;
+  --color-accent: #ececf2;
+  --color-accent-foreground: #1a1d2e;
+  --color-border: #e3e4ea;
+  --color-input: #868a98;
+  --color-ring: #7a7fa3;
+  --color-overlay: #0c0d13;
+  --color-destructive: #b0303f;
+  --color-destructive-hover: #932634;
   --color-destructive-foreground: #ffffff;
-  --color-destructive-soft: #fdf0f3;
-  --color-destructive-border: #f0c3cd;
-  --color-warning-soft: #fdf5e2;
-  --color-warning-border: #ead199;
-  --color-warning-foreground: #693f0c;
-  --color-warning-icon: #a35d07;
-  --color-success-soft: #eaf6ef;
-  --color-success-border: #b6dfc6;
-  --color-success-foreground: #1a5f3d;
-  --color-info-soft: #ecebfe;
-  --color-info-border: #c6c3f4;
-  --color-info-foreground: #37309b;
-  --color-logo-tile: #e4e6fa;
-  --color-logo-moon: #2f3482;
-  --color-logo-star: #7f86e3;
-  --color-glow: #dfe2fb;
-  --color-selection: #cfd3f7;
+  --color-destructive-soft: #fbf1f2;
+  --color-destructive-border: #efcdd1;
+  --color-warning-soft: #faf5ea;
+  --color-warning-border: #e6d5ad;
+  --color-warning-foreground: #674814;
+  --color-warning-icon: #9a6510;
+  --color-success-soft: #eef5f1;
+  --color-success-border: #c4dccf;
+  --color-success-foreground: #2a5a41;
+  --color-info-soft: #ecedf9;
+  --color-info-border: #c8cbea;
+  --color-info-foreground: #353b78;
+  --color-link: #363d6e;
+  --color-logo-tile: #1a1d2e;
+  --color-logo-moon: #eef0f6;
+  --color-logo-star: #9da2c4;
+  --color-glow: #ededf3;
+  --color-selection: #d8dae6;
 
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
@@ -65,7 +67,7 @@
   --radius-2xl: 1.5rem;
 
   --shadow-soft:
-    0 1px 2px rgb(27 31 63 / 0.05), 0 4px 16px rgb(27 31 63 / 0.06);
+    0 1px 2px rgb(23 25 34 / 0.05), 0 4px 16px rgb(23 25 34 / 0.06);
 }
 
 @layer base {
@@ -73,49 +75,50 @@
     color-scheme: light;
   }
 
-  /* Dark mode: a deep navy background, not black. */
+  /* Dark mode: near-black with a faint blue tint, not pure black. */
   :root.dark {
     color-scheme: dark;
-    --color-background: #0f1330;
-    --color-foreground: #e4e6f6;
-    --color-card: #171c3f;
-    --color-card-foreground: #e4e6f6;
-    --color-popover: #1c2248;
-    --color-popover-foreground: #e4e6f6;
-    --color-muted: #1f2549;
-    --color-muted-foreground: #a6acd0;
-    --color-primary: #a9aefc;
-    --color-primary-hover: #c0c4ff;
-    --color-primary-foreground: #12163a;
-    --color-secondary: #242a55;
-    --color-secondary-foreground: #dfe2fb;
-    --color-accent: #272e5e;
-    --color-accent-foreground: #e2e5ff;
-    --color-border: #2b3262;
-    --color-input: #6b72a6;
-    --color-ring: #9ea4f6;
-    --color-overlay: #03050f;
-    --color-destructive: #f28b9e;
-    --color-destructive-hover: #f6a6b5;
-    --color-destructive-foreground: #2b0a14;
-    --color-destructive-soft: #36172d;
-    --color-destructive-border: #6e3049;
-    --color-warning-soft: #312811;
-    --color-warning-border: #6b5222;
-    --color-warning-foreground: #f2d48e;
-    --color-warning-icon: #e6b350;
-    --color-success-soft: #112f2a;
-    --color-success-border: #2a6451;
-    --color-success-foreground: #a0dfc0;
-    --color-info-soft: #252a68;
-    --color-info-border: #4a50a8;
-    --color-info-foreground: #d3d5ff;
-    --color-logo-tile: #272e5e;
-    --color-logo-moon: #c3c7ff;
-    --color-logo-star: #8a90e8;
-    --color-glow: #1f2656;
-    --color-selection: #3b4290;
-    --shadow-soft: 0 1px 2px rgb(3 5 15 / 0.3), 0 4px 16px rgb(3 5 15 / 0.35);
+    --color-background: #111318;
+    --color-foreground: #e6e7ec;
+    --color-card: #181a21;
+    --color-card-foreground: #e6e7ec;
+    --color-popover: #1d2028;
+    --color-popover-foreground: #e6e7ec;
+    --color-muted: #1f2129;
+    --color-muted-foreground: #a2a5b2;
+    --color-primary: #e6e8f0;
+    --color-primary-hover: #f6f7fa;
+    --color-primary-foreground: #14161d;
+    --color-secondary: #22252e;
+    --color-secondary-foreground: #e3e5ec;
+    --color-accent: #262932;
+    --color-accent-foreground: #eceef4;
+    --color-border: #2a2d37;
+    --color-input: #6a6e7d;
+    --color-ring: #9095b5;
+    --color-overlay: #040508;
+    --color-destructive: #ef8f9c;
+    --color-destructive-hover: #f4abb5;
+    --color-destructive-foreground: #2a0d13;
+    --color-destructive-soft: #2c1a1e;
+    --color-destructive-border: #5c3038;
+    --color-warning-soft: #272216;
+    --color-warning-border: #584826;
+    --color-warning-foreground: #ecd49c;
+    --color-warning-icon: #d9ae5c;
+    --color-success-soft: #16251f;
+    --color-success-border: #2d4d3f;
+    --color-success-foreground: #a8d8bf;
+    --color-info-soft: #1e2236;
+    --color-info-border: #3d4470;
+    --color-info-foreground: #ccd1f2;
+    --color-link: #c3c8e6;
+    --color-logo-tile: #2a2e3b;
+    --color-logo-moon: #e6e8f0;
+    --color-logo-star: #8d92b0;
+    --color-glow: #171a22;
+    --color-selection: #3a3e52;
+    --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.35);
   }
 
   *,

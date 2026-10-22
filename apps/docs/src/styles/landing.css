@@ -26,12 +26,12 @@
   background:
     radial-gradient(
       ellipse at 85% 15%,
-      color-mix(in oklab, var(--color-fd-primary) 16%, transparent),
+      color-mix(in oklab, var(--hero-tint) 70%, transparent),
       transparent 55%
     ),
     radial-gradient(
       ellipse at 10% 90%,
-      color-mix(in oklab, var(--hero-glow) 30%, transparent),
+      color-mix(in oklab, var(--hero-glow) 60%, transparent),
       transparent 50%
     );
 }

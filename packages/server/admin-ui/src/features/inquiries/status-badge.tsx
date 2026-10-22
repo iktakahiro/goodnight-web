@@ -4,7 +4,7 @@ import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { Badge } from '../../shared/ui/badge.tsx';
 
 const TONE = {
-  new: 'violet',
+  new: 'indigo',
   read: 'slate',
   done: 'mint',
   held: 'amber',

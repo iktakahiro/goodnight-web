@@ -357,7 +357,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
               >
                 <a
                   href={`mailto:${item.email}`}
-                  className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
+                  className='rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
                 >
                   {item.email}
                 </a>
@@ -377,7 +377,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                 >
                   <a
                     href={`tel:${item.phone}`}
-                    className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
+                    className='rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
                   >
                     {item.phone}
                   </a>
