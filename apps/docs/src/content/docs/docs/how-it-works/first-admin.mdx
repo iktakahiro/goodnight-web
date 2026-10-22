@@ -14,6 +14,16 @@ Right after a deploy, the site has no admin. The setup endpoint `/api/setup` cre
 
 Setup attempts are also rate-limited, and setup is turned off when the rate limit cannot run (the Rate Limiting binding or `IP_HASH_SECRET` is missing). `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters; with a shorter value, setup stays off and the setup screen names the setting. The new admin is signed in and then registers a passkey. Once the first passkey is registered, the setup endpoint closes and stays closed, even if every passkey is deleted later. Until then, setup can run again, so a person who left before registering a passkey is not locked out.
 
+Setup counts as closed when `settings.setup_closed_at` exists or any passkey exists. The first passkey registration writes `setup_closed_at` itself (see [Sessions](#sessions)), and a database trigger writes it as well whenever a passkey row is inserted, so the mark stays even if every passkey is deleted later:
+
+```sql title="packages/server/migrations/0002_setup_closed_trigger.sql"
+CREATE TRIGGER `passkey_closes_setup` AFTER INSERT ON `passkey`
+BEGIN
+  INSERT OR IGNORE INTO `settings` (`key`, `value`)
+    VALUES ('setup_closed_at', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+END;
+```
+
 The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session from setup alone is only good for registering the first passkey.
 
 ## Sessions [#sessions]
@@ -27,31 +37,21 @@ Someone else who had the token earlier could have run setup with the same addres
 - Once setup is closed, a user without a passkey cannot register one.
 - The admin API rejects (401) a session created before the user's first passkey. Registering another passkey needs such a session too, so an old setup session cannot add a passkey either.
 
-```ts
-// packages/server/src/features/setup/first-passkey.ts
-export const beforePasskeySaved = async (
-  db: D1Database,
-  { userId, sessionCreatedAt, request }: PasskeyRegistration,
-): Promise<void> => {
-  const state = await checkPasskeySession(
-    db,
-    userId,
-    sessionCreatedAt ?? new Date(0),
-  );
-  if (state === 'ok') return;
-  if (state === 'too_old') {
-    throw new APIError('UNAUTHORIZED', { message: 'passkey session required' });
-  }
-  if (await isSetupClosed(db)) {
-    throw new APIError('FORBIDDEN', { message: 'setup closed' });
-  }
-  const claim = await claimSetup(db);
-  if (!claim) throw new APIError('FORBIDDEN', { message: 'setup closed' });
-  claims.set(request, claim);
-  await getDatabase(db).delete(sessionTable);
-};
+Just before the first passkey is saved, the passkey registration hook does this:
 
-// packages/server/src/features/setup/setup-state.ts
+```ts title="packages/server/src/features/setup/first-passkey.ts"
+if (await isSetupClosed(db)) {
+  throw new APIError('FORBIDDEN', { message: 'setup closed' });
+}
+const claim = await claimSetup(db);
+if (!claim) throw new APIError('FORBIDDEN', { message: 'setup closed' });
+claims.set(request, claim);
+await getDatabase(db).delete(sessionTable);
+```
+
+The claim is one `INSERT ... ON CONFLICT DO NOTHING` statement. Only the registration that writes the row wins:
+
+```ts title="packages/server/src/features/setup/setup-state.ts"
 export const claimSetup = async (db: D1Database): Promise<string | null> => {
   const value = String(Date.now());
   const rows = await getDatabase(db)
@@ -61,8 +61,11 @@ export const claimSetup = async (db: D1Database): Promise<string | null> => {
     .returning({ value: settings.value });
   return rows.length === 1 ? value : null;
 };
+```
 
-// packages/server/src/features/auth/passkey-session.ts
+The admin API compares the session's creation time with the user's first passkey:
+
+```ts title="packages/server/src/features/auth/passkey-session.ts"
 const first = await getDatabase(db)
   .select({ createdAt: passkey.createdAt })
   .from(passkey)

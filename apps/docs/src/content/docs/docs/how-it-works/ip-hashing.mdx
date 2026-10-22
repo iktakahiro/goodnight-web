@@ -3,15 +3,53 @@ title: No raw IP addresses
 description: goodnight-web never stores or logs a visitor's IP address. It stores HMAC-SHA256(ip, IP_HASH_SECRET), which is enough for rate limiting and spotting repeat senders.
 ---
 
-<Callout type='info'>
-  Code excerpts will be added once the server package lands.
-</Callout>
-
 ## What it does
 
 - For each contact submission, the Worker computes `ip_hash = HMAC-SHA256(ip, IP_HASH_SECRET)`.
 - Only `ip_hash` is stored in D1. The raw IP address is never written to D1 and never logged.
 - The Rate Limiting binding uses `ip_hash` as its key.
+
+## In the code
+
+The contact API reads the IP address from the `cf-connecting-ip` header and keeps only its hash. The raw value is passed to nothing else but Turnstile siteverify, as `remoteip`:
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+const ip = c.req.header('cf-connecting-ip');
+const ipHash = await hmacSha256Hex(ipHashSecret, ip ?? 'unknown');
+```
+
+`hmacSha256Hex()` uses the Web Crypto API that Workers provide:
+
+```ts title="packages/server/src/shared/crypto.ts"
+export const hmacSha256Hex = async (
+  secret: string,
+  message: string,
+): Promise<string> => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(message),
+  );
+  return [...new Uint8Array(signature)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+};
+```
+
+The same hash is the rate limit key. Setup and passkey sign-in use it too, with a prefix (`setup:` or `auth:`), so each has its own counter:
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+// 4. Rate limit per ip_hash.
+const { success } = await limiter.limit({ key: ipHash });
+if (!success) return apiError(c, 429, 'rate_limited');
+```
 
 ## Why it is built this way
 

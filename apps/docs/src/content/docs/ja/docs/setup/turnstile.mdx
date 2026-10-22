@@ -56,7 +56,7 @@ starter では、サイトキーを `wrangler.jsonc` に書きます。変更を
 Worker は送信のたびに、フォームから届いたトークンを siteverify に送り、次をすべて満たすときだけ受け付けます。
 
 - `success` が true である。
-- `hostname` があなたのサイトのホスト名である。
+- `hostname` があなたのサイトのホスト名である（リクエストが来たホスト名か、`createGoodnightWorker()` の `contact.turnstileHostnames` オプションに並べたホスト名のどれか）。
 - `action` が問い合わせフォームで設定した action である。
 
 トークンの有効期限は 300 秒で、検証できるのは 1 回だけです（[Cloudflare: サーバー側の検証](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)）。確認に失敗したら 400 を返し、何も保存しません。ほかの確認については[問い合わせフォームの保護](/ja/docs/how-it-works/contact-protection/)で説明しています。

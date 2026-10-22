@@ -24,6 +24,34 @@ description: D1 データベースのテーブル、クエリの書き方、マ�
 
 時刻は Unix ミリ秒で保存します。Better Auth のテーブルは、Better Auth の CLI で Drizzle アダプター用に生成しています。そのため、Better Auth とサーバーのほかの部分は、同じスキーマと同じマイグレーションの履歴を使います。
 
+問い合わせの状態と、スパムの疑いの印は別の列です。`SUBMISSION_STATUSES` は `['unread', 'read']` です。
+
+```ts title="packages/server/src/db/schema.ts"
+status: text('status', { enum: SUBMISSION_STATUSES })
+  .notNull()
+  .default('unread'),
+/**
+ * Set when the honeypot was filled or the spam score reached
+ * `SPAM_SUSPECT_THRESHOLD`. Admins can clear or set it. Flagged rows are
+ * never sent to Slack and are listed apart from the others.
+ */
+suspectedSpam: integer('suspected_spam', { mode: 'boolean' })
+  .notNull()
+  .default(false),
+```
+
+CHECK 制約で、データベースをこのリストと合わせておきます。インデックスは、未読件数と、未読・既読の表示に使います。
+
+```ts title="packages/server/src/db/schema.ts"
+// Unread count and the unread and read views.
+index('idx_submissions_status_created').on(table.status, table.createdAt),
+// Keep in step with SUBMISSION_STATUSES (checked by a test).
+check(
+  'submissions_status_check',
+  sql`${table.status} in ('unread', 'read')`,
+),
+```
+
 ## お問い合わせフォームの項目
 
 お問い合わせフォームの項目は列ではありません。管理者が管理画面で編集し、保存するたびに、次の `version` 番号と JSON の定義を持つ行が `form_definitions` に増えます。いちばん大きいバージョンが現在のフォームです。2 つのトリガーで、このテーブルを追記だけにしています。
@@ -37,9 +65,50 @@ END;
 
 （`DELETE` にも同じトリガーがあります。）送信内容は、値を `f_name` のような変わらない項目 ID をキーにして `submissions.fields` に、確かめたときのバージョンを `submissions.form_version` に保存します。古い問い合わせは、いつもそのバージョンの定義で読みます。[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)を参照してください。
 
-## クエリの書き方
+## クエリの書き方 [#how-queries-are-written]
 
-サーバーは、入力から SQL の文字列を組み立てません。すべてのクエリは Drizzle のクエリビルダーを通り、値はバインドされたパラメーターとして D1 に送られます。セキュリティモデルのページの [SQL インジェクション](/ja/docs/security/#sql-injection)を参照してください。
+サーバーは、入力から SQL の文字列を組み立てません。すべてのクエリは Drizzle のクエリビルダーを通り、値はバインドされたパラメーターとして D1 に送られます。`packages/server/src/db/database.ts` の `getDatabase(env.DB)` が binding 用の Drizzle のデータベースを返し、アプリのコードはこれを通してだけ D1 を使います。
+
+管理画面の一覧が典型的な例です。絞り込みの条件、1 ページの件数、オフセットはすべてバインドします。一覧と総数は、1 回のバッチで D1 に送ります。
+
+```ts title="packages/server/src/features/submissions/submission-store.ts"
+const orm = getDatabase(db);
+const where = filterWhere(filter);
+const [rows, [counted]] = await orm.batch([
+  orm
+    .select()
+    .from(submissions)
+    .where(where)
+    .orderBy(...orderBy(order))
+    .limit(limit)
+    .offset(offset),
+  orm.select({ total: count() }).from(submissions).where(where),
+]);
+```
+
+CI のチェックで、この書き方を守ります。`bun run check:sql`（`bun run validate` に含まれます）は `packages/server` を調べ、テスト用のヘルパー以外で次の書き方があれば失敗します。
+
+```ts title="scripts/check-sql.ts"
+export const SQL_RULES: readonly SqlRule[] = [
+  {
+    name: 'sql.raw(',
+    pattern: /\bsql\s*(?:\.\s*raw|\[\s*['"`]raw['"`]\s*\])\s*\(/g,
+    reason: 'inserts text into SQL unescaped; use the sql`` template',
+  },
+  {
+    name: '.prepare(',
+    pattern: /\.\s*prepare\s*\(/g,
+    reason: 'builds a D1 statement directly; use the Drizzle query builder',
+  },
+  {
+    name: '$client',
+    pattern: /\$client\b/g,
+    reason: 'reaches the raw D1 binding behind Drizzle',
+  },
+];
+```
+
+入力の確認と、D1 が受け取る SQL は、セキュリティモデルのページの [SQL インジェクション](/ja/docs/security/#sql-injection)を参照してください。
 
 ## マイグレーションの配布と適用
 
@@ -89,9 +158,9 @@ wrangler はファイルを名前順に並べ、適用したファイルをデ�
 
 ## スキーマの変更がサイトに届くまで
 
-1. goodnight-web がスキーマを変え、`0006_add_note.sql` のような新しいマイグレーションを生成して、`@goodnight-web/server` の新しいバージョンを公開します。公開したマイグレーションのファイルは、編集も名前の変更もしません。
+1. goodnight-web がスキーマを変え、`0007_add_note.sql` のような新しいマイグレーションを生成して、`@goodnight-web/server` の新しいバージョンを公開します。公開したマイグレーションのファイルは、編集も名前の変更もしません。
 2. Dependabot が、あなたのリポジトリに `@goodnight-web/server` を更新するプルリクエストを作ります。[配布と更新](/ja/docs/distribution/)を参照してください。
-3. あなたがマージします。deploy スクリプトが `0006_add_note.sql` を適用してから、新しいコードを公開します。
+3. あなたがマージします。deploy スクリプトが `0007_add_note.sql` を適用してから、新しいコードを公開します。
 
 2 つのコマンドの間は、古いバージョンの Worker が新しいスキーマに対して動きます。goodnight-web はスキーマの変更を追加だけ（新しいテーブルと列）にとどめ、クエリは列名を指定しているので、その間も古いバージョンは動き続けます。
 

@@ -5,7 +5,9 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 ---
 
 <Callout type='warn' title='下書き / 未検証'>
-  予定している設計です。サーバーのパッケージはまだ書いていないので、ルート名などの細かい点は変わることがあります。
+  このページはリポジトリにあるコードを説明しています。テストと、`wrangler dev`
+  とローカルの D1 を使った E2E テストで確認しています。実際の Cloudflare
+  へのデプロイではまだ動かしていません（M2 で予定）。
 </Callout>
 
 <ArchitectureDiagram locale='ja' />
@@ -19,7 +21,7 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 | Hono アプリ               | `@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけがここに届きます。                                                                      |
 | D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを入れます。マイグレーションは npm パッケージに入っています。                                                                                             |
 | Turnstile                 | 問い合わせフォームのボット対策（Cloudflare 製）。Worker がトークンをサーバー側で検証します。                                                                                                                                  |
-| Rate Limiting binding     | `ip_hash` ごとに問い合わせの送信回数を制限する Workers の binding。無料プランで使えます。                                                                                                                                     |
+| Rate Limiting binding     | `ip_hash` ごとに、問い合わせの送信、セットアップ、パスキーでのログインの回数を制限する Workers の binding。無料プランで使えます。                                                                                             |
 | Better Auth とパスキー    | 管理者のログイン。パスキーだけを使い、メールとパスワードでのログインは無効にします。                                                                                                                                          |
 | 管理画面                  | React と TanStack Router、Form、Table で作り、Vite でビルドしたアプリ。ビルド済みで `@goodnight-web/server` に入っていて、Worker が配信します。                                                                               |
 | Slack Webhook（任意）     | 「新しい問い合わせ」の短い通知。個人情報は含めません。                                                                                                                                                                        |
@@ -57,26 +59,97 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
    - スパムの疑いがなく、Slack Webhook が設定されていれば、「新しい問い合わせ 1 件・受信日時・管理画面の URL」を送り、`notified_at` を記録します。
    - 前回の削除から 1 時間以上たっていれば、保持期間（既定は 180 日）を過ぎた問い合わせと、期限切れのパスキーのチャレンジを削除します。
 
-`TURNSTILE_SECRET` が設定されていなければ、この API は 503 を返し、フォームには「まだ利用できません」と表示します。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
+問い合わせ API はフェイルクローズです。`TURNSTILE_SECRET` か `TURNSTILE_SITE_KEY` が設定されていない、`IP_HASH_SECRET` がないか 32 文字より短い、または Rate Limiting binding がない場合、この API は 503 を返し、フォームには「まだ利用できません」と表示します。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
+
+## コードでは
+
+サイトの Worker は 3 行です。サイトの既定の言語を、`@goodnight-web/server` のファクトリーに渡します。
+
+```ts title="templates/starter/src/worker.ts"
+import { createGoodnightWorker } from '@goodnight-web/server';
+import { siteConfig } from '../site.config';
+
+export default createGoodnightWorker({ locale: siteConfig.defaultLocale });
+```
+
+`wrangler.jsonc` は、API と管理画面のパスだけを Worker に送ります。それ以外のパスは、Worker のコードを動かさずに Static Assets が返します。
+
+```jsonc title="templates/starter/wrangler.jsonc"
+"assets": {
+  "directory": "./dist",
+  "binding": "ASSETS",
+  "not_found_handling": "404-page",
+  // The contact API and the admin screen run in the Worker. Every other
+  // path is a page from ./dist.
+  "run_worker_first": ["/api/*", "/admin", "/admin/*"],
+},
+```
+
+ファクトリーは Hono アプリを 1 つ作ります。最初にセキュリティヘッダー、HTTPS、Cloudflare Access のミドルウェアが動き、続いて機能ごとに自分のルートをマウントします。どのルートにも当たらないリクエストは `ASSETS` binding に渡ります。
+
+```ts title="packages/server/src/app.ts"
+app.use('*', securityHeaders);
+// The admin UI, admin API, setup, and Better Auth: HTTPS only (except on
+// localhost), then Cloudflare Access when ACCESS_AUD and
+// ACCESS_TEAM_DOMAIN are set.
+app.use('*', requireHttps);
+app.use('*', requireAccess);
+app.route('/api/contact', contactRoutes);
+app.route('/api/setup', setupRoutes);
+app.route('/api/auth', authRoutes);
+app.route('/api/admin', adminRoutes);
+app.all('/api/*', (c) => apiError(c, 404, 'not_found'));
+app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
+  serveAdminFile(c.req.raw),
+);
+```
+
+機能（問い合わせ、セットアップ、認証、管理 API、管理画面）は、それぞれ `packages/server/src/features/` の下の自分のフォルダーにあります。
 
 ## シークレットと binding
 
-| 名前                 | 種類                   | 用途                                                                                     |
-| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `DB`                 | D1 binding             | 保存するデータのすべて                                                                   |
-| rate limit binding   | Rate Limiting binding  | `ip_hash` ごとの問い合わせの回数制限                                                     |
-| `SETUP_TOKEN`        | シークレット           | 最初の管理者を作るときに必要。32 文字以上。セットアップ後に削除します。                  |
-| `ADMIN_EMAILS`       | シークレットまたは変数 | 管理者になれるメールアドレス                                                             |
-| `BETTER_AUTH_SECRET` | シークレット           | Better Auth の署名用。32 文字以上。                                                      |
-| `IP_HASH_SECRET`     | シークレット           | `HMAC-SHA256(ip, IP_HASH_SECRET)` の鍵。32 文字以上。                                    |
-| `TURNSTILE_SECRET`   | シークレット           | Turnstile の siteverify。ないと問い合わせ API は止まります。                             |
-| `SLACK_WEBHOOK_URL`  | シークレット（任意）   | 新しい問い合わせの通知                                                                   |
-| `ACCESS_AUD`         | 変数（任意）           | Cloudflare Access アプリケーションの AUD タグ。`ACCESS_TEAM_DOMAIN` と一緒に設定します。 |
-| `ACCESS_TEAM_DOMAIN` | 変数（任意）           | Cloudflare Access のチームドメイン。たとえば `your-team.cloudflareaccess.com`。          |
+| 名前                   | 種類                   | 用途                                                                                                  |
+| ---------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| `DB`                   | D1 binding             | 保存するデータのすべて                                                                                |
+| `ASSETS`               | Static Assets binding  | Astro でビルドしたページ                                                                              |
+| `CONTACT_RATE_LIMITER` | Rate Limiting binding  | `ip_hash` ごとの、問い合わせ、セットアップ、パスキーでのログインの回数制限                            |
+| `TURNSTILE_SITE_KEY`   | 変数                   | 公開してよい Turnstile のサイトキー。`wrangler.jsonc` に書きます。ないと問い合わせ API は止まります。 |
+| `SETUP_TOKEN`          | シークレット           | 最初の管理者を作るときに必要。32 文字以上。セットアップ後に削除します。                               |
+| `ADMIN_EMAILS`         | シークレットまたは変数 | 管理者になれるメールアドレス                                                                          |
+| `BETTER_AUTH_SECRET`   | シークレット           | Better Auth の署名用。32 文字以上。                                                                   |
+| `IP_HASH_SECRET`       | シークレット           | `HMAC-SHA256(ip, IP_HASH_SECRET)` の鍵。32 文字以上。                                                 |
+| `TURNSTILE_SECRET`     | シークレット           | Turnstile の siteverify。ないと問い合わせ API は止まります。                                          |
+| `SLACK_WEBHOOK_URL`    | シークレット（任意）   | 新しい問い合わせの通知                                                                                |
+| `ACCESS_AUD`           | 変数（任意）           | Cloudflare Access アプリケーションの AUD タグ。`ACCESS_TEAM_DOMAIN` と一緒に設定します。              |
+| `ACCESS_TEAM_DOMAIN`   | 変数（任意）           | Cloudflare Access のチームドメイン。たとえば `your-team.cloudflareaccess.com`。                       |
 
 32 文字より短いシークレットは、ないのと同じ扱いで機能を止めます。シークレットは Worker の中にとどめます。ブラウザに返すことも、D1 に書くこともありません。
 
 `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` は `https://` でだけ動きます（`localhost` を除きます）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
+
+## スタイルとフォント [#styles-and-fonts]
+
+Web フォントはどこでも読み込みません。サイトでも、管理画面でも、このドキュメントサイトでもです。それぞれがシステムフォントの並びを CSS のトークンとして 1 か所で決めているので、文字は訪問者の端末にすでにあるフォント（たとえば macOS と iOS ではヒラギノ、Windows ではメイリオや游ゴシック）で表示されます。フォントのファイルも、フォントの配信サービスも使わず、Content Security Policy にフォント用のホストもありません。
+
+スターターは自分のトークンを持ちます。テーマの 3 色は `site.config.ts`（`theme.primary`、`theme.background`、`theme.foreground`）から取り、CSS 変数として `<html>` に設定します。ほかの色合いはこの 3 色から混ぜて作るので、3 つの値を変えればサイト全体の色が変わります。
+
+```css title="templates/starter/src/styles/global.css"
+:root {
+  --site-primary: #7357c8;
+  --site-background: #fcfbff;
+  --site-foreground: #2f2a40;
+}
+
+@theme inline {
+  --font-sans:
+    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+    'BIZ UDPGothic', Meiryo, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-background: var(--site-background);
+  --color-foreground: var(--site-foreground);
+```
+
+管理画面は `@goodnight-web/server` の中に自分のトークンを持っているので、サイトの色を変えても管理画面の色は変わりません。
 
 ## 関連ページ
 

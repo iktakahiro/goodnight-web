@@ -5,7 +5,7 @@ description: 任意の Slack 通知で、新しい問い合わせが来たこと
 
 ## 何をするか
 
-- `SLACK_WEBHOOK_URL` が設定されていれば、Worker はスパムの疑いがない問い合わせを保存した後、その Slack Incoming Webhook に投稿します。
+- `SLACK_WEBHOOK_URL` が設定されていれば、Worker はスパムの疑いがない問い合わせを保存した後、その Slack Incoming Webhook に投稿します。呼び出すのは `https://hooks.slack.com/...` のアドレスだけで、ほかの URL は無視します。
 - 通知に含めるのは、件数（「新しい問い合わせ 1 件」）、受信日時、管理画面へのリンクだけです。メールアドレスもフォームの項目の値も含めません。セレクトの回答も含めません。管理者がフォームに項目を足しても、これは変わりません。
 - 受信日時は Slack の日付トークンで送るので、Slack は読む人それぞれのタイムゾーンで表示します。
 - 投稿に成功したら、Worker は `notified_at` を記録します。再送はしません。
@@ -19,6 +19,30 @@ description: 任意の Slack 通知で、新しい問い合わせが来たこと
 - **Webhook の URL はシークレットです。** URL を知っている人は誰でもチャンネルに投稿できるので、Worker のシークレットとして持ち、管理画面にも表示しません。
 
 ## コード
+
+問い合わせ API は、行を保存したあと、スパムの疑いがない問い合わせのときだけ通知を始めます。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+// 7. After the response: notification (never for suspected spam) and
+//    pruning.
+const webhookUrl = env.SLACK_WEBHOOK_URL;
+if (!suspectedSpam && isSlackWebhookUrl(webhookUrl)) {
+  runInBackground(c, 'slack', () =>
+    sendSlackNotification({
+      db: env.DB,
+      webhookUrl,
+      submissionId: id,
+      payload: buildSlackPayload({
+        locale: options.locale,
+        receivedAt: now,
+        adminUrl: `${origin}/admin/inquiries/${id}`,
+      }),
+    }),
+  );
+}
+```
+
+メッセージは、受信日時と管理画面の URL だけから組み立てます。
 
 ```ts title="packages/server/src/features/notify/slack.ts"
 export const buildSlackPayload = ({

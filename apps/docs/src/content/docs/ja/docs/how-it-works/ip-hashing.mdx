@@ -3,15 +3,53 @@ title: 生の IP アドレスを保存しない
 description: goodnight-web は、訪問者の IP アドレスを保存もログ出力もしません。保存するのは HMAC-SHA256(ip, IP_HASH_SECRET) で、回数制限や同じ送信者の確認にはこれで足ります。
 ---
 
-<Callout type='info'>
-  コードの抜粋は、サーバーのパッケージができたら追加します。
-</Callout>
-
 ## 何をするか
 
 - 問い合わせが送信されるたびに、Worker は `ip_hash = HMAC-SHA256(ip, IP_HASH_SECRET)` を計算します。
 - D1 に保存するのは `ip_hash` だけです。生の IP アドレスは D1 に書かず、ログにも出しません。
 - Rate Limiting binding のキーにも `ip_hash` を使います。
+
+## コードでは
+
+問い合わせ API は、`cf-connecting-ip` ヘッダーから IP アドレスを読み、ハッシュだけを残します。生の値を渡す先は、Turnstile の siteverify（`remoteip`）だけです。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+const ip = c.req.header('cf-connecting-ip');
+const ipHash = await hmacSha256Hex(ipHashSecret, ip ?? 'unknown');
+```
+
+`hmacSha256Hex()` は、Workers にある Web Crypto API を使います。
+
+```ts title="packages/server/src/shared/crypto.ts"
+export const hmacSha256Hex = async (
+  secret: string,
+  message: string,
+): Promise<string> => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(message),
+  );
+  return [...new Uint8Array(signature)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+};
+```
+
+同じハッシュを回数制限のキーにします。セットアップとパスキーでのログインも、接頭辞（`setup:` か `auth:`）を付けて同じハッシュを使うので、それぞれ別に数えます。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+// 4. Rate limit per ip_hash.
+const { success } = await limiter.limit({ key: ipHash });
+if (!success) return apiError(c, 429, 'rate_limited');
+```
 
 ## なぜこう作るか
 

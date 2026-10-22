@@ -3,10 +3,6 @@ title: Deleting old inquiries without Cron
 description: Inquiries older than the retention period (180 days by default) are deleted during normal requests, at most once an hour, with no scheduled job.
 ---
 
-<Callout type='info'>
-  Code excerpts will be added once the server package lands.
-</Callout>
-
 ## What it does
 
 - Each inquiry is kept for a retention period, 180 days by default.
@@ -15,6 +11,40 @@ description: Inquiries older than the retention period (180 days by default) are
 - An index on `created_at` keeps the delete fast.
 - The same cleanup deletes expired rows in Better Auth's `verification` table. Each passkey sign-in attempt writes a challenge there; a used challenge is deleted at once, but an abandoned one would stay forever. Challenges expire after a few minutes and sign-in is rate-limited, so the table stays small without an index.
 - Admins can also delete an inquiry by hand and export inquiries as CSV. The export reads 200 rows per query and streams them, so it works the same for a large table.
+
+## In the code
+
+The contact API starts the cleanup after it has its reply ready. `runInBackground()` hands the task to `ctx.waitUntil` and logs a failure without changing the reply:
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+runInBackground(c, 'prune', () => pruneIfDue(env.DB, now));
+return c.json({ ok: true });
+```
+
+`pruneIfDue()` first claims the run with one conditional upsert of `last_cleanup_at`. The update happens only if the stored time is an hour old or more, so when two requests arrive together, only one of them prunes. The retention period comes from `settings.retention_days` (1 to 3,650 days; 180 when it is missing or invalid):
+
+```ts title="packages/server/src/features/retention/prune.ts"
+const orm = getDatabase(db);
+const claim = await orm
+  .insert(settings)
+  .values({ key: 'last_cleanup_at', value: String(now) })
+  .onConflictDoUpdate({
+    target: settings.key,
+    set: { value: sql`excluded.value` },
+    setWhere: lte(
+      sql`cast(${settings.value} as integer)`,
+      now - PRUNE_INTERVAL_MS,
+    ),
+  });
+if (claim.meta.changes === 0) return { ran: false };
+const retentionDays = await getRetentionDays(db);
+const result = await orm
+  .delete(submissions)
+  .where(lt(submissions.createdAt, now - retentionDays * DAY_MS));
+const verifications = await orm
+  .delete(verification)
+  .where(lt(verification.expiresAt, new Date(now)));
+```
 
 ## Why it is built this way
 

@@ -14,6 +14,16 @@ description: 最初の管理者は、シークレットの SETUP_TOKEN と、ADM
 
 セットアップの試行回数にも制限があります。この制限をかけられないとき（Rate Limiting binding か `IP_HASH_SECRET` がないとき）は、セットアップは使えません。`SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上が必要です。短い値があるとセットアップは使えず、セットアップ画面にその設定の名前を表示します。新しい管理者はログインした状態になり、続けてパスキーを登録します。最初のパスキーが登録されると、セットアップのエンドポイントは閉じ、後でパスキーをすべて削除しても閉じた状態が続きます。それまではセットアップをやり直せるので、パスキーを登録する前に離れても締め出されません。
 
+`settings.setup_closed_at` があるか、パスキーが 1 つでもあれば、セットアップは閉じているとみなします。最初のパスキーの登録が `setup_closed_at` を自分で書き込みます（[セッション](#sessions)を参照）。さらに、パスキーの行が追加されるたびにデータベースのトリガーも書き込むので、後でパスキーをすべて削除しても印は残ります。
+
+```sql title="packages/server/migrations/0002_setup_closed_trigger.sql"
+CREATE TRIGGER `passkey_closes_setup` AFTER INSERT ON `passkey`
+BEGIN
+  INSERT OR IGNORE INTO `settings` (`key`, `value`)
+    VALUES ('setup_closed_at', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+END;
+```
+
 管理 API が受け付けるのは、ログインしていて、まだ `ADMIN_EMAILS` に入っていて、パスキーを持っているユーザーだけです。セットアップで得たセッションだけでは、最初のパスキーの登録しかできません。
 
 ## セッション [#sessions]
@@ -27,31 +37,21 @@ description: 最初の管理者は、シークレットの SETUP_TOKEN と、ADM
 - セットアップが閉じたあとは、パスキーを持たないユーザーはパスキーを登録できません。
 - 最初のパスキーより前に作られたセッションは、管理 API が拒否します（401）。パスキーを追加で登録するときも同じセッションが必要なので、古いセットアップのセッションではパスキーを追加できません。
 
-```ts
-// packages/server/src/features/setup/first-passkey.ts
-export const beforePasskeySaved = async (
-  db: D1Database,
-  { userId, sessionCreatedAt, request }: PasskeyRegistration,
-): Promise<void> => {
-  const state = await checkPasskeySession(
-    db,
-    userId,
-    sessionCreatedAt ?? new Date(0),
-  );
-  if (state === 'ok') return;
-  if (state === 'too_old') {
-    throw new APIError('UNAUTHORIZED', { message: 'passkey session required' });
-  }
-  if (await isSetupClosed(db)) {
-    throw new APIError('FORBIDDEN', { message: 'setup closed' });
-  }
-  const claim = await claimSetup(db);
-  if (!claim) throw new APIError('FORBIDDEN', { message: 'setup closed' });
-  claims.set(request, claim);
-  await getDatabase(db).delete(sessionTable);
-};
+最初のパスキーを保存する直前に、パスキー登録のフックが次の処理をします。
 
-// packages/server/src/features/setup/setup-state.ts
+```ts title="packages/server/src/features/setup/first-passkey.ts"
+if (await isSetupClosed(db)) {
+  throw new APIError('FORBIDDEN', { message: 'setup closed' });
+}
+const claim = await claimSetup(db);
+if (!claim) throw new APIError('FORBIDDEN', { message: 'setup closed' });
+claims.set(request, claim);
+await getDatabase(db).delete(sessionTable);
+```
+
+確保は `INSERT ... ON CONFLICT DO NOTHING` の 1 文です。行を書けた登録だけが勝ちます。
+
+```ts title="packages/server/src/features/setup/setup-state.ts"
 export const claimSetup = async (db: D1Database): Promise<string | null> => {
   const value = String(Date.now());
   const rows = await getDatabase(db)
@@ -61,8 +61,11 @@ export const claimSetup = async (db: D1Database): Promise<string | null> => {
     .returning({ value: settings.value });
   return rows.length === 1 ? value : null;
 };
+```
 
-// packages/server/src/features/auth/passkey-session.ts
+管理 API は、セッションの作成時刻を、そのユーザーの最初のパスキーの作成時刻と比べます。
+
+```ts title="packages/server/src/features/auth/passkey-session.ts"
 const first = await getDatabase(db)
   .select({ createdAt: passkey.createdAt })
   .from(passkey)

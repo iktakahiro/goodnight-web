@@ -26,7 +26,20 @@ Deploy to Cloudflare ボタンは、公開されている starter リポジト�
 ## 更新の届き方
 
 1. goodnight-web が `@goodnight-web/server` の新しいバージョンを公開します。脆弱性の修正なら、GitHub の Security Advisory も出します。
-2. starter には `.github/dependabot.yml` が入っています。`@goodnight-web/*` の更新を 1 つにまとめ、数日の cooldown を設定しています。Dependabot は、公開からその日数がたったバージョンだけを提案します。セキュリティアップデートは cooldown で遅れません。
+2. starter には `.github/dependabot.yml` が入っています。`@goodnight-web/*` の更新を 1 つにまとめ、5 日の cooldown を設定しています。Dependabot は、公開からその日数がたったバージョンだけを提案します。セキュリティアップデートは cooldown で遅れません。サイトのほかのパッケージ（Astro など）のマイナーとパッチの更新は、別のグループにまとめます。
+
+   ```yaml title="templates/starter/.github/dependabot.yml"
+   cooldown:
+     default-days: 5
+   groups:
+     goodnight-web:
+       patterns: ['@goodnight-web/*']
+     site-dependencies:
+       patterns: ['*']
+       exclude-patterns: ['@goodnight-web/*']
+       update-types: [minor, patch]
+   ```
+
 3. Dependabot があなたのリポジトリに PR を 1 つ作ります。
 4. Workers Builds がその PR をビルドし、プレビューを表示します。
 5. プレビューを確認してマージします。deploy スクリプトは `wrangler d1 migrations apply DB --remote && wrangler deploy` を実行するので、新しいコードが動く前にデータベースのマイグレーションが済みます。
@@ -41,21 +54,80 @@ Deploy to Cloudflare ボタンは、公開されている starter リポジト�
 
 - 作成者が `dependabot[bot]` で、アカウントの種類が `Bot` である。
 - ブランチが fork ではなく、あなた自身のリポジトリにある。
-- 変更されたファイルが `package.json` と lockfile（`bun.lock`、`package-lock.json`、`pnpm-lock.yaml`）だけである。
+- 変更されたファイルが `package.json` と lockfile（`bun.lock`、`package-lock.json`、`pnpm-lock.yaml`）だけで、どれも追加や削除ではなく変更である。
 - `package.json` で変更された行が、すべて `@goodnight-web/*` の依存関係のバージョンである。
 
 lockfile はほかの部分が変わってもかまいません。新しい `@goodnight-web/server` は、それが使うパッケージ（たとえば `hono`）の新しいバージョンを連れてくることがあり、その変更は lockfile にだけ現れます。サイトが直接使うパッケージは `package.json` に書かれていて、その差分は1行ずつ確認します。すべての変更を確認できない場合、その PR は公式とみなしません。たとえば、GitHub が `package.json` の差分を省略したり途中で切ったりした場合や、変更ファイルの一覧が欠けているおそれがある場合です。
+
+スクリプト `.github/scripts/update-check.cjs` は、満たさない決まりごとに理由を集めます。理由が 1 つもないときだけ、公式とみなします。最初の 2 つの決まりは次のとおりです。
+
+{/* prettier-ignore */}
+```js title="templates/starter/.github/scripts/update-check.cjs"
+const user = pullRequest.user;
+if (!user || user.login !== OFFICIAL_AUTHOR || user.type !== 'Bot') {
+  reasons.push(
+    `author is not ${OFFICIAL_AUTHOR}: ${user ? user.login : 'unknown'}`,
+  );
+}
+
+const headRepo = pullRequest.head.repo
+  ? pullRequest.head.repo.full_name
+  : null;
+if (headRepo !== pullRequest.base.repo.full_name) {
+  reasons.push(
+    `branch is not in this repository: ${headRepo ?? 'deleted repository'}`,
+  );
+}
+```
+
+続いて、`package.json` で変更された行が、すべてバージョン番号を指定した `@goodnight-web/*` の項目であることを確かめます。
+
+```js title="templates/starter/.github/scripts/update-check.cjs"
+for (const change of packageJsonChanges(hunks)) {
+  if (change.name === null) {
+    reasons.push(
+      `package.json: change outside a dependency entry: ${change.line}`,
+    );
+  } else if (!change.name.startsWith(OFFICIAL_SCOPE)) {
+    reasons.push(
+      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${change.name}`,
+    );
+  } else if (change.invalidSpec) {
+    reasons.push(
+      `package.json: ${change.name} is not set to a version number: ${change.line}`,
+    );
+  } else {
+    officialChanges += 1;
+  }
+}
+```
 
 公式のアップデートには「goodnight-web の公式アップデートです。プレビューを確認してからマージしてください。」とコメントします。それ以外には「公式のアップデートではありません。変更内容がわからない場合はマージしないでください。」とコメントします。コメントは日本語と英語で書かれ、新しく増やさずに同じコメントを更新します。
 
 **公式アップデートのコメントが付いた PR だけをマージしてください。**
 
-このワークフローは `pull_request_target` で動くので、コメントを書く権限を持っています。ただし、PR のコードをチェックアウトすることも、実行することもありません。GitHub API で、PR のメタデータと変更されたファイルの一覧だけを読みます。
+このワークフローは `pull_request_target` で動くので、コメントを書く権限を持っています。ただし、PR のコードをチェックアウトすることも、実行することもありません。ベースブランチから `.github/scripts` だけをチェックアウトするので、動くのはすでにあなたのリポジトリにあるスクリプトです。PR については、GitHub API でメタデータと変更されたファイルの一覧だけを読みます。
+
+```yaml title="templates/starter/.github/workflows/update-check.yml"
+steps:
+  - name: Check out the script from the base branch
+    uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    with:
+      ref: ${{ github.event.pull_request.base.sha }}
+      persist-credentials: false
+      sparse-checkout: .github/scripts
+  - name: Classify the pull request and comment
+    uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+    with:
+      script: |
+        const { run } = require('./.github/scripts/update-check.cjs');
+        await run({ github, context, core });
+```
 
 ## リポジトリは private にする [#private-repository]
 
 サイトのコピーは **private** リポジトリに置いてください。public リポジトリでは、サイトのソース全体、設定、すべての変更の履歴（間違えてコミットしたものも含む）が誰にでも見えます。また、知らない人が PR を作れるようになります。これは、更新チェックのワークフローが警告する状況そのものです。
 
-starter には `.github/workflows/visibility-check.yml` が入っています。push のたびに動き、手動でも実行できます。リポジトリが public なら、日本語と英語で「private にしてください」というエラーを出してジョブを失敗させます。token も権限も必要ありません。
+starter には `.github/workflows/visibility-check.yml` が入っています。push のたびに動き、手動でも実行できます。リポジトリが public なら、日本語と英語で「private にしてください」というエラーを出してジョブを失敗させます。token も権限も必要ありません。ジョブを飛ばすのは、サイトのコピー元である公開の starter リポジトリの中だけです。
 
 GitHub のリポジトリを private にするには、**Settings > General > Danger Zone > Change visibility** を開き、private を選びます。

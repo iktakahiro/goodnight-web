@@ -207,17 +207,17 @@ local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
    siteverify answers marked `result_with_testing_key`, sets `hostname` to
    the request's hostname and `action` to `contact`. The production check is
    unchanged. The test checks the ja validation messages, waits 3.5 s (the
-   server holds faster submissions as `too_fast`), submits, and reads the row
+   server flags faster submissions as suspected spam (`too_fast`)), submits, and reads the row
    with `wrangler d1 execute DB --local`: email, `fields` (name, category,
-   message), `form_version`,
-   `status = new`, `page_path`, and a 64-character hex `ip_hash`. Then it
+   message), `form_version`, `status = unread`, `suspected_spam = 0`, empty
+   `spam_reasons`, `page_path`, and a 64-character hex `ip_hash`. Then it
    opens `/admin` in a Japanese browser context with a CDP virtual
    authenticator (as in `packages/server/e2e`): setup with `SETUP_TOKEN` and
    an `ADMIN_EMAILS` address, passkey registration (one resident credential,
    one `passkey` row, `setup_closed_at` set), sign-out (the admin API answers
    401), passkey sign-in, the submitted inquiry in the list, the switch to
-   English, the detail (marks it read), and a status change to Done that is
-   stored in D1. It fails on any CSP violation or page error in the admin UI.
+   English, the detail (marks it read), and marking it unread again, which
+   is stored in D1. It fails on any CSP violation or page error in the admin UI.
 
 The admin steps find buttons and headings by role, with names from
 `@goodnight-web/server/admin-messages.json` (the admin UI strings, written by
