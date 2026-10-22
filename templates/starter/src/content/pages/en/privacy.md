@@ -12,13 +12,13 @@ Yunagi Works Co., Ltd. ("we") handles your personal information as described bel
 
 Through the contact form we collect:
 
-- Your name, email address, company or organization, phone number (optional), and the category and content of your inquiry
+- Your name, email address, company or organization (optional), phone number (optional), and the category and content of your inquiry
 - The date and time you agreed to this privacy policy
 - The page you sent the form from, your browser type (user agent), and your country (estimated from the connection)
 
-To prevent abuse, we store a value calculated from your IP address. It is made with a one-way calculation that uses a secret key (HMAC-SHA256), and it cannot be turned back into the IP address. We do not store the IP address itself.
+To prevent spam and abuse, we store a value calculated from your IP address. It is made with a one-way calculation that uses a secret key (HMAC-SHA256), and it cannot be turned back into the IP address. We do not store the IP address itself in our database.
 
-## 2. How we use it
+## 2. How we use your information
 
 - To answer your inquiry and contact you about it
 - To keep a record of inquiries and manage them
@@ -36,7 +36,7 @@ Inquiries are stored in a database (Cloudflare D1) provided by Cloudflare, Inc. 
 
 ## 4. Spam protection (Cloudflare Turnstile)
 
-The contact form uses Cloudflare Turnstile, provided by Cloudflare, Inc., to stop automated submissions. Turnstile sends information about your browser and device to Cloudflare to make its decision. See the Cloudflare Privacy Policy above for how Cloudflare handles it.
+The contact form uses Cloudflare Turnstile, provided by Cloudflare, Inc., to stop submissions by automated programs (bots). Turnstile sends information about your browser and device to Cloudflare to make its decision. See the Cloudflare Privacy Policy above for how Cloudflare handles it.
 
 ## 5. Internal notifications
 
@@ -44,15 +44,15 @@ We may post a notice of a new inquiry to our internal chat tool. The notice cont
 
 ## 6. Retention and deletion
 
-- Inquiries are deleted automatically **180 days** after we receive them.
+- The information in Section 1 (the inquiry record) is deleted automatically **180 days** after we receive it.
 - Because of the database's restore feature (Cloudflare D1 Time Travel), deleted information can still be restored for up to **7 days** after deletion. After that it is erased completely.
-- To ask us to delete your information, contact us at the address below.
+- To ask us to delete your information before the retention period ends, contact us as described in Section 9.
 
 <!-- On a paid Cloudflare plan (Workers Paid), Time Travel keeps data for 30 days. In that case, change "7 days" to "30 days". If you change the retention period (180 days), update it here too. -->
 
 ## 7. Sharing with third parties
 
-We do not give your personal information to third parties without your consent, except where the law requires it.
+We do not give your personal information to third parties without your consent, except where the law requires it. The Cloudflare services described in Sections 3 and 4 are services we use to receive and store inquiries.
 
 ## 8. Cookies
 
@@ -62,11 +62,12 @@ The public pages of this site do not use cookies for analytics or advertising.
 
 ## 9. Requests and contact
 
-To ask us to disclose, correct, stop using, or delete your personal information, contact us below. We will confirm your identity before we act on the request.
+To ask us to tell you the purpose of use, disclose, correct, add to, or delete your personal information, stop using or erase it, or stop providing it to third parties, contact us below. We will confirm your identity and then respond as required by law.
 
-- Yunagi Works Co., Ltd., Personal Information Desk
+- Company: Yunagi Works Co., Ltd.
+- Representative: Hanako Yamada, Representative Director
 - Address: 1-2-3 Yunagi-machi, Kanazawa, Ishikawa 920-0000, Japan
-- Email: info@example.com
+- Contact: Personal Information Desk (email: info@example.com)
 
 ## 10. Changes
 

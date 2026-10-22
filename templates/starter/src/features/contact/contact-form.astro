@@ -28,12 +28,12 @@ const text = {
     name: 'お名前',
     namePlaceholder: '山田 太郎',
     email: 'メールアドレス',
-    emailHint: 'お返事はこのアドレスにお送りします。',
+    emailHint: 'ご返信はこのアドレスにお送りします。',
     company: '会社名・団体名',
     phone: '電話番号',
-    phoneHint: 'お電話での連絡を希望される場合にご記入ください。',
+    phoneHint: 'お電話でのご連絡をご希望の場合にご記入ください。',
     category: 'お問い合わせの種類',
-    categoryPlaceholder: '選んでください',
+    categoryPlaceholder: '選択してください',
     body: 'お問い合わせ内容',
     bodyHint: '5,000文字まで入力できます。',
     loading: 'フォームを読み込んでいます…',
@@ -47,22 +47,21 @@ const text = {
     sending: '送信しています…',
     unavailableTitle: 'お問い合わせフォームは準備中です',
     unavailableBody:
-      '現在、このフォームからはお問い合わせを受け付けていません。お急ぎの場合は、メールまたはお電話でご連絡ください。',
+      '現在、このフォームからはお問い合わせを受け付けていません。恐れ入りますが、メールまたはお電話でご連絡ください。',
     success:
       'お問い合わせを受け付けました。内容を確認のうえ、担当者よりご連絡します。',
-    invalid:
-      '送信できませんでした。赤く表示された項目を確認してください。',
+    invalid: '赤く表示された項目をご確認のうえ、もう一度送信してください。',
     verify:
-      'フォームの下にある確認（Turnstile）が終わるまでお待ちください。終わったら、もう一度「送信する」を押してください。',
+      '送信ボタンの上にある確認（Turnstile）が終わるまでお待ちください。終わったら、もう一度「送信する」を押してください。',
     turnstile:
-      '人による送信であることを確認できませんでした。もう一度確認を行ってから送信してください。',
-    fieldRequired: '入力してください。',
+      '確認（Turnstile）を完了できませんでした。確認が終わるまでお待ちいただき、もう一度「送信する」を押してください。',
+    fieldRequired: 'この項目は必須です。',
     fieldInvalid: '入力内容を確認してください。',
-    fieldTooLong: '長すぎます。',
+    fieldTooLong: '文字数が上限を超えています。',
     rateLimited:
-      '短い時間に何度も送信されたため、受け付けを止めています。しばらく待ってからもう一度お試しください。',
+      '短い時間に送信が続いたため、一時的に受け付けを制限しています。しばらく待ってからもう一度お試しください。',
     error:
-      'エラーのため送信できませんでした。時間をおいてもう一度お試しください。',
+      'エラーのため送信できませんでした。時間をおいてもう一度お試しいただくか、メールまたはお電話でご連絡ください。',
     contactEmail: 'メール',
     contactPhone: '電話',
   },
@@ -77,7 +76,7 @@ const text = {
     phone: 'Phone',
     phoneHint: 'Fill this in if you would like us to call you.',
     category: 'Category',
-    categoryPlaceholder: 'Choose one',
+    categoryPlaceholder: 'Select a category',
     body: 'Message',
     bodyHint: 'Up to 5,000 characters.',
     loading: 'Loading the form…',
@@ -91,22 +90,21 @@ const text = {
     sending: 'Sending…',
     unavailableTitle: 'The contact form is not available yet',
     unavailableBody:
-      'This form is not accepting inquiries at the moment. If your matter is urgent, please contact us by email or phone.',
+      'This form is not accepting inquiries at the moment. Please contact us by email or phone instead.',
     success:
       'Thank you. We have received your inquiry and will get back to you.',
-    invalid:
-      'Your message could not be sent. Please check the fields marked in red.',
+    invalid: 'Please check the fields marked in red, then send again.',
     verify:
-      'Please wait until the check (Turnstile) below the form is complete, then press "Send" again.',
+      'Please wait until the check (Turnstile) above the Send button is complete, then press "Send" again.',
     turnstile:
-      'We could not confirm that you are human. Please complete the check again and resend.',
-    fieldRequired: 'Please fill this in.',
+      'The check (Turnstile) could not be completed. Please wait until the check is complete, then press "Send" again.',
+    fieldRequired: 'This field is required.',
     fieldInvalid: 'Please check this field.',
-    fieldTooLong: 'This is too long.',
+    fieldTooLong: 'This is over the character limit.',
     rateLimited:
       'Too many messages were sent in a short time. Please wait a while and try again.',
     error:
-      'Your message could not be sent because of an error. Please try again later.',
+      'Your message could not be sent because of an error. Please try again later, or contact us by email or phone.',
     contactEmail: 'Email',
     contactPhone: 'Phone',
   },
@@ -337,6 +335,11 @@ const limits = CONTACT_FIELD_LIMITS;
               {text.consentLink}
             </a>
             {text.consentAfter}
+            <span
+              class='ml-2 inline-block rounded-full bg-primary px-2 py-px align-middle text-[0.7rem] text-primary-foreground'
+            >
+              {text.required}
+            </span>
           </span>
         </label>
       </div>

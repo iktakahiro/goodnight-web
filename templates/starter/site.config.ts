@@ -96,7 +96,7 @@ export const siteConfig: SiteConfig = {
       en: 'Yunagi Works Co., Ltd.',
     },
     tagline: {
-      ja: '店舗とオフィスの家具を、つくって直す小さな工房です。',
+      ja: '店舗とオフィスの家具をつくって直す、小さな工房です。',
       en: 'A small workshop that makes and repairs furniture for shops and offices.',
     },
     description: {
@@ -116,7 +116,10 @@ export const siteConfig: SiteConfig = {
       },
       {
         label: { ja: '代表者', en: 'Representative' },
-        value: { ja: '代表取締役 山田 花子', en: 'Hanako Yamada, CEO' },
+        value: {
+          ja: '代表取締役 山田 花子',
+          en: 'Hanako Yamada, Representative Director',
+        },
       },
       {
         label: { ja: '設立', en: 'Founded' },
@@ -169,10 +172,10 @@ export const siteConfig: SiteConfig = {
   },
 
   contactCategories: [
-    { value: 'service', label: { ja: 'サービスについて', en: 'Our services' } },
-    { value: 'press', label: { ja: '取材', en: 'Press' } },
-    { value: 'recruit', label: { ja: '採用', en: 'Careers' } },
-    { value: 'sales', label: { ja: '営業・ご提案', en: 'Sales proposal' } },
+    { value: 'service', label: { ja: 'サービスについて', en: 'Services' } },
+    { value: 'press', label: { ja: '取材について', en: 'Press' } },
+    { value: 'recruit', label: { ja: '採用について', en: 'Careers' } },
+    { value: 'sales', label: { ja: '営業・ご提案', en: 'Business proposal' } },
     { value: 'other', label: { ja: 'その他', en: 'Other' } },
   ],
 };
