@@ -1,0 +1,47 @@
+{
+  "name": "goodnight-web-starter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "check": "astro check",
+    "preview": "astro preview",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "type-check": "astro check",
+    "deploy:check": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "astro": "7.4.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.11",
+    "@tailwindcss/vite": "4.3.3",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "wrangler": "4.151.2"
+  },
+  "cloudflare": {
+    "bindings": {
+      "SETUP_TOKEN": {
+        "description": "A long random string. You enter it once at /admin/setup to create the first admin. 最初の管理者を作るときに /admin/setup で入力する、長いランダムな文字列です。"
+      },
+      "ADMIN_EMAILS": {
+        "description": "Email addresses that may become admins, separated by commas. 管理者になれるメールアドレスです。複数ある場合はカンマで区切ります。"
+      },
+      "BETTER_AUTH_SECRET": {
+        "description": "A long random string used to sign admin sessions (32 characters or more). 管理画面のログイン情報の署名に使う、長いランダムな文字列です（32文字以上）。"
+      },
+      "IP_HASH_SECRET": {
+        "description": "A long random string used to hash IP addresses. Raw IP addresses are never stored. IP アドレスをハッシュ化するための長いランダムな文字列です。IP アドレスそのものは保存しません。"
+      },
+      "TURNSTILE_SECRET": {
+        "description": "The Turnstile secret key. Without it, the contact form does not accept inquiries. Turnstile のシークレットキーです。未設定の間、問い合わせフォームは受け付けを停止します。"
+      },
+      "SLACK_WEBHOOK_URL": {
+        "description": "Optional. A Slack incoming webhook URL for new-inquiry notices (no personal data is sent). 任意。新着の問い合わせを知らせる Slack の Incoming Webhook URL です（個人情報は送りません）。"
+      }
+    }
+  }
+}

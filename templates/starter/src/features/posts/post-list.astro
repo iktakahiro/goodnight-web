@@ -1,0 +1,76 @@
+---
+/** A list of news or blog posts with date, title, and description. */
+import Badge from '../../components/ui/badge.astro';
+import { formatDate, localizePath } from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+import { parsePostId, type Post, type PostCollection } from './posts';
+import type { Locale } from '../../../site.config';
+
+interface Props {
+  locale: Locale;
+  collection: PostCollection;
+  posts: Post[];
+  /** Heading level of each post title. */
+  headingLevel?: 2 | 3;
+  /** Show the description under each title. */
+  showDescription?: boolean;
+}
+
+const {
+  locale,
+  collection,
+  posts,
+  headingLevel = 2,
+  showDescription = true,
+} = Astro.props;
+const Heading = headingLevel === 2 ? 'h2' : 'h3';
+---
+
+{
+  posts.length === 0 ? (
+    <p class='rounded-card border border-dashed border-border p-8 text-center text-muted'>
+      {ui.noPosts[locale]}
+    </p>
+  ) : (
+    <ul class='divide-y divide-border overflow-hidden rounded-card border border-border bg-card'>
+      {posts.map((post) => {
+        const href = localizePath(
+          locale,
+          `/${collection}/${parsePostId(post.id).slug}/`,
+        );
+        return (
+          <li class='group relative px-6 py-5 transition-colors hover:bg-primary-softer sm:px-8'>
+            <div class='flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-6'>
+              <time
+                datetime={post.data.date.toISOString().slice(0, 10)}
+                class='shrink-0 text-sm font-bold text-muted tabular-nums sm:w-36'
+              >
+                {formatDate(locale, post.data.date)}
+              </time>
+              <div class='min-w-0 space-y-1.5'>
+                <Heading class='text-base leading-relaxed font-bold sm:text-lg'>
+                  <a
+                    href={href}
+                    class='no-underline after:absolute after:inset-0 group-hover:text-primary-strong'
+                  >
+                    {post.data.title}
+                  </a>
+                </Heading>
+                {showDescription && (
+                  <p class='text-sm text-muted'>{post.data.description}</p>
+                )}
+                {post.data.tags.length > 0 && (
+                  <p class='flex flex-wrap gap-1.5 pt-1'>
+                    {post.data.tags.map((tag) => (
+                      <Badge>{tag}</Badge>
+                    ))}
+                  </p>
+                )}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  )
+}

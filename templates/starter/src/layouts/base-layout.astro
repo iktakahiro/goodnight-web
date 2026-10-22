@@ -1,0 +1,90 @@
+---
+/**
+ * The page frame: `<head>` metadata, the header, the main content, and the
+ * footer. Every page uses it.
+ */
+import '../styles/global.css';
+import SiteFooter from '../components/site/site-footer.astro';
+import SiteHeader from '../components/site/site-header.astro';
+import { localeTags, localizePath } from '../i18n/locales';
+import { ui } from '../i18n/ui';
+import { siteConfig, type Locale } from '../../site.config';
+
+interface Props {
+  locale: Locale;
+  /** Page title. The company name is added after it. Omit on the home page. */
+  title?: string;
+  /** Page description for search engines. Defaults to the company description. */
+  description?: string;
+  /**
+   * The URL of this page in each language, without the language prefix.
+   * Defaults to the current path. Set it when a page does not exist in every
+   * language, such as a blog post that is only in Japanese.
+   */
+  alternates?: Partial<Record<Locale, string>>;
+  /** The path of this page without the language prefix, such as `/about/`. */
+  path: string;
+  /** Ask search engines not to index the page, for example the 404 page. */
+  noindex?: boolean;
+}
+
+const { locale, title, description, path, noindex = false } = Astro.props;
+const alternates: Partial<Record<Locale, string>> =
+  Astro.props.alternates ??
+  Object.fromEntries(siteConfig.locales.map((l) => [l, path]));
+
+const companyName = siteConfig.company.name[locale];
+const fullTitle = title ? `${title} | ${companyName}` : companyName;
+const pageDescription = description ?? siteConfig.company.description[locale];
+const canonical = new URL(localizePath(locale, path), siteConfig.url).href;
+const themeStyle = [
+  `--site-primary: ${siteConfig.theme.primary}`,
+  `--site-background: ${siteConfig.theme.background}`,
+  `--site-foreground: ${siteConfig.theme.foreground}`,
+].join('; ');
+---
+
+<!doctype html>
+<html lang={locale} style={themeStyle}>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <title>{fullTitle}</title>
+    <meta name='description' content={pageDescription} />
+    {noindex && <meta name='robots' content='noindex' />}
+    {!noindex && <link rel='canonical' href={canonical} />}
+    {
+      siteConfig.locales.map((l) => {
+        const alternatePath = alternates[l];
+        return alternatePath ? (
+          <link
+            rel='alternate'
+            hreflang={localeTags[l]}
+            href={new URL(localizePath(l, alternatePath), siteConfig.url).href}
+          />
+        ) : null;
+      })
+    }
+    <link rel='icon' href='/favicon.svg' type='image/svg+xml' />
+    <meta name='theme-color' content={siteConfig.theme.background} />
+    <meta property='og:type' content='website' />
+    <meta property='og:title' content={fullTitle} />
+    <meta property='og:description' content={pageDescription} />
+    <meta property='og:url' content={canonical} />
+    <meta property='og:site_name' content={companyName} />
+    <meta property='og:locale' content={localeTags[locale].replace('-', '_')} />
+  </head>
+  <body class='flex flex-col'>
+    <a
+      href='#main'
+      class='sr-only z-50 rounded-full bg-primary px-5 py-2 font-bold text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3'
+    >
+      {ui.skipToContent[locale]}
+    </a>
+    <SiteHeader locale={locale} alternates={alternates} path={path} />
+    <main id='main' class='flex-1' tabindex='-1'>
+      <slot />
+    </main>
+    <SiteFooter locale={locale} />
+  </body>
+</html>

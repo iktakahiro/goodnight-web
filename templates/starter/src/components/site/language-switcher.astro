@@ -1,0 +1,38 @@
+---
+/**
+ * Links to this page in the other languages. When a page does not exist in a
+ * language, the link goes to that language's home page.
+ */
+import { localeNames, localizePath } from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+import { siteConfig, type Locale } from '../../../site.config';
+
+interface Props {
+  locale: Locale;
+  alternates: Partial<Record<Locale, string>>;
+}
+
+const { locale, alternates } = Astro.props;
+---
+
+{
+  siteConfig.locales.length > 1 && (
+    <nav aria-label={ui.language[locale]}>
+      <ul class='flex items-center rounded-full border border-border bg-card p-1 text-sm'>
+        {siteConfig.locales.map((l) => (
+          <li>
+            <a
+              href={localizePath(l, alternates[l] ?? '/')}
+              lang={l}
+              hreflang={l}
+              aria-current={l === locale ? 'true' : undefined}
+              class='block rounded-full px-3 py-1 font-bold text-muted no-underline hover:text-primary-strong aria-[current=true]:bg-primary aria-[current=true]:text-primary-foreground'
+            >
+              {localeNames[l]}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}

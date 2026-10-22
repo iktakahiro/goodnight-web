@@ -1,0 +1,226 @@
+---
+import SectionHeading from '../../components/ui/section-heading.astro';
+import Button from '../../components/ui/button.astro';
+import Card from '../../components/ui/card.astro';
+import PostList from '../../features/posts/post-list.astro';
+import { getPosts } from '../../features/posts/posts';
+import BaseLayout from '../../layouts/base-layout.astro';
+import {
+  localeFromParam,
+  localeStaticPaths,
+  localizePath,
+} from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+import { siteConfig } from '../../../site.config';
+
+export const getStaticPaths = localeStaticPaths;
+
+const locale = localeFromParam(Astro.params.lang);
+const news = (await getPosts('news', locale)).slice(0, 3);
+const posts = (await getPosts('blog', locale)).slice(0, 3);
+
+const text = {
+  ja: {
+    heroTitle: '長く使える家具を、\nお店とオフィスに。',
+    heroLead:
+      '金沢の小さな工房で、店舗やオフィスの家具をつくり、直しています。図面がなくても、写真とご要望から相談できます。',
+    heroPrimary: 'サービスを見る',
+    heroSecondary: 'お問い合わせ',
+    servicesEyebrow: 'Services',
+    servicesTitle: 'できること',
+    services: [
+      {
+        title: '家具の製作',
+        body: 'カウンター、棚、テーブルなどを、お店の広さと使い方に合わせてつくります。',
+      },
+      {
+        title: '修理と張り替え',
+        body: 'ぐらつく椅子の修理や、座面の張り替え、テーブルの塗り直しを行います。',
+      },
+      {
+        title: '店舗内装の設計',
+        body: '家具の配置から照明、床材まで、開店の準備をまとめてお手伝いします。',
+      },
+    ],
+    newsTitle: 'お知らせ',
+    blogTitle: 'ブログ',
+    ctaTitle: 'まずはお気軽にご相談ください',
+    ctaBody:
+      '「この椅子は直せる？」といった小さなご質問でもかまいません。2営業日以内にお返事します。',
+  },
+  en: {
+    heroTitle: 'Furniture that lasts,\nfor shops and offices.',
+    heroLead:
+      'We are a small workshop in Kanazawa that makes and repairs furniture for shops and offices. You can start with a few photos and a description; drawings are not needed.',
+    heroPrimary: 'See our services',
+    heroSecondary: 'Contact us',
+    servicesEyebrow: 'Services',
+    servicesTitle: 'What we do',
+    services: [
+      {
+        title: 'Custom furniture',
+        body: 'Counters, shelves, and tables made to fit the size of your shop and the way you use it.',
+      },
+      {
+        title: 'Repair and reupholstery',
+        body: 'We fix wobbly chairs, replace seat fabric, and refinish tables.',
+      },
+      {
+        title: 'Shop interior design',
+        body: 'From furniture layout to lighting and flooring, we help you prepare for opening day.',
+      },
+    ],
+    newsTitle: 'News',
+    blogTitle: 'Blog',
+    ctaTitle: 'Tell us what you need',
+    ctaBody:
+      'Small questions such as "Can this chair be repaired?" are welcome. We reply within two business days.',
+  },
+}[locale];
+---
+
+<BaseLayout locale={locale} path='/'>
+  <section
+    class='relative overflow-hidden bg-linear-to-b from-primary-soft via-primary-softer to-background'
+  >
+    <div
+      aria-hidden='true'
+      class='pointer-events-none absolute -top-32 -right-24 size-[28rem] rounded-full bg-primary/15 blur-3xl'
+    >
+    </div>
+    <div
+      aria-hidden='true'
+      class='pointer-events-none absolute bottom-[-10rem] -left-24 size-80 rounded-full bg-[#ffd9e8]/50 blur-3xl'
+    >
+    </div>
+    <div
+      class='relative mx-auto grid max-w-6xl gap-10 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1.3fr_1fr] lg:items-center'
+    >
+      <div class='space-y-6'>
+        <p
+          class='inline-flex rounded-full bg-card/80 px-4 py-1 text-sm font-bold text-primary-strong shadow-xs'
+        >
+          {siteConfig.company.name[locale]}
+        </p>
+        <h1
+          class='text-4xl leading-tight font-bold whitespace-pre-line sm:text-5xl'
+        >
+          {text.heroTitle}
+        </h1>
+        <p class='max-w-xl text-base text-muted sm:text-lg'>{text.heroLead}</p>
+        <div class='flex flex-wrap gap-3 pt-2'>
+          <Button href={localizePath(locale, '/services/')} size='lg'>
+            {text.heroPrimary}
+          </Button>
+          <Button
+            href={localizePath(locale, '/contact/')}
+            variant='outline'
+            size='lg'
+          >
+            {text.heroSecondary}
+          </Button>
+        </div>
+      </div>
+      <div aria-hidden='true' class='hidden lg:block'>
+        <div
+          class='relative mx-auto aspect-square w-full max-w-sm rounded-[2.5rem] border border-border bg-card/70 p-8 shadow-xl shadow-primary/10'
+        >
+          <div class='grid h-full grid-cols-2 gap-4'>
+            <div class='rounded-3xl bg-primary-soft'></div>
+            <div class='rounded-3xl bg-[#ffe7f0]'></div>
+            <div class='rounded-3xl bg-[#e7f3ff]'></div>
+            <div class='rounded-3xl bg-primary/20'></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section
+    aria-labelledby='services-title'
+    class='mx-auto max-w-6xl px-5 pt-20 sm:px-8'
+  >
+    <SectionHeading
+      id='services-title'
+      eyebrow={text.servicesEyebrow}
+      title={text.servicesTitle}
+    />
+    <ul class='mt-8 grid gap-5 md:grid-cols-3'>
+      {
+        text.services.map((service, index) => (
+          <Card as='li' class='space-y-3'>
+            <span
+              aria-hidden='true'
+              class='grid size-10 place-items-center rounded-full bg-primary-soft text-sm font-bold text-primary-strong'
+            >
+              {String(index + 1).padStart(2, '0')}
+            </span>
+            <h3 class='text-lg font-bold'>{service.title}</h3>
+            <p class='text-[0.95rem] text-muted'>{service.body}</p>
+          </Card>
+        ))
+      }
+    </ul>
+    <div class='mt-6'>
+      <Button href={localizePath(locale, '/services/')} variant='secondary'>
+        {ui.viewAll[locale]}
+      </Button>
+    </div>
+  </section>
+
+  <div class='mx-auto grid max-w-6xl gap-12 px-5 pt-20 sm:px-8 lg:grid-cols-2'>
+    <section aria-labelledby='news-title' class='space-y-6'>
+      <div class='flex items-end justify-between gap-4'>
+        <SectionHeading id='news-title' eyebrow='News' title={text.newsTitle} />
+        <a
+          href={localizePath(locale, '/news/')}
+          class='shrink-0 text-sm font-bold text-primary-strong'
+        >
+          {ui.viewAll[locale]}
+        </a>
+      </div>
+      <PostList
+        locale={locale}
+        collection='news'
+        posts={news}
+        headingLevel={3}
+        showDescription={false}
+      />
+    </section>
+    <section aria-labelledby='blog-title' class='space-y-6'>
+      <div class='flex items-end justify-between gap-4'>
+        <SectionHeading id='blog-title' eyebrow='Blog' title={text.blogTitle} />
+        <a
+          href={localizePath(locale, '/blog/')}
+          class='shrink-0 text-sm font-bold text-primary-strong'
+        >
+          {ui.viewAll[locale]}
+        </a>
+      </div>
+      <PostList
+        locale={locale}
+        collection='blog'
+        posts={posts}
+        headingLevel={3}
+        showDescription={false}
+      />
+    </section>
+  </div>
+
+  <section class='mx-auto max-w-6xl px-5 pt-20 sm:px-8'>
+    <div
+      class='flex flex-col items-start gap-6 rounded-[2rem] bg-linear-to-br from-primary to-primary-strong px-8 py-12 text-primary-foreground sm:px-12 md:flex-row md:items-center md:justify-between'
+    >
+      <div class='space-y-3'>
+        <h2 class='text-2xl font-bold sm:text-3xl'>{text.ctaTitle}</h2>
+        <p class='max-w-xl text-primary-foreground/90'>{text.ctaBody}</p>
+      </div>
+      <a
+        href={localizePath(locale, '/contact/')}
+        class='inline-flex min-h-13 shrink-0 items-center rounded-full bg-card px-8 font-bold text-primary-strong no-underline shadow-sm hover:bg-primary-soft'
+      >
+        {ui.contactUs[locale]}
+      </a>
+    </div>
+  </section>
+</BaseLayout>

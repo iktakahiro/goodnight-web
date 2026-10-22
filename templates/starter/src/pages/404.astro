@@ -1,0 +1,56 @@
+---
+/**
+ * The page shown for a URL that does not exist. Static hosting cannot tell
+ * which language the visitor reads, so the page shows both.
+ */
+import BaseLayout from '../layouts/base-layout.astro';
+import { localizePath } from '../i18n/locales';
+import { siteConfig, type Locale } from '../../site.config';
+
+const text: Record<Locale, { title: string; body: string; home: string }> = {
+  ja: {
+    title: 'ページが見つかりません',
+    body: 'お探しのページは移動したか、削除された可能性があります。',
+    home: 'トップページへ戻る',
+  },
+  en: {
+    title: 'Page not found',
+    body: 'The page you are looking for may have been moved or deleted.',
+    home: 'Back to the home page',
+  },
+};
+
+const locale = siteConfig.defaultLocale;
+const others = siteConfig.locales.filter((l) => l !== locale);
+---
+
+<BaseLayout locale={locale} title={text[locale].title} path='/404/' alternates={{}} noindex>
+  <div class='mx-auto max-w-2xl px-5 py-24 text-center sm:px-8'>
+    <p
+      aria-hidden='true'
+      class='text-7xl font-bold text-primary/30 tabular-nums'
+    >
+      404
+    </p>
+    {
+      [locale, ...others].map((l, index) => (
+        <section lang={l} class:list={['space-y-3', index > 0 && 'mt-10 border-t border-border pt-10']}>
+          {index === 0 ? (
+            <h1 class='mt-6 text-2xl font-bold sm:text-3xl'>{text[l].title}</h1>
+          ) : (
+            <h2 class='text-xl font-bold sm:text-2xl'>{text[l].title}</h2>
+          )}
+          <p class='text-muted'>{text[l].body}</p>
+          <p>
+            <a
+              href={localizePath(l, '/')}
+              class='inline-flex min-h-11 items-center rounded-full bg-primary-soft px-6 font-bold text-primary-strong no-underline hover:bg-primary-ring/40'
+            >
+              {text[l].home}
+            </a>
+          </p>
+        </section>
+      ))
+    }
+  </div>
+</BaseLayout>

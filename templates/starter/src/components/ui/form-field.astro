@@ -1,0 +1,45 @@
+---
+/**
+ * A label, an optional hint, and a form control passed in the default slot.
+ * Give the control `id={id}` and `aria-describedby={`${id}-hint`}` when a
+ * hint is set.
+ */
+interface Props {
+  id: string;
+  label: string;
+  required?: boolean;
+  /** Text shown next to the label for required fields, for example `必須`. */
+  requiredText: string;
+  /** Text shown next to the label for optional fields, for example `任意`. */
+  optionalText: string;
+  hint?: string;
+}
+
+const { id, label, required = false, requiredText, optionalText, hint } =
+  Astro.props;
+---
+
+<div class='space-y-2'>
+  <label for={id} class='flex items-center gap-2 text-sm font-bold'>
+    {label}
+    {
+      required ? (
+        <span class='rounded-full bg-primary px-2 py-px text-[0.7rem] text-primary-foreground'>
+          {requiredText}
+        </span>
+      ) : (
+        <span class='rounded-full bg-primary-soft px-2 py-px text-[0.7rem] text-primary-strong'>
+          {optionalText}
+        </span>
+      )
+    }
+  </label>
+  <slot />
+  {
+    hint && (
+      <p id={`${id}-hint`} class='text-sm text-muted'>
+        {hint}
+      </p>
+    )
+  }
+</div>

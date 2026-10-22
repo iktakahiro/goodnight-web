@@ -1,0 +1,19 @@
+---
+import PostArticle from '../../../features/posts/post-article.astro';
+import { postStaticPaths } from '../../../features/posts/posts';
+import { localeParam } from '../../../i18n/locales';
+
+export function getStaticPaths() {
+  return postStaticPaths('blog', localeParam);
+}
+
+const { post, locale, slug, locales } = Astro.props;
+---
+
+<PostArticle
+  collection='blog'
+  post={post}
+  locale={locale}
+  slug={slug}
+  locales={locales}
+/>

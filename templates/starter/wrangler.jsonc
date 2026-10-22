@@ -1,0 +1,17 @@
+// Cloudflare Workers settings for this site.
+// Do not rename the bindings (such as "DB"): the goodnight-web server package
+// looks them up by name.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "goodnight-web-starter",
+  "compatibility_date": "2026-10-15",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+  },
+  // Phase 2 (after @goodnight-web/server is available) adds:
+  // "main": "src/worker.ts", "compatibility_flags": ["nodejs_compat"],
+  // assets.binding "ASSETS", assets.run_worker_first
+  // ["/api/*", "/admin", "/admin/*"], the D1 binding "DB" with migrations_dir
+  // "node_modules/@goodnight-web/server/migrations", and the rate limit binding.
+}

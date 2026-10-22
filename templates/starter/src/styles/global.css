@@ -1,0 +1,198 @@
+@import 'tailwindcss';
+
+/*
+ * Theme colors. The values in site.config.ts (theme) are set on <html> as
+ * --site-primary, --site-background, and --site-foreground. The lighter and
+ * darker shades below are mixed from them, so changing three colors in
+ * site.config.ts updates the whole site.
+ */
+:root {
+  --site-primary: #7357c8;
+  --site-background: #fcfbff;
+  --site-foreground: #2f2a40;
+}
+
+@theme inline {
+  --font-sans:
+    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+    'BIZ UDPGothic', Meiryo, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-background: var(--site-background);
+  --color-foreground: var(--site-foreground);
+  --color-muted: color-mix(in oklab, var(--site-foreground) 68%, white);
+  --color-border: color-mix(in oklab, var(--site-primary) 16%, white);
+  --color-card: #ffffff;
+
+  --color-primary: var(--site-primary);
+  --color-primary-strong: color-mix(in oklab, var(--site-primary) 82%, black);
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: color-mix(in oklab, var(--site-primary) 9%, white);
+  --color-primary-softer: color-mix(in oklab, var(--site-primary) 5%, white);
+  --color-primary-ring: color-mix(in oklab, var(--site-primary) 45%, white);
+
+  --color-danger: #b4235a;
+  --color-danger-soft: #fdf0f4;
+  --color-success: #23775a;
+  --color-success-soft: #eef8f3;
+
+  --radius-card: 1.25rem;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Japanese text: break lines between phrases where the browser supports it. */
+  :lang(ja) {
+    line-break: strict;
+    word-break: auto-phrase;
+  }
+
+  h1,
+  h2,
+  h3 {
+    line-height: 1.45;
+    text-wrap: balance;
+  }
+
+  :lang(ja) :is(h1, h2, h3) {
+    font-feature-settings: 'palt';
+    letter-spacing: 0.02em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-primary-ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--site-primary) 22%, white);
+  }
+}
+
+/* Body text of Markdown pages (blog, news, privacy policy). */
+@layer components {
+  .prose-content {
+    font-size: 1rem;
+    line-height: 1.95;
+    max-width: 42rem;
+  }
+
+  .prose-content > * + * {
+    margin-top: 1.25em;
+  }
+
+  .prose-content h2 {
+    margin-top: 2.4em;
+    padding-bottom: 0.35em;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 1.375rem;
+    font-weight: 700;
+  }
+
+  .prose-content h3 {
+    margin-top: 2em;
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+
+  .prose-content :is(h2, h3) + * {
+    margin-top: 0.9em;
+  }
+
+  .prose-content a {
+    color: var(--color-primary-strong);
+    text-decoration: underline;
+  }
+
+  .prose-content :is(ul, ol) {
+    padding-left: 1.5em;
+  }
+
+  .prose-content ul {
+    list-style: disc;
+  }
+
+  .prose-content ol {
+    list-style: decimal;
+  }
+
+  .prose-content li + li {
+    margin-top: 0.4em;
+  }
+
+  .prose-content li::marker {
+    color: var(--color-primary);
+  }
+
+  .prose-content blockquote {
+    border-left: 4px solid var(--color-primary-soft);
+    padding-left: 1em;
+    color: var(--color-muted);
+  }
+
+  .prose-content code {
+    border-radius: 0.375rem;
+    background-color: var(--color-primary-soft);
+    padding: 0.1em 0.4em;
+    font-size: 0.9em;
+  }
+
+  .prose-content pre {
+    overflow-x: auto;
+    border-radius: 0.75rem;
+    padding: 1em;
+    font-size: 0.875rem;
+    line-height: 1.7;
+  }
+
+  .prose-content pre code {
+    background: none;
+    padding: 0;
+  }
+
+  .prose-content table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95em;
+  }
+
+  .prose-content :is(th, td) {
+    border: 1px solid var(--color-border);
+    padding: 0.5em 0.75em;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .prose-content th {
+    background-color: var(--color-primary-softer);
+  }
+
+  .prose-content hr {
+    border-color: var(--color-border);
+  }
+
+  .prose-content strong {
+    font-weight: 700;
+  }
+}

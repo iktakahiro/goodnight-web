@@ -1,0 +1,80 @@
+---
+/** The detail page of one news or blog post. */
+import { render } from 'astro:content';
+import Badge from '../../components/ui/badge.astro';
+import BaseLayout from '../../layouts/base-layout.astro';
+import { formatDate, localizePath } from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+import type { Post, PostCollection } from './posts';
+import type { Locale } from '../../../site.config';
+
+interface Props {
+  collection: PostCollection;
+  post: Post;
+  locale: Locale;
+  slug: string;
+  /** Languages that have a post with the same slug. */
+  locales: Locale[];
+}
+
+const { collection, post, locale, slug, locales } = Astro.props;
+const { Content } = await render(post);
+const path = `/${collection}/${slug}/`;
+const listPath = `/${collection}/`;
+const alternates = Object.fromEntries(
+  locales.map((l) => [l, path] as const),
+) as Partial<Record<Locale, string>>;
+const backLabel = collection === 'news' ? ui.backToNews : ui.backToBlog;
+const isoDate = (date: Date) => date.toISOString().slice(0, 10);
+---
+
+<BaseLayout
+  locale={locale}
+  title={post.data.title}
+  description={post.data.description}
+  path={path}
+  alternates={alternates}
+>
+  <article class='mx-auto max-w-3xl px-5 pt-12 sm:px-8 sm:pt-16'>
+    <a
+      href={localizePath(locale, listPath)}
+      class='inline-flex items-center gap-1 text-sm font-bold text-primary-strong no-underline hover:underline'
+    >
+      <span aria-hidden='true'>←</span>
+      {backLabel[locale]}
+    </a>
+    <header class='mt-6 space-y-4 border-b border-border pb-8'>
+      <h1 class='text-2xl font-bold sm:text-3xl'>{post.data.title}</h1>
+      <p class='flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted'>
+        <span>
+          {ui.published[locale]}:
+          <time datetime={isoDate(post.data.date)}>
+            {formatDate(locale, post.data.date)}
+          </time>
+        </span>
+        {
+          post.data.updated && (
+            <span>
+              {ui.updated[locale]}:
+              <time datetime={isoDate(post.data.updated)}>
+                {formatDate(locale, post.data.updated)}
+              </time>
+            </span>
+          )
+        }
+      </p>
+      {
+        post.data.tags.length > 0 && (
+          <p class='flex flex-wrap gap-1.5'>
+            {post.data.tags.map((tag) => (
+              <Badge>{tag}</Badge>
+            ))}
+          </p>
+        )
+      }
+    </header>
+    <div class='prose-content mt-8'>
+      <Content />
+    </div>
+  </article>
+</BaseLayout>

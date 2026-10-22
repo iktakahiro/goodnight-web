@@ -1,0 +1,382 @@
+---
+/**
+ * The contact form. When `siteConfig.turnstileSiteKey` is empty, it shows a
+ * notice that the form is not available yet instead of the fields.
+ *
+ * Field names (`name`, `email`, `company`, `phone`, `category`, `body`,
+ * `consent`, and the honeypot `website`) are read by the server. Keep them as
+ * they are when you change the layout or the labels.
+ */
+import FormField from '../../components/ui/form-field.astro';
+import { controlClass } from '../../components/ui/input-styles';
+import { localizePath } from '../../i18n/locales';
+import { siteConfig, type Locale } from '../../../site.config';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const siteKey = siteConfig.turnstileSiteKey.trim();
+const available = siteKey !== '';
+
+const text = {
+  ja: {
+    required: '必須',
+    optional: '任意',
+    name: 'お名前',
+    namePlaceholder: '山田 太郎',
+    email: 'メールアドレス',
+    emailHint: 'お返事はこのアドレスにお送りします。',
+    company: '会社名・団体名',
+    phone: '電話番号',
+    phoneHint: 'お電話での連絡を希望される場合にご記入ください。',
+    category: 'お問い合わせの種類',
+    categoryPlaceholder: '選んでください',
+    body: 'お問い合わせ内容',
+    bodyHint: '5,000文字まで入力できます。',
+    consentBefore: '',
+    consentLink: 'プライバシーポリシー',
+    consentAfter: 'に同意します',
+    honeypot: 'このフィールドは空のままにしてください',
+    submit: '送信する',
+    sending: '送信しています…',
+    unavailableTitle: 'お問い合わせフォームは準備中です',
+    unavailableBody:
+      '現在、このフォームからはお問い合わせを受け付けていません。お急ぎの場合は、メールまたはお電話でご連絡ください。',
+    success:
+      'お問い合わせを受け付けました。内容を確認のうえ、担当者よりご連絡します。',
+    invalid:
+      '送信できませんでした。入力内容を確認し、もう一度お試しください。',
+    rateLimited:
+      '短い時間に何度も送信されたため、受け付けを止めています。しばらく待ってからもう一度お試しください。',
+    error:
+      '通信エラーで送信できませんでした。時間をおいてもう一度お試しください。',
+    contactEmail: 'メール',
+    contactPhone: '電話',
+  },
+  en: {
+    required: 'Required',
+    optional: 'Optional',
+    name: 'Name',
+    namePlaceholder: 'Taro Yamada',
+    email: 'Email',
+    emailHint: 'We will reply to this address.',
+    company: 'Company or organization',
+    phone: 'Phone',
+    phoneHint: 'Fill this in if you would like us to call you.',
+    category: 'Category',
+    categoryPlaceholder: 'Choose one',
+    body: 'Message',
+    bodyHint: 'Up to 5,000 characters.',
+    consentBefore: 'I agree to the ',
+    consentLink: 'privacy policy',
+    consentAfter: '',
+    honeypot: 'Leave this field empty',
+    submit: 'Send',
+    sending: 'Sending…',
+    unavailableTitle: 'The contact form is not available yet',
+    unavailableBody:
+      'This form is not accepting inquiries at the moment. If your matter is urgent, please contact us by email or phone.',
+    success:
+      'Thank you. We have received your inquiry and will get back to you.',
+    invalid:
+      'Your message could not be sent. Please check your entries and try again.',
+    rateLimited:
+      'Too many messages were sent in a short time. Please wait a while and try again.',
+    error:
+      'Your message could not be sent because of a connection error. Please try again later.',
+    contactEmail: 'Email',
+    contactPhone: 'Phone',
+  },
+}[locale];
+
+const { company } = siteConfig;
+---
+
+<div
+  data-contact-unavailable
+  role='status'
+  class='rounded-card border border-primary-ring/50 bg-primary-softer p-6 sm:p-8'
+  hidden={available}
+>
+  <h2 class='text-lg font-bold'>{text.unavailableTitle}</h2>
+  <p class='mt-2 text-muted'>{text.unavailableBody}</p>
+  <dl class='mt-4 grid gap-1 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4'>
+    <dt class='font-bold'>{text.contactEmail}</dt>
+    <dd><a href={`mailto:${company.email}`}>{company.email}</a></dd>
+    {
+      company.phone && (
+        <>
+          <dt class='font-bold'>{text.contactPhone}</dt>
+          <dd>
+            <a href={`tel:${company.phone}`}>{company.phone}</a>
+          </dd>
+        </>
+      )
+    }
+  </dl>
+</div>
+
+{
+  available && (
+    <form
+      data-contact-form
+      method='post'
+      action='/api/contact'
+      novalidate
+      class='space-y-6'
+    >
+      <FormField
+        id='contact-name'
+        label={text.name}
+        required
+        requiredText={text.required}
+        optionalText={text.optional}
+      >
+        <input
+          id='contact-name'
+          name='name'
+          type='text'
+          autocomplete='name'
+          required
+          maxlength='100'
+          placeholder={text.namePlaceholder}
+          class={controlClass}
+        />
+      </FormField>
+
+      <FormField
+        id='contact-email'
+        label={text.email}
+        required
+        requiredText={text.required}
+        optionalText={text.optional}
+        hint={text.emailHint}
+      >
+        <input
+          id='contact-email'
+          name='email'
+          type='email'
+          autocomplete='email'
+          inputmode='email'
+          required
+          maxlength='254'
+          placeholder='name@example.com'
+          aria-describedby='contact-email-hint'
+          class={controlClass}
+        />
+      </FormField>
+
+      <div class='grid gap-6 sm:grid-cols-2'>
+        <FormField
+          id='contact-company'
+          label={text.company}
+          requiredText={text.required}
+          optionalText={text.optional}
+        >
+          <input
+            id='contact-company'
+            name='company'
+            type='text'
+            autocomplete='organization'
+            maxlength='100'
+            class={controlClass}
+          />
+        </FormField>
+
+        <FormField
+          id='contact-phone'
+          label={text.phone}
+          requiredText={text.required}
+          optionalText={text.optional}
+          hint={text.phoneHint}
+        >
+          <input
+            id='contact-phone'
+            name='phone'
+            type='tel'
+            autocomplete='tel'
+            inputmode='tel'
+            maxlength='30'
+            pattern='[0-9０-９+()\- ]*'
+            placeholder='03-0000-0000'
+            aria-describedby='contact-phone-hint'
+            class={controlClass}
+          />
+        </FormField>
+      </div>
+
+      <FormField
+        id='contact-category'
+        label={text.category}
+        required
+        requiredText={text.required}
+        optionalText={text.optional}
+      >
+        <div class='relative'>
+          <select
+            id='contact-category'
+            name='category'
+            required
+            class:list={[controlClass, 'appearance-none pr-12']}
+          >
+            <option value=''>{text.categoryPlaceholder}</option>
+            {siteConfig.contactCategories.map((category) => (
+              <option value={category.value}>{category.label[locale]}</option>
+            ))}
+          </select>
+          <svg
+            aria-hidden='true'
+            viewBox='0 0 24 24'
+            class='pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-muted'
+            fill='none'
+            stroke='currentColor'
+            stroke-width='2'
+            stroke-linecap='round'
+            stroke-linejoin='round'
+          >
+            <path d='m6 9 6 6 6-6' />
+          </svg>
+        </div>
+      </FormField>
+
+      <FormField
+        id='contact-body'
+        label={text.body}
+        required
+        requiredText={text.required}
+        optionalText={text.optional}
+        hint={text.bodyHint}
+      >
+        <textarea
+          id='contact-body'
+          name='body'
+          required
+          rows='8'
+          maxlength='5000'
+          aria-describedby='contact-body-hint'
+          class:list={[controlClass, 'min-h-48 resize-y leading-relaxed']}
+        />
+      </FormField>
+
+      {/* Honeypot: hidden from people, filled in by some bots. */}
+      <div class='absolute -left-[9999px] h-px w-px overflow-hidden' aria-hidden='true'>
+        <label for='contact-website'>{text.honeypot}</label>
+        <input
+          id='contact-website'
+          name='website'
+          type='text'
+          tabindex='-1'
+          autocomplete='off'
+        />
+      </div>
+
+      <div class='rounded-xl bg-primary-softer p-4'>
+        <label class='flex items-start gap-3 font-bold'>
+          <input
+            name='consent'
+            type='checkbox'
+            value='yes'
+            required
+            class='mt-1.5 size-5 shrink-0 accent-primary'
+          />
+          <span>
+            {text.consentBefore}
+            <a
+              href={localizePath(locale, '/privacy/')}
+              target='_blank'
+              class='text-primary-strong underline'
+            >
+              {text.consentLink}
+            </a>
+            {text.consentAfter}
+          </span>
+        </label>
+      </div>
+
+      {/* Turnstile widget. The script below fills this element. */}
+      <div
+        class='cf-turnstile min-h-[65px]'
+        data-sitekey={siteKey}
+        data-action='contact'
+        data-language={locale}
+        data-theme='light'
+      />
+
+      <div class='space-y-4'>
+        <p
+          data-result='success'
+          role='status'
+          tabindex='-1'
+          hidden
+          class='rounded-xl bg-success-soft p-4 font-bold text-success'
+        >
+          {text.success}
+        </p>
+        <p
+          data-result='invalid'
+          role='alert'
+          tabindex='-1'
+          hidden
+          class='rounded-xl bg-danger-soft p-4 font-bold text-danger'
+        >
+          {text.invalid}
+        </p>
+        <p
+          data-result='rate-limited'
+          role='alert'
+          tabindex='-1'
+          hidden
+          class='rounded-xl bg-danger-soft p-4 font-bold text-danger'
+        >
+          {text.rateLimited}
+        </p>
+        <p
+          data-result='error'
+          role='alert'
+          tabindex='-1'
+          hidden
+          class='rounded-xl bg-danger-soft p-4 font-bold text-danger'
+        >
+          {text.error}
+        </p>
+        <p
+          data-result='unavailable'
+          role='alert'
+          tabindex='-1'
+          hidden
+          class='rounded-xl bg-danger-soft p-4 font-bold text-danger'
+        >
+          {text.unavailableTitle}
+        </p>
+
+        <button
+          type='submit'
+          class='inline-flex min-h-13 w-full items-center justify-center rounded-full bg-primary px-10 font-bold text-primary-foreground shadow-sm shadow-primary/20 transition-colors hover:bg-primary-strong disabled:opacity-60 sm:w-auto'
+          data-label-sending={text.sending}
+        >
+          {text.submit}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+{
+  available && (
+    <script
+      is:inline
+      src='https://challenges.cloudflare.com/turnstile/v0/api.js'
+      async
+      defer
+    />
+  )
+}
+
+<script>
+  import { setupContactForm } from './contact-form-client';
+
+  const form = document.querySelector<HTMLFormElement>('[data-contact-form]');
+  if (form) setupContactForm(form);
+</script>
