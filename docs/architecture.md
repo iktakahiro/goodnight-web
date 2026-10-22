@@ -40,8 +40,7 @@ are not yet. Design decisions are recorded in
   `/api/*`, `/admin`, and `/admin/*` reach Hono (`run_worker_first`). The
   bare `/admin` must be listed: `/admin/*` does not match it.
 - **Hono** routes the API. `createGoodnightWorker(options)` takes options
-  from the site (locale, contact categories, extra allowed origins, Turnstile
-  hostnames) and reads bindings and secrets from `env` on every request.
+  from the site (locale, contact categories, Turnstile hostnames) and reads bindings and secrets from `env` on every request.
   Requests it does not handle go to the `ASSETS` binding.
 - **Better Auth** is built from the env bindings and cached per isolate,
   keyed by the `env` object and the request origin. A new `env` object (new
@@ -49,7 +48,12 @@ are not yet. Design decisions are recorded in
   CPU, which is too much to repeat on every request on the free plan
   ([0001](decisions/0001-passkey-auth-on-workers.md)). Email and password
   sign-in is disabled; admins use passkeys. IP tracking is off, so the
-  `session.ipAddress` column stays empty.
+  `session.ipAddress` column stays empty. That also turns off Better Auth's
+  own rate limiter, so the Worker limits the public sign-in endpoints
+  (`passkey/generate-authenticate-options` and
+  `passkey/verify-authentication`) itself, with the key `auth:<ip_hash>` on
+  the Rate Limiting binding. Over the limit returns 429; without the binding
+  or `IP_HASH_SECRET` they return 503.
 - **D1** stores submissions, settings, and the Better Auth tables. The
   migrations ship inside `@goodnight-web/server`
   ([0002](decisions/0002-migrations-from-package.md)).
@@ -60,11 +64,11 @@ are not yet. Design decisions are recorded in
 | ---------------------- | ------------------ | ---------------------------------------------------------- | ------------------------------ |
 | `DB`                   | D1 binding         | All persistent data                                        | Worker cannot run              |
 | `ASSETS`               | Static Assets      | The site's pages                                           | non-API paths return 404       |
-| `CONTACT_RATE_LIMITER` | Rate Limiting      | Contact submissions and setup attempts per `ip_hash`       | contact API 503                |
+| `CONTACT_RATE_LIMITER` | Rate Limiting      | Contact, setup, and passkey sign-in requests per `ip_hash` | contact, setup, sign-in 503    |
 | `SETUP_TOKEN`          | secret             | Required to create the first admin                         | setup 503                      |
 | `ADMIN_EMAILS`         | secret or variable | Comma-separated addresses that may be admins               | setup 503, admin API 403       |
 | `BETTER_AUTH_SECRET`   | secret             | Better Auth signing secret, 32 characters or more          | auth, setup, and admin API 503 |
-| `IP_HASH_SECRET`       | secret             | HMAC key for `ip_hash`                                     | contact API 503                |
+| `IP_HASH_SECRET`       | secret             | HMAC key for `ip_hash`                                     | contact, setup, sign-in 503    |
 | `TURNSTILE_SECRET`     | secret             | Turnstile siteverify                                       | contact API 503                |
 | `TURNSTILE_SITE_KEY`   | variable (public)  | Turnstile widget; the form reads it from the config API    | contact API 503                |
 | `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification                |
@@ -87,11 +91,11 @@ When `available` is `false`, the form shows that it is not available yet.
 0. If `TURNSTILE_SECRET`, `TURNSTILE_SITE_KEY`, `IP_HASH_SECRET`, or the
    `CONTACT_RATE_LIMITER` binding is missing, return 503
    (`contact_unavailable`) without reading the body.
-1. Check that `Origin` is the Worker's own origin (or one listed in
-   `options.contact.allowedOrigins`), that `Content-Type` is JSON, and that the
-   body is at most 16 KB. The size is checked against `Content-Length` and
-   again while reading, so a chunked body cannot bypass it. Errors: 403, 415,
-   413, then 400 for bad JSON.
+1. Check that `Origin` is the Worker's own origin, that `Content-Type` is
+   JSON, and that the body is at most 16 KB. The size is checked against
+   `Content-Length` and again while reading, so a chunked body cannot bypass
+   it. Errors: 403, 415, 413, then 400 for bad JSON. The form is served by the
+   same Worker, so the API is same-origin only and sends no CORS headers.
 2. If the honeypot field is filled, save the submission with status `held` and
    return success, so a bot learns nothing. This path also counts against the
    rate limit; over the limit it still returns success but saves nothing, so a
@@ -154,11 +158,13 @@ arrive.
 `POST /api/setup` with `{ token, email, name? }`
 (`packages/server/src/features/setup/`):
 
-1. 503 without `BETTER_AUTH_SECRET`, `SETUP_TOKEN`, or `ADMIN_EMAILS`.
+1. 503 without `BETTER_AUTH_SECRET`, `SETUP_TOKEN`, `ADMIN_EMAILS`,
+   `IP_HASH_SECRET`, or the `CONTACT_RATE_LIMITER` binding. Setup never runs
+   without its attempt limit.
 2. 403 unless `Origin` is the Worker's origin. Better Auth skips its own
    origin check for server-side calls, so the route checks it.
 3. 429 over the rate limit (`setup:<ip_hash>` on the same binding).
-4. 403 `setup_closed` when any passkey exists.
+4. 403 `setup_closed` once a passkey was ever registered.
 5. 403 `invalid_setup_token` unless the token matches `SETUP_TOKEN`
    (constant-time compare).
 6. 403 `email_not_allowed` unless the address is in `ADMIN_EMAILS`
@@ -167,8 +173,10 @@ arrive.
    and sets the session cookie. It is not reachable under `/api/auth/*`.
 
 The browser then registers a passkey with the Better Auth passkey client.
-Setup closes when a passkey exists, so a person who left before registering
-one can run setup again. `GET /api/setup` returns `{ configured, open }`.
+Setup closes when the first passkey is registered, so a person who left before
+registering one can run setup again. A trigger on the `passkey` table records
+`settings.setup_closed_at` in the same transaction, so setup stays closed even
+if every passkey is deleted later (migration `0003_setup_closed.sql`). `GET /api/setup` returns `{ configured, open }`.
 
 ### Admin API
 
