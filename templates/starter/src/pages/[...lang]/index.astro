@@ -21,9 +21,9 @@ const posts = (await getPosts('blog', locale)).slice(0, 3);
 
 const text = {
   ja: {
-    heroTitle: '長く使える家具を、\nお店とオフィスに。',
+    heroTitle: '長く使える家具を、\n店舗とオフィスに。',
     heroLead:
-      '金沢の小さな工房で、店舗やオフィスの家具をつくり、直しています。図面がなくても、写真とご要望から相談できます。',
+      '金沢の小さな工房で、店舗やオフィスの家具をつくり、直しています。図面がなくても、写真とご要望からご相談いただけます。',
     heroPrimary: 'サービスを見る',
     heroSecondary: 'お問い合わせ',
     servicesEyebrow: 'Services',
@@ -31,7 +31,7 @@ const text = {
     services: [
       {
         title: '家具の製作',
-        body: 'カウンター、棚、テーブルなどを、お店の広さと使い方に合わせてつくります。',
+        body: 'カウンター、棚、テーブルなどを、店舗やオフィスの広さと使い方に合わせてつくります。',
       },
       {
         title: '修理と張り替え',
@@ -42,16 +42,17 @@ const text = {
         body: '家具の配置から照明、床材まで、開店の準備をまとめてお手伝いします。',
       },
     ],
+    servicesMore: 'サービスの詳細を見る',
     newsTitle: 'お知らせ',
     blogTitle: 'ブログ',
     ctaTitle: 'まずはお気軽にご相談ください',
     ctaBody:
-      '「この椅子は直せる？」といった小さなご質問でもかまいません。2営業日以内にお返事します。',
+      '「この椅子は直せる？」といった小さなご質問も歓迎します。2営業日以内にご連絡します。',
   },
   en: {
-    heroTitle: 'Furniture that lasts,\nfor shops and offices.',
+    heroTitle: 'Furniture that lasts\nfor shops and offices.',
     heroLead:
-      'We are a small workshop in Kanazawa that makes and repairs furniture for shops and offices. You can start with a few photos and a description; drawings are not needed.',
+      'We make and repair furniture for shops and offices at our small workshop in Kanazawa. You do not need drawings to start. A few photos and a short description are enough.',
     heroPrimary: 'See our services',
     heroSecondary: 'Contact us',
     servicesEyebrow: 'Services',
@@ -59,7 +60,7 @@ const text = {
     services: [
       {
         title: 'Custom furniture',
-        body: 'Counters, shelves, and tables made to fit the size of your shop and the way you use it.',
+        body: 'We make counters, shelves, and tables to fit the size of your space and the way you use it.',
       },
       {
         title: 'Repair and reupholstery',
@@ -70,6 +71,7 @@ const text = {
         body: 'From furniture layout to lighting and flooring, we help you prepare for opening day.',
       },
     ],
+    servicesMore: 'More about our services',
     newsTitle: 'News',
     blogTitle: 'Blog',
     ctaTitle: 'Tell us what you need',
@@ -163,7 +165,7 @@ const text = {
     </ul>
     <div class='mt-6'>
       <Button href={localizePath(locale, '/services/')} variant='secondary'>
-        {ui.viewAll[locale]}
+        {text.servicesMore}
       </Button>
     </div>
   </section>

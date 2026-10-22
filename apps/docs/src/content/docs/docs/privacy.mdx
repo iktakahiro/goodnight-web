@@ -16,7 +16,7 @@ Inquiries are deleted after the retention period, 180 days by default. See [Dele
 
 ## Data is stored outside Japan
 
-D1 lets you restrict where data is stored only to the EU, FedRAMP, or the US. You cannot pin a database to Japan ([Cloudflare: D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/)). The privacy policy template therefore says that data is stored on servers in other countries (such as the United States), and it describes those countries and their privacy rules. Japan's Act on the Protection of Personal Information asks a business that handles personal data abroad to understand that environment.
+D1 lets you restrict where data is stored only to the EU, FedRAMP, or the US. You cannot pin a database to Japan ([Cloudflare: D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/)). The privacy policy template therefore says that data may be stored on servers in other countries (such as the United States), names the storage provider, and says that the company has checked the privacy rules of those countries. Japan's Act on the Protection of Personal Information asks a business that handles personal data abroad to understand that environment. A comment in the template points to the country surveys published by the Personal Information Protection Commission, for when you describe those rules in detail.
 
 ## Deleted data can be restored for a while
 
@@ -27,7 +27,6 @@ D1 Time Travel can restore a database to an earlier point in time: up to 7 days 
 - **Turnstile.** The contact form uses Cloudflare Turnstile. The template mentions it.
 - **Slack.** If you turn on Slack notifications, the message contains only the count, the category, and a link. No personal data is sent to Slack.
 
-<Callout type='warn' title='Draft / not verified yet'>
-  The privacy policy template is part of the starter, which is not written yet.
-  This page will link to it when it lands.
-</Callout>
+## The template
+
+The starter has the template in Japanese and English: `src/content/pages/ja/privacy.md` and `src/content/pages/en/privacy.md`. It uses the sample company's details, including the representative's name and the contact desk for requests to disclose, correct, or delete personal information. Replace them with your own, and remove the note at the top of the page after a professional has reviewed it.
