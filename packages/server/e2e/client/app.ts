@@ -1,12 +1,9 @@
-// Browser side of the end-to-end test: exposes window.gnw for Playwright.
-import { passkeyClient } from '@better-auth/passkey/client';
+// Browser side of the end-to-end test: exposes window.gnw for Playwright, for
+// API checks next to the admin UI.
 import { createAuthClient } from 'better-auth/client';
 import { submitContact } from '../../src/client.ts';
 
-const auth = createAuthClient({
-  basePath: '/api/auth',
-  plugins: [passkeyClient()],
-});
+const auth = createAuthClient({ basePath: '/api/auth' });
 
 const call = async (path: string, init: RequestInit = {}) => {
   const response = await fetch(path, {
@@ -35,9 +32,7 @@ const gnw = {
       method: 'POST',
       body: JSON.stringify({ token, email, name }),
     }),
-  addPasskey: () => auth.passkey.addPasskey({ name: 'e2e key' }),
   signOut: () => auth.signOut(),
-  signInPasskey: () => auth.signIn.passkey(),
 };
 
 (window as unknown as { gnw: typeof gnw }).gnw = gnw;

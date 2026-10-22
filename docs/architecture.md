@@ -2,8 +2,8 @@
 
 This document describes the architecture of goodnight-web. Milestone M1 is in
 progress: `@goodnight-web/server` (contact API, setup, passkey auth, admin API,
-migrations) is implemented; the admin UI SPA, the starter, and the docs site
-are not yet. Design decisions are recorded in
+admin UI, migrations) and the documentation site are implemented; the starter
+is not yet. Design decisions are recorded in
 [decisions/](decisions/README.md).
 
 ## Constraints
@@ -108,8 +108,9 @@ When `available` is `false`, the form shows that it is not available yet.
    returns 429.
 5. Validate the input with the zod schema exported from
    `@goodnight-web/server/contact` (control characters removed, lengths
-   checked, `consent` must be `true`). A category outside
-   `options.contact.categories` is rejected. Then compute the spam score; a
+   checked, `consent` must be `true`). A category outside the values of
+   `options.contact.categories` is rejected; labels are only for the admin
+   UI. Then compute the spam score; a
    score of 3 or more sets the status to `held`.
 6. Insert the row into D1, then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
@@ -185,37 +186,75 @@ in `ADMIN_EMAILS` and has at least one passkey. The session from setup alone
 only allows registering the first passkey. State-changing requests also need
 the Worker's own `Origin` (CSRF). There is no development bypass.
 
-| Route                                      | Result                                                                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/admin/me`                        | the signed-in admin                                                                                                       |
-| `GET /api/admin/status`                    | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount` |
-| `GET /api/admin/submissions?status=&page=` | 50 per page, newest first, `total` and `unreadCount`; runs pruning                                                        |
-| `GET /api/admin/submissions/:id`           | one submission; a `new` one becomes `read`                                                                                |
-| `PATCH /api/admin/submissions/:id`         | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                    |
-| `DELETE /api/admin/submissions/:id`        | deletes the row                                                                                                           |
-| `GET /api/admin/submissions.csv?status=`   | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                         |
+| Route                                      | Result                                                                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/admin/me`                        | the signed-in admin                                                                                                                                          |
+| `GET /api/admin/status`                    | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`, `categories` (`{ value, label }`) |
+| `GET /api/admin/submissions?status=&page=` | 50 per page, newest first, `total` and `unreadCount`; runs pruning                                                                                           |
+| `GET /api/admin/submissions/:id`           | one submission; a `new` one becomes `read`                                                                                                                   |
+| `PATCH /api/admin/submissions/:id`         | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                       |
+| `DELETE /api/admin/submissions/:id`        | deletes the row                                                                                                                                              |
+| `GET /api/admin/submissions.csv?status=`   | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                                                            |
 
 `ip_hash` is never returned by the admin API.
 
 ### Admin UI
 
-- Screens: setup, passkey registration, sign-in, inquiry list (50 per page,
-  unread count always in the header, a notice with a link to the Turnstile
-  setup docs when `turnstileConfigured` is `false`), and detail (status change
-  and delete).
-- The admin UI is a React SPA built with Vite, Base UI, shadcn, and Tailwind
-  v4. It ships prebuilt inside `@goodnight-web/server` and is served by the
-  Worker ([0004](decisions/0004-admin-ui-delivery.md)): the package build
-  (`scripts/build-admin-module.ts`) turns the build output into
-  `src/features/admin-ui/admin-files.gen.ts`. Until the SPA lands, the
-  source is `packages/server/admin-placeholder/`.
-- `/admin` and paths without a file extension return `index.html`
-  (`no-cache`); `/admin/assets/*` are immutable; ETags give 304s. Every admin
-  response gets the admin CSP
-  (`default-src 'self'; script-src 'self'; style-src 'self'; ...`).
-- Japanese and English strings shared by the API, the admin UI, and the
-  contact form live in `@goodnight-web/server/messages`. The SPA shell loads
-  without a session, but every data request needs one.
+The admin UI is a React SPA in `packages/server/admin-ui/`, built with Vite,
+Base UI, shadcn-style components (the component source is copied into
+`admin-ui/src/shared/ui/` and adapted to Base UI, as shadcn does), Tailwind
+v4, and lucide icons. It ships prebuilt inside `@goodnight-web/server` and is
+served by the Worker ([0004](decisions/0004-admin-ui-delivery.md)).
+
+| Path                    | Screen                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                              |
+| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                            |
+| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), 50 per page, CSV export; `?status=&page=` keep the state |
+| `/admin/inquiries/<id>` | Detail: message, contact details, status change, reply by email, delete with a confirmation dialog                        |
+
+- **Session.** The list and detail screens first call `GET /api/admin/me`.
+  Without a session (401) they go to `/admin/setup` while setup is open, and
+  otherwise to `/admin/login?next=<path>`. After sign-in the user returns to
+  `next`, so the link in a Slack notification (`/admin/inquiries/<id>`) works
+  when signed out. `next` must be an `/admin` path. A session without a
+  passkey (403 `passkey_required`) goes to the passkey step of setup. There
+  is no client-side bypass: the API decides.
+- **Header.** The unread count from `GET /api/admin/status` (and from each
+  list response) is always shown, with the language switch and sign-out.
+- **Setup notices.** When `turnstileConfigured` is `false`, the list and
+  detail screens show a notice that the contact form is not accepting
+  submissions, with a link to the Turnstile setup page in the documentation.
+  The documentation origin is one constant, `DOCS_BASE_URL` in
+  `admin-ui/src/shared/docs-links.ts` (`https://goodnight-web.invalid` until
+  the site has a domain). Other missing contact settings are listed by name.
+  When Slack is not configured, the list shows a quieter note that can be
+  dismissed.
+- **Languages.** The UI picks Japanese or English from `navigator.languages`;
+  the header switch saves the choice in `localStorage`. Strings shared with
+  the API and the contact form (errors, statuses, field names) come from
+  `@goodnight-web/server/messages`; strings used only by the UI are in
+  `admin-ui/src/shared/i18n/admin-messages.ts`. API errors are shown with
+  the `error.<code>` message in the UI's language. Dates use `Intl` in the
+  viewer's time zone.
+- **CSP.** Every admin response gets the admin CSP
+  (`default-src 'self'; script-src 'self'; style-src 'self'; ...`). The
+  build has no inline scripts or styles. Base UI's one inline `<style>`
+  element is turned off (`CSPProvider disableStyleElements`) and its rule is
+  in `styles.css`. A test checks the built `index.html`, and the end-to-end
+  test fails on any CSP violation.
+- **Build.** `bun run build` in `packages/server` runs `vite build` into
+  `admin-ui/dist` and then `scripts/build-admin-module.ts`, which writes
+  `src/features/admin-ui/admin-files.gen.ts` (path, content type, ETag,
+  body). The generated file is not committed. Turborepo builds it before
+  `type-check`, `test`, and `deploy:check` of the server package. The bundle
+  is one JS file of about 190 kB gzip and one CSS file of about 8 kB gzip.
+  With it, `deploy:check` reports the server's test Worker at about
+  3,250 KiB (670 KiB gzip).
+- **Serving.** `/admin` and paths without a file extension return
+  `index.html` (`no-cache`); `/admin/assets/*` are immutable; ETags give
+  304s. The SPA shell loads without a session, but every data request needs
+  one.
 
 ### Security headers
 
@@ -310,11 +349,21 @@ the Worker a token that can write to GitHub.
 - `bun run test:e2e` in `packages/server` is the end-to-end test. It applies
   the migrations to a fresh local D1 (`.wrangler/e2e-state`), starts
   `wrangler dev` with `e2e/wrangler.jsonc` on port 8790 (`E2E_PORT` to
-  change), and drives Chromium with a CDP virtual authenticator: contact POST
-  and the row in D1, setup, passkey registration, sign-out, passkey sign-in,
-  and the admin API. The test Worker stubs Turnstile siteverify, so it calls
-  no Cloudflare service. It needs `bunx playwright install chromium` and is
-  not run in CI yet.
+  change), and drives the real admin UI in Chromium with a CDP virtual
+  authenticator: contact POST and the row in D1; setup with a wrong token, an
+  address outside `ADMIN_EMAILS`, and the right input; passkey registration;
+  sign-out; passkey sign-in with the button and with autofill; the list, the
+  detail, and a status change; a deep link while signed out; the language
+  switch; and delete with confirmation. It also checks the API rules the UI
+  relies on and fails on any CSP violation. The test Worker stubs Turnstile
+  siteverify, so it calls no Cloudflare service. It needs
+  `bunx playwright install chromium` and is not run in CI yet.
+- `bun run screenshots <dir>` in `packages/server` takes screenshots of the
+  admin UI in Japanese and English with fictional sample inquiries, using the
+  same local setup.
+- `bun test` also runs the admin UI's unit tests (`admin-ui/src/**/*.test.ts`):
+  language detection, date and number formatting, routes and the `next`
+  parameter, list query parsing, and the message catalogs.
 - `bun run test:e2e` in `templates/starter` runs the starter against
   `wrangler dev` with Cloudflare's Turnstile test keys: pages, the
   not-available state and 503, `/admin`, and a form submission saved to D1.

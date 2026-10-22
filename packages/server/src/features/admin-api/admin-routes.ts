@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import packageJson from '../../../package.json' with { type: 'json' };
 import type { HonoEnv } from '../../hono-env.ts';
+import type { LocalizedLabel } from '../../options.ts';
 import { apiError } from '../../shared/api-error.ts';
 import { getContactAvailability } from '../contact/contact-availability.ts';
 import { isSlackWebhookUrl } from '../notify/slack.ts';
@@ -53,6 +54,15 @@ export interface AdminSubmissionList {
   unreadCount: number;
 }
 
+/**
+ * A configured contact category. `label` is `null` when the category was
+ * configured as a plain string; show `value` then.
+ */
+export interface AdminCategory {
+  value: string;
+  label: LocalizedLabel | null;
+}
+
 /** Body of `GET /api/admin/status`. Never contains secret values. */
 export interface AdminStatus {
   version: string;
@@ -66,6 +76,11 @@ export interface AdminStatus {
   slackConfigured: boolean;
   retentionDays: number;
   unreadCount: number;
+  /**
+   * The `contact.categories` option in its configured order, empty when no
+   * categories are configured.
+   */
+  categories: AdminCategory[];
 }
 
 const toAdminSubmission = ({ ipHash: _ipHash, ...rest }: Submission) => rest;
@@ -115,6 +130,9 @@ export const adminRoutes = new Hono<HonoEnv>()
       slackConfigured: isSlackWebhookUrl(c.env.SLACK_WEBHOOK_URL),
       retentionDays,
       unreadCount,
+      categories: c
+        .get('options')
+        .contact.categoryLabels.map(({ value, label }) => ({ value, label })),
     };
     return c.json(status);
   })

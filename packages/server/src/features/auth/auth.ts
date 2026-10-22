@@ -3,9 +3,7 @@ import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import type { GoodnightEnv } from '../../env.ts';
 import { createSetupPlugin } from '../setup/setup-plugin.ts';
-
-/** Better Auth's base path. The admin UI's auth client uses the same path. */
-export const AUTH_BASE_PATH = '/api/auth';
+import { AUTH_BASE_PATH } from './auth-paths.ts';
 
 /** Shortest accepted `BETTER_AUTH_SECRET`, in characters. */
 export const MIN_AUTH_SECRET_LENGTH = 32;

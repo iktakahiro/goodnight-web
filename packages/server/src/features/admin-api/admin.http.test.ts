@@ -281,6 +281,31 @@ describe('admin API with an admin session', () => {
     });
   });
 
+  test('GET /status lists no categories when none are configured', async () => {
+    expect((await (await get('/api/admin/status')).json()).categories).toEqual(
+      [],
+    );
+  });
+
+  test('GET /status lists the configured categories with labels', async () => {
+    worker = createTestWorker({
+      options: {
+        contact: {
+          categories: [
+            { value: 'sales', label: { ja: '営業', en: 'Sales' } },
+            'other',
+          ],
+        },
+      },
+    });
+    cookie = await signInAsAdmin(worker);
+    const status = await (await get('/api/admin/status')).json();
+    expect(status.categories).toEqual([
+      { value: 'sales', label: { ja: '営業', en: 'Sales' } },
+      { value: 'other', label: null },
+    ]);
+  });
+
   test('listing prunes rows past the retention period', async () => {
     await seed(worker, 'old', { createdAt: Date.now() - 181 * DAY });
     await seed(worker, 'recent', { createdAt: Date.now() - 179 * DAY });
