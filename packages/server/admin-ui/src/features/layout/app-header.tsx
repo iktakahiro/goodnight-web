@@ -85,7 +85,7 @@ export const AppHeader = () => {
         <div className='ml-auto flex items-center gap-1 sm:gap-2'>
           <Link
             to='/'
-            search={{ status: 'new' }}
+            search={{ view: 'unread' }}
             aria-label={`${t('header.unread')}: ${t('admin.unreadCount', {
               count: formatNumber(unreadCount ?? 0, locale),
             })}`}

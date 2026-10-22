@@ -20,8 +20,8 @@
 //    in a Japanese browser with a CDP virtual authenticator: first-admin
 //    setup with SETUP_TOKEN and an ADMIN_EMAILS address -> passkey
 //    registration -> sign-out -> passkey sign-in -> the inquiry in the list
-//    -> switch to English -> the detail with the field labels -> status
-//    change, stored in D1.
+//    -> switch to English -> the detail with the field labels, marked read
+//    -> back to unread, stored in D1.
 //
 // Every secret is passed with --var, so a local .dev.vars does not change the
 // result. Set E2E_PORT to change the port (default 8841),
@@ -443,8 +443,33 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
       JSON.stringify(['email', ...definition.fields.map((field) => field.id)]),
     rendered,
   );
-  // The server holds messages sent within 3 seconds of showing the form
-  // (spam score `too_fast`). Take as long as a person would.
+  const honeypot = await page
+    .locator('[data-contact-honeypot]')
+    .evaluate((input) => ({
+      name: input.getAttribute('name'),
+      tabindex: input.getAttribute('tabindex'),
+      autocomplete: input.getAttribute('autocomplete'),
+      ignored: [
+        'data-1p-ignore',
+        'data-lpignore',
+        'data-bwignore',
+        'data-form-type',
+      ].every((name) => input.hasAttribute(name)),
+      hidden: input.parentElement?.getAttribute('aria-hidden'),
+      value: (input as HTMLInputElement).value,
+    }));
+  check(
+    'the honeypot is gnw_hp_x, hidden, empty, and opted out of autofill',
+    honeypot.name === 'gnw_hp_x' &&
+      honeypot.tabindex === '-1' &&
+      honeypot.autocomplete === 'off' &&
+      honeypot.ignored &&
+      honeypot.hidden === 'true' &&
+      honeypot.value === '',
+    honeypot,
+  );
+  // The server flags messages sent within 3 seconds of showing the form as
+  // suspected spam (spam score `too_fast`). Take as long as a person would.
   const shownAt = Date.now();
 
   await page.click('[data-contact-form] [type="submit"]');
@@ -495,7 +520,7 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
   check('contact form shows the thank-you message', await sent.isVisible());
 
   const rows = await query(
-    'SELECT email, fields, form_version, locale, status, ip_hash, page_path FROM submissions',
+    'SELECT email, fields, form_version, locale, status, suspected_spam, spam_reasons, ip_hash, page_path FROM submissions',
   );
   const row = rows[0];
   const values = JSON.parse(String(row?.fields ?? '{}')) as Record<
@@ -511,7 +536,9 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
       String(values[picked.message.id]).startsWith('テーブルの修理') &&
       row.form_version === definition.version &&
       row.locale === 'ja' &&
-      row.status === 'new' &&
+      row.status === 'unread' &&
+      row.suspected_spam === 0 &&
+      row.spam_reasons === '[]' &&
       row.page_path === '/contact/',
     rows,
   );
@@ -698,8 +725,8 @@ async function adminFlow(browser: Browser): Promise<void> {
         .first()
         .waitFor();
       await page
-        .getByTestId('status-select')
-        .getByText(ui('en', 'status.read'))
+        .getByTestId('read-toggle')
+        .getByText(ui('en', 'list.markUnread'))
         .waitFor();
       await page
         .getByTestId('unread-count')
@@ -707,18 +734,23 @@ async function adminFlow(browser: Browser): Promise<void> {
         .waitFor();
     },
   );
-  const statusChanged = page.getByText(
-    ui('en', 'detail.statusChanged', { status: ui('en', 'status.done') }),
-  );
-  await step(page, 'change the status to Done', async () => {
-    await page.getByTestId('status-select').click();
-    await page.getByRole('option', { name: ui('en', 'status.done') }).click();
+  const statusChanged = page.getByText(ui('en', 'detail.markedUnread'));
+  await step(page, 'mark the inquiry unread again', async () => {
+    await page.getByTestId('read-toggle').click();
     await statusChanged.waitFor();
+    await page
+      .getByTestId('unread-count')
+      .getByText(ui('en', 'admin.unreadCount', { count: 1 }))
+      .waitFor();
   });
   const status = await query(
     `SELECT status FROM submissions WHERE id = '${id}'`,
   );
-  check('the new status is stored in D1', status[0]?.status === 'done', status);
+  check(
+    'the unread status is stored in D1',
+    status[0]?.status === 'unread',
+    status,
+  );
   check(
     'no CSP violations or page errors in the admin screen',
     pageErrors.length === 0,

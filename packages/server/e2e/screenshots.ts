@@ -33,7 +33,8 @@ interface Sample {
   phone: string | null;
   category: string | null;
   body: string;
-  status: 'new' | 'read' | 'done' | 'held' | 'spam';
+  status: 'unread' | 'read';
+  suspectedSpam?: boolean;
   spamScore?: number;
   spamReasons?: string[];
 }
@@ -49,7 +50,7 @@ const samples: Sample[] = [
     phone: '03-1234-5678',
     category: 'sales',
     body: 'はじめまして。株式会社つきあかりの山田と申します。\n\n貴社のウェブサイト制作サービスについて、料金と納期の目安を教えていただけますでしょうか。社員 20 名ほどの会社で、会社案内とお知らせのページを考えています。\n\n来週以降でしたら、オンラインでの打ち合わせも可能です。どうぞよろしくお願いいたします。',
-    status: 'new',
+    status: 'unread',
   },
   {
     id: '01JSAMPLE0000000000000002',
@@ -60,7 +61,7 @@ const samples: Sample[] = [
     phone: '+1 555 0142',
     category: 'press',
     body: 'Hello,\n\nI am writing a short feature about small teams that run their websites without their own servers. Would someone from your team be available for a 20-minute interview next week?\n\nBest regards,\nEmily',
-    status: 'new',
+    status: 'unread',
   },
   {
     id: '01JSAMPLE0000000000000003',
@@ -71,7 +72,7 @@ const samples: Sample[] = [
     phone: null,
     category: 'sales',
     body: '先日お送りした見積もりの件で、追加の質問があります。ブログ機能は英語のページにも対応していますか？',
-    status: 'new',
+    status: 'unread',
   },
   {
     id: '01JSAMPLE0000000000000004',
@@ -93,7 +94,7 @@ const samples: Sample[] = [
     phone: '090-1234-5678',
     category: 'other',
     body: '採用ページを拝見しました。デザイナー職の募集について、応募の締め切りを教えてください。',
-    status: 'done',
+    status: 'read',
   },
   {
     id: '01JSAMPLE0000000000000006',
@@ -104,7 +105,7 @@ const samples: Sample[] = [
     phone: null,
     category: 'sales',
     body: 'We would like to update our product pages every season. Can the editors on our side change the text without help from a developer?',
-    status: 'done',
+    status: 'read',
   },
   {
     id: '01JSAMPLE0000000000000007',
@@ -126,9 +127,10 @@ const samples: Sample[] = [
     phone: null,
     category: 'other',
     body: 'Get 10,000 visitors today! https://example.net/offer https://example.net/now www.example.net',
-    status: 'held',
+    status: 'unread',
+    suspectedSpam: true,
     spamScore: 6,
-    spamReasons: ['links:3', 'link_in_name'],
+    spamReasons: ['links:3', 'link_in_field'],
   },
   {
     id: '01JSAMPLE0000000000000009',
@@ -139,7 +141,7 @@ const samples: Sample[] = [
     phone: null,
     category: 'sales',
     body: '資料のダウンロードができませんでした。PDF をメールで送っていただくことはできますか？',
-    status: 'done',
+    status: 'read',
   },
   {
     id: '01JSAMPLE0000000000000010',
@@ -150,9 +152,10 @@ const samples: Sample[] = [
     phone: null,
     category: 'other',
     body: 'You have been selected! Claim your prize at https://example.org/claim',
-    status: 'spam',
+    status: 'read',
+    suspectedSpam: true,
     spamScore: 4,
-    spamReasons: ['links:1', 'too_fast'],
+    spamReasons: ['honeypot', 'links:1', 'too_fast'],
   },
 ];
 
@@ -185,17 +188,18 @@ const insertSamples = async () => {
       sql(1),
       sql(s.email.endsWith('.jp') ? 'ja' : 'en'),
       sql(s.status),
+      sql(s.suspectedSpam ? 1 : 0),
       sql(s.spamScore ?? 0),
       sql(JSON.stringify(s.spamReasons ?? [])),
       sql('/contact'),
       sql(s.email.endsWith('.jp') ? 'JP' : 'US'),
       sql(created),
-      sql(s.status === 'new' ? null : created + 3_600_000),
+      sql(s.status === 'unread' ? null : created + 3_600_000),
     ].join(', ')})`;
   });
   await queryDatabase(
     stateDir,
-    `INSERT INTO submissions (id, created_at, email, fields, form_version, locale, status, spam_score, spam_reasons, page_path, country, consent_at, read_at) VALUES ${rows.join(', ')}`,
+    `INSERT INTO submissions (id, created_at, email, fields, form_version, locale, status, suspected_spam, spam_score, spam_reasons, page_path, country, consent_at, read_at) VALUES ${rows.join(', ')}`,
   );
 };
 
@@ -225,7 +229,7 @@ const insertCustomFieldSample = async (): Promise<string> => {
       sql(JSON.stringify(fields)),
       sql(2),
       sql('ja'),
-      sql('new'),
+      sql('unread'),
       sql(0),
       sql('[]'),
       sql('/contact'),
@@ -330,6 +334,16 @@ const main = async () => {
 
     await page.getByTestId('inquiry-row').first().waitFor();
     await shoot(page, 'admin-list-ja.png');
+    await page.goto(`${base}/admin?view=spam`);
+    await page.getByTestId('spam-view-hint').waitFor();
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-spam-ja.png');
+    const spamSample = samples.find((sample) => sample.suspectedSpam);
+    await page.goto(`${base}/admin/inquiries/${spamSample?.id}`);
+    await page.getByTestId('spam-notice').waitFor();
+    await shoot(page, 'admin-detail-spam-ja.png');
+    await page.goto(`${base}/admin`);
+    await page.getByTestId('inquiry-row').first().waitFor();
     await setLocale(page, 'en');
     await page.getByTestId('inquiry-row').first().waitFor();
     await shoot(page, 'admin-list-en.png');

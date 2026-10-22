@@ -11,8 +11,10 @@
 // Covers: contact POST -> row in D1; then the real admin UI: first-admin
 // setup with empty, wrong, and right input -> passkey registration (CDP
 // virtual authenticator) -> sign-out -> passkey sign-in -> list (URL search
-// parameters, not-found) -> detail -> status
-// change -> Slack-style deep link while signed out -> language switch ->
+// parameters, not-found) -> detail (marks read) -> back to unread from the
+// detail and the list -> email search -> a honeypot submission in the
+// suspected spam view, with its badge and reasons, cleared and set again ->
+// Slack-style deep link while signed out -> language switch ->
 // delete with confirmation -> the form editor: add a field and remove one,
 // save version 2, submit with the new field, see it in the list (column
 // toggle) and the detail, see an old submission with its own labels, and
@@ -218,17 +220,35 @@ const main = async () => {
       rejected.code === 'turnstile_failed',
       rejected,
     );
+    const trapped = await gnw(page, 'submitContact', {
+      ...contactBody('e2e-pass', 'Trap Visitor'),
+      email: 'trap@example.org',
+      gnw_hp_x: 'filled by a bot',
+    });
+    check('a filled honeypot gets the same success', trapped.ok, trapped);
     const stored = await query(
-      "SELECT id, json_extract(fields, '$.f_name') AS name, status, ip_hash, form_version FROM submissions ORDER BY created_at",
+      "SELECT id, json_extract(fields, '$.f_name') AS name, status, ip_hash, form_version FROM submissions WHERE suspected_spam = 0 ORDER BY created_at",
     );
     check(
-      'exactly one row is in D1 with status new',
+      'exactly one row is in D1 that is not suspected spam, unread',
       stored.length === 1 &&
         stored[0]?.name === 'E2E Visitor' &&
-        stored[0]?.status === 'new' &&
+        stored[0]?.status === 'unread' &&
         stored[0]?.form_version === 1,
       stored,
     );
+    const spamRows = await query(
+      'SELECT id, status, spam_reasons, notified_at FROM submissions WHERE suspected_spam = 1',
+    );
+    check(
+      'the honeypot submission is stored as suspected spam',
+      spamRows.length === 1 &&
+        spamRows[0]?.status === 'unread' &&
+        spamRows[0]?.spam_reasons === '["honeypot"]' &&
+        spamRows[0]?.notified_at === null,
+      spamRows,
+    );
+    const spamId = String(spamRows[0]?.id);
     check(
       'ip_hash is an HMAC, not an IP',
       /^[0-9a-f]{64}$/.test(String(stored[0]?.ip_hash)),
@@ -339,25 +359,41 @@ const main = async () => {
         .click();
       await page.waitForURL(`${base}/admin`);
     });
-    await step('the list shows the inquiry as new', async () => {
+    await step('the list shows the inquiry as unread', async () => {
       const row = page.getByTestId('inquiry-row').filter({
         hasText: 'E2E Visitor',
       });
-      await row.getByText(ui('en', 'status.new')).waitFor();
+      await row.locator('[data-status="unread"]').waitFor();
       await row.getByText('Hello from the end-to-end test.').waitFor();
+    });
+    await step('suspected spam is left out, with a hint', async () => {
+      await page.getByTestId('spam-hint').waitFor();
+      await page.getByTestId('view-count-spam').getByText('1').waitFor();
+      const rows = await page.getByTestId('inquiry-row').count();
+      if (rows !== 1) throw new Error(`expected 1 row, got ${rows}`);
     });
 
     await step('an invalid list URL falls back to the defaults', async () => {
-      await page.goto(`${base}/admin?status=deleted&page=abc`);
+      await page.goto(`${base}/admin?view=held&page=abc&sort=email`);
       await page
-        .getByRole('tab', { name: ui('en', 'list.filter.all'), selected: true })
+        .getByRole('tab', { name: ui('en', 'list.view.all'), selected: true })
         .waitFor();
       await page.getByTestId('inquiry-row').first().waitFor();
     });
-    await step('the status tab is kept in the URL', async () => {
-      await page.getByRole('tab', { name: ui('en', 'status.new') }).click();
-      await page.waitForURL(`${base}/admin?status=new`);
+    await step('the view tab is kept in the URL', async () => {
+      await page
+        .getByRole('tab', {
+          name: new RegExp(`^${ui('en', 'list.view.unread')}`),
+        })
+        .click();
+      await page.waitForURL(`${base}/admin?view=unread`);
       await page.getByTestId('inquiry-row').first().waitFor();
+    });
+    await step('the received column switches to oldest first', async () => {
+      await page.getByTestId('sort-received').click();
+      await page.waitForURL(`${base}/admin?view=unread&dir=asc`);
+      await page.locator('th[aria-sort="ascending"]').waitFor();
+      await page.goto(`${base}/admin`);
     });
     await step('an unknown admin path shows not found', async () => {
       await page.goto(`${base}/admin/nope`);
@@ -379,29 +415,28 @@ const main = async () => {
         .getByText('Second line.')
         .waitFor();
       await page
-        .getByTestId('status-select')
-        .getByText(ui('en', 'status.read'))
+        .getByTestId('read-toggle')
+        .getByText(ui('en', 'list.markUnread'))
         .waitFor();
       await page
         .getByTestId('unread-count')
         .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
         .waitFor();
     });
-    await step('status change to Done', async () => {
-      await page.getByTestId('status-select').click();
-      await page.getByRole('option', { name: ui('en', 'status.done') }).click();
+    await step('the detail sets it back to unread', async () => {
+      await page.getByTestId('read-toggle').click();
+      await page.getByText(ui('en', 'detail.markedUnread')).waitFor();
       await page
-        .getByText(
-          ui('en', 'detail.statusChanged', { status: ui('en', 'status.done') }),
-        )
+        .getByTestId('unread-count')
+        .getByText(ui('en', 'admin.unreadCount', { count: 1 }))
         .waitFor();
     });
     const afterChange = await query(
-      `SELECT status FROM submissions WHERE id = '${id}'`,
+      `SELECT status, read_at FROM submissions WHERE id = '${id}'`,
     );
     check(
-      'the new status is stored',
-      afterChange[0]?.status === 'done',
+      'unread is stored and read_at is cleared',
+      afterChange[0]?.status === 'unread' && afterChange[0]?.read_at === null,
       afterChange,
     );
     await step('back to the list keeps working', async () => {
@@ -412,8 +447,78 @@ const main = async () => {
       await page
         .getByTestId('inquiry-row')
         .filter({ hasText: 'E2E Visitor' })
-        .getByText(ui('en', 'status.done'))
+        .locator('[data-status="unread"]')
         .waitFor();
+    });
+    await step('the list row marks it read', async () => {
+      const row = page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'E2E Visitor' });
+      await row
+        .getByRole('button', { name: ui('en', 'list.markRead') })
+        .click();
+      await row.locator('[data-status="read"]').waitFor();
+      await page.waitForURL(`${base}/admin`);
+    });
+    const afterRow = await query(
+      `SELECT status FROM submissions WHERE id = '${id}'`,
+    );
+    check(
+      'the list toggle is stored',
+      afterRow[0]?.status === 'read',
+      afterRow,
+    );
+
+    await step('the email search matches part of the address', async () => {
+      await page.getByTestId('email-search').fill('VISITOR@example');
+      await page.getByTestId('email-search').press('Enter');
+      await page.waitForURL(`${base}/admin?q=VISITOR%40example`);
+      await page.getByTestId('inquiry-row').first().waitFor();
+      await page.getByTestId('email-search').fill('nobody@');
+      await page.getByTestId('email-search').press('Enter');
+      await page.getByText(ui('en', 'list.emptyFiltered')).waitFor();
+      await page
+        .getByRole('button', { name: ui('en', 'list.search.clear') })
+        .click();
+      await page.waitForURL(`${base}/admin`);
+    });
+
+    await step('the suspected spam view lists the honeypot row', async () => {
+      await page
+        .getByRole('tab', {
+          name: new RegExp(`^${ui('en', 'list.view.spam')}`),
+        })
+        .click();
+      await page.waitForURL(`${base}/admin?view=spam`);
+      await page.getByTestId('spam-view-hint').waitFor();
+      const row = page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'trap@example.org' });
+      await row.getByTestId('suspected-spam-badge').waitFor();
+      await row.click();
+      await page.waitForURL(`${base}/admin/inquiries/${spamId}`);
+      await page
+        .getByTestId('spam-notice')
+        .getByText(ui('en', 'spam.reason.honeypot'))
+        .waitFor();
+    });
+    await step('Not spam and Mark as spam switch the flag', async () => {
+      await page
+        .getByRole('button', { name: ui('en', 'detail.notSpam') })
+        .click();
+      await page.getByText(ui('en', 'detail.notSpamDone')).waitFor();
+      const cleared = await query(
+        `SELECT suspected_spam FROM submissions WHERE id = '${spamId}'`,
+      );
+      if (cleared[0]?.suspected_spam !== 0) throw new Error('not cleared');
+      await page
+        .getByRole('button', { name: ui('en', 'detail.markSpam') })
+        .click();
+      await page.getByText(ui('en', 'detail.markSpamDone')).waitFor();
+      const flagged = await query(
+        `SELECT suspected_spam FROM submissions WHERE id = '${spamId}'`,
+      );
+      if (flagged[0]?.suspected_spam !== 1) throw new Error('not flagged');
     });
 
     // API rules that the UI relies on.
@@ -497,7 +602,9 @@ const main = async () => {
       await page.waitForURL(`${base}/admin`);
       await page.getByText(ui('ja', 'admin.empty')).waitFor();
     });
-    const remaining = await query('SELECT COUNT(*) AS n FROM submissions');
+    const remaining = await query(
+      `SELECT COUNT(*) AS n FROM submissions WHERE id = '${id}'`,
+    );
     check('the row is deleted', remaining[0]?.n === 0, remaining);
 
     // The form editor (the UI is in Japanese now). A version 1 submission
