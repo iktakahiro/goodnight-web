@@ -20,13 +20,15 @@
     "db:check": "bun run --cwd packages/server db:check",
     "validate": "bun run lint && bun run format && bun run type-check && bun run check:sql && bun run db:check && bun run test",
     "fix": "bun run lint:fix && bun run format:fix",
-    "deploy:check": "turbo run deploy:check"
+    "deploy:check": "turbo run deploy:check",
+    "brand:build": "bun brand/scripts/build.ts"
   },
   "devDependencies": {
     "@goodnight-web/typescript-config": "workspace:*",
     "@types/bun": "1.4.3",
     "oxfmt": "0.74.0",
     "oxlint": "1.89.0",
+    "playwright": "1.64.1",
     "turbo": "2.11.9",
     "typescript": "6.0.3"
   },

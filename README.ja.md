@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/goodnight-web-lockup-dark.svg">
+  <img src="brand/goodnight-web-lockup-light.svg" alt="goodnight web" width="360">
+</picture>
+
 # goodnight-web
 
 goodnight-web は、会社のウェブサイト、ブログ、問い合わせフォームをまとめたテンプレートです。Cloudflare だけで動きます。1 つの Worker が静的なサイト、問い合わせ API、問い合わせを読むための管理画面を配信し、1 つの D1 データベースに問い合わせを保存します。
@@ -23,6 +28,7 @@ goodnight-web は、会社のウェブサイト、ブログ、問い合わせフ
 | `templates/starter`          | 利用者がコピーして編集する Astro のサイト                                              |
 | `apps/docs`                  | ドキュメントサイト                                                                     |
 | `docs`                       | 開発者向けのドキュメント                                                               |
+| `brand`                      | ロゴ、ファビコン、アプリアイコンのファイルと、それを作るスクリプト                     |
 
 詳しくは [docs/architecture.md](docs/architecture.md)（英語）を参照してください。
 
