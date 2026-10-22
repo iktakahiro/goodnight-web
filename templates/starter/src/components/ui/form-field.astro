@@ -1,8 +1,9 @@
 ---
 /**
- * A label, an optional hint, and a form control passed in the default slot.
- * Give the control `id={id}` and `aria-describedby={`${id}-hint`}` when a
- * hint is set.
+ * A label, an optional hint, an error message, and a form control passed in
+ * the default slot. Give the control `id={id}` and
+ * `aria-describedby={`${id}-hint`}` when a hint is set. The error message
+ * (`#${id}-error`) is empty and hidden until the contact form script fills it.
  */
 interface Props {
   id: string;
@@ -42,4 +43,5 @@ const { id, label, required = false, requiredText, optionalText, hint } =
       </p>
     )
   }
+  <p id={`${id}-error`} class='text-sm font-bold text-danger' hidden></p>
 </div>
