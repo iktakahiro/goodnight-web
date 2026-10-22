@@ -305,11 +305,11 @@ The UI does not use TanStack Start; the Worker serves the static build.
   `admin-ui/src/shared/i18n/admin-messages.ts`. API errors are shown with
   the `error.<code>` message in the UI's language. Dates use `Intl` in the
   viewer's time zone.
-- **Theme.** A fixed deep navy-violet theme, separate from the starter's
-  colors (the starter owns its colors in `site.config.ts` and
-  `src/styles/global.css`). All colors are tokens in `admin-ui/src/styles.css`:
-  light values in `@theme`, dark values under `:root.dark`; components use
-  only token classes. `theme-contrast.test.ts` reads that file and checks
+- **Theme.** A fixed theme with a violet primary on neutral backgrounds,
+  separate from the starter's colors (the starter owns its colors in
+  `site.config.ts` and `src/styles/global.css`). All colors are tokens in
+  `admin-ui/src/styles.css`: light values in `@theme`, dark values under
+  `:root.dark`; components use only token classes. `theme-contrast.test.ts` reads that file and checks
   WCAG AA for the main pairs in both modes (4.5:1 text, 3:1 control borders
   and focus rings).
 - **Fonts.** No web fonts. `--font-sans` and `--font-mono` in

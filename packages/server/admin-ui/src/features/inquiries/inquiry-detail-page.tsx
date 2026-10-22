@@ -307,7 +307,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
       {back}
       <div className='grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]'>
         <Card className='overflow-hidden'>
-          <div className='flex flex-col gap-3 border-b border-border/70 bg-gradient-to-b from-accent/50 to-card px-6 pt-6 pb-5 sm:px-8 sm:pt-8'>
+          <div className='flex flex-col gap-3 border-b border-border/70 bg-gradient-to-b from-muted to-card px-6 pt-6 pb-5 sm:px-8 sm:pt-8'>
             <div className='flex flex-wrap items-center gap-2'>
               <StatusBadge status={item.status} />
               {category ? <Badge tone='outline'>{category}</Badge> : null}

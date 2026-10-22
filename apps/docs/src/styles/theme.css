@@ -12,19 +12,19 @@
     ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
-/* The project palette: deep navy-violet on light, soft backgrounds. The admin
+/* The project palette: a violet primary on neutral backgrounds. The admin
    screen (packages/server/admin-ui/src/styles.css) uses the same colors. The
    light theme is the default; Fumadocs switches to .dark. */
 :root {
-  --color-fd-background: #f5f6fb;
+  --color-fd-background: #f7f7f8;
   --color-fd-foreground: #1b1f3f;
-  --color-fd-muted: #eef0f7;
+  --color-fd-muted: #f1f1f3;
   --color-fd-muted-foreground: #525979;
   --color-fd-popover: #ffffff;
   --color-fd-popover-foreground: #1b1f3f;
   --color-fd-card: #ffffff;
   --color-fd-card-foreground: #1b1f3f;
-  --color-fd-border: #dde0ee;
+  --color-fd-border: #e4e4e7;
   --color-fd-primary: #2f3482;
   --color-fd-primary-foreground: #ffffff;
   --color-fd-secondary: #e8eaf7;
@@ -37,15 +37,15 @@
   --hero-glow: #c9c4f3;
 }
 .dark {
-  --color-fd-background: #0f1330;
+  --color-fd-background: #111113;
   --color-fd-foreground: #e4e6f6;
-  --color-fd-muted: #1f2549;
+  --color-fd-muted: #232327;
   --color-fd-muted-foreground: #a6acd0;
-  --color-fd-popover: #1c2248;
+  --color-fd-popover: #1f1f23;
   --color-fd-popover-foreground: #e4e6f6;
-  --color-fd-card: #171c3f;
+  --color-fd-card: #1a1a1d;
   --color-fd-card-foreground: #e4e6f6;
-  --color-fd-border: #2b3262;
+  --color-fd-border: #2e2e33;
   --color-fd-primary: #a9aefc;
   --color-fd-primary-foreground: #12163a;
   --color-fd-secondary: #242a55;
