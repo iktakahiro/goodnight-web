@@ -1,6 +1,10 @@
 import { passkey } from '@better-auth/passkey';
-import { betterAuth } from 'better-auth';
+import { betterAuth } from 'better-auth/minimal';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError } from 'better-auth/api';
+import { getDatabase } from '../../db/database.ts';
+import * as schema from '../../db/schema.ts';
+import { safeErrorMessage } from '../../shared/log-error.ts';
 import type { GoodnightEnv } from '../../env.ts';
 import { createSetupPlugin } from '../setup/setup-plugin.ts';
 import { AUTH_BASE_PATH } from './auth-paths.ts';
@@ -21,13 +25,28 @@ const buildAuth = (env: GoodnightEnv, origin: string) =>
     baseURL: origin,
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,
-    // Better Auth detects D1 and uses its own D1 dialect.
-    database: env.DB as unknown as Parameters<typeof betterAuth>[0]['database'],
+    // The same Drizzle schema and migrations as the app tables
+    // (docs/decisions/0005).
+    database: drizzleAdapter(getDatabase(env.DB), {
+      provider: 'sqlite',
+      schema,
+    }),
     emailAndPassword: { enabled: false },
     trustedOrigins: [origin],
     telemetry: { enabled: false },
+    logger: {
+      // Better Auth passes errors and other values to the logger. A failed
+      // query carries its bound values (addresses, session tokens), so only
+      // the message and safe error messages are logged.
+      log: (level, message, ...args: unknown[]) => {
+        const errors = args
+          .filter((arg) => arg instanceof Error)
+          .map(safeErrorMessage);
+        console[level](`better-auth: ${message}`, ...errors);
+      },
+    },
     advanced: {
-      // Never store raw IP addresses (the session table has an ipAddress
+      // Never store raw IP addresses (the session table has an ip_address
       // column). Contact rate limits use the HMAC ip_hash instead.
       ipAddress: { disableIpTracking: true },
     },

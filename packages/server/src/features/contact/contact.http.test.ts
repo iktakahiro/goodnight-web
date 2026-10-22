@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
 import {
   mockExternalFetch,
@@ -360,6 +360,22 @@ describe('POST /api/contact', () => {
     const response = await post(worker, validBody());
     expect(response.status).toBe(500);
     expect((await response.json()).error.code).toBe('server_error');
+  });
+
+  test('logs no submitted values when D1 rejects the insert', async () => {
+    const worker = createTestWorker();
+    worker.sqlite.exec('DROP TABLE submissions');
+    const errors = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect((await post(worker, validBody())).status).toBe(500);
+      const logged = JSON.stringify(errors.mock.calls);
+      expect(logged).toContain('no such table');
+      for (const value of ['hanako@example.org', 'Hanako', 'services']) {
+        expect(logged).not.toContain(value);
+      }
+    } finally {
+      errors.mockRestore();
+    }
   });
 });
 

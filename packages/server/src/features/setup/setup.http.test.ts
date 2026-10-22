@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
 import { signInAsAdmin } from '../../testing/admin-session.ts';
 import {
@@ -62,8 +62,8 @@ describe('/api/setup', () => {
   test('stores no raw IP in the session', async () => {
     const worker = createTestWorker();
     await signInAsAdmin(worker, { passkey: false });
-    const ips = worker.sqlite.query('SELECT ipAddress FROM session').all();
-    expect(ips).toEqual([{ ipAddress: '' }]);
+    const ips = worker.sqlite.query('SELECT ip_address FROM session').all();
+    expect(ips).toEqual([{ ip_address: '' }]);
     expect(dumpDatabase(worker.sqlite)).not.toContain(CLIENT_IP);
   });
 
@@ -103,6 +103,28 @@ describe('/api/setup', () => {
       configured: true,
       open: false,
     });
+  });
+
+  test('logs no address or token when the database write fails', async () => {
+    const worker = createTestWorker();
+    worker.sqlite.exec('DROP TABLE session');
+    const logs = [
+      spyOn(console, 'error').mockImplementation(() => {}),
+      spyOn(console, 'warn').mockImplementation(() => {}),
+    ];
+    try {
+      const response = await setup(worker, {
+        token: SECRETS.SETUP_TOKEN,
+        email: 'admin@example.com',
+        name: 'Admin',
+      });
+      expect(response.status).toBe(500);
+      const logged = JSON.stringify(logs.map((log) => log.mock.calls));
+      expect(logged).toContain('no such table');
+      expect(logged).not.toContain('admin@example.com');
+    } finally {
+      for (const log of logs) log.mockRestore();
+    }
   });
 
   test('stays closed after every passkey is deleted', async () => {

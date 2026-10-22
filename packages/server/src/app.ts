@@ -8,6 +8,7 @@ import { setupRoutes } from './features/setup/setup-routes.ts';
 import type { HonoEnv } from './hono-env.ts';
 import { resolveOptions, type GoodnightWorkerOptions } from './options.ts';
 import { apiError } from './shared/api-error.ts';
+import { safeErrorMessage } from './shared/log-error.ts';
 
 /**
  * Creates the goodnight-web Worker: a Hono app that serves the contact API,
@@ -58,10 +59,7 @@ export const createGoodnightWorker = (options: GoodnightWorkerOptions = {}) => {
       : c.notFound(),
   );
   app.onError((error, c) => {
-    console.error(
-      'unhandled error:',
-      error instanceof Error ? error.message : 'unknown error',
-    );
+    console.error('unhandled error:', safeErrorMessage(error));
     return apiError(c, 500, 'server_error');
   });
   return app;

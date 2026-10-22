@@ -1,4 +1,7 @@
+import { eq } from 'drizzle-orm';
 import { createMiddleware } from 'hono/factory';
+import { getDatabase } from '../../db/database.ts';
+import { passkey } from '../../db/schema.ts';
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
 import { isAllowedOrigin } from '../../shared/request.ts';
@@ -30,12 +33,12 @@ export const requireAdmin = createMiddleware<HonoEnv>(async (c, next) => {
   if (!isAdminEmail(c.env.ADMIN_EMAILS, user.email)) {
     return apiError(c, 403, 'forbidden');
   }
-  const passkey = await c.env.DB.prepare(
-    'SELECT 1 AS found FROM passkey WHERE userId = ?1 LIMIT 1',
-  )
-    .bind(user.id)
-    .first();
-  if (!passkey) return apiError(c, 403, 'passkey_required');
+  const registered = await getDatabase(c.env.DB)
+    .select({ id: passkey.id })
+    .from(passkey)
+    .where(eq(passkey.userId, user.id))
+    .get();
+  if (!registered) return apiError(c, 403, 'passkey_required');
   c.set('admin', { userId: user.id, email: user.email, name: user.name });
   await next();
 });

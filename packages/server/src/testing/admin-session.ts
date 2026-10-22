@@ -28,16 +28,11 @@ export const signInAsAdmin = async (
       .get(email.toLowerCase()) as { id: string };
     worker.sqlite
       .query(
-        `INSERT INTO passkey (id, name, publicKey, userId, credentialID, counter,
-          deviceType, backedUp, transports, createdAt)
+        `INSERT INTO passkey (id, name, public_key, user_id, credential_id,
+          counter, device_type, backed_up, transports, created_at)
         VALUES (?1, 'test', 'pk', ?2, ?3, 0, 'singleDevice', 0, 'internal', ?4)`,
       )
-      .run(
-        crypto.randomUUID(),
-        user.id,
-        crypto.randomUUID(),
-        new Date().toISOString(),
-      );
+      .run(crypto.randomUUID(), user.id, crypto.randomUUID(), Date.now());
   }
   return cookie;
 };

@@ -1,4 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { eq } from 'drizzle-orm';
+import { getDatabase } from '../../db/database.ts';
+import { passkey, settings } from '../../db/schema.ts';
 import type { GoodnightEnv } from '../../env.ts';
 import { parseAdminEmails } from '../auth/admin-emails.ts';
 
@@ -20,11 +23,15 @@ export const isSetupConfigured = (env: GoodnightEnv): boolean =>
  * `settings.setup_closed_at` on the first passkey insert, so setup stays
  * closed even if every passkey is deleted later.
  */
-export const isSetupClosed = async (db: D1Database): Promise<boolean> =>
-  (await db
-    .prepare(
-      `SELECT 1 AS found WHERE
-        EXISTS (SELECT 1 FROM settings WHERE key = 'setup_closed_at')
-        OR EXISTS (SELECT 1 FROM passkey)`,
-    )
-    .first()) !== null;
+export const isSetupClosed = async (db: D1Database): Promise<boolean> => {
+  const orm = getDatabase(db);
+  const [closed, passkeys] = await orm.batch([
+    orm
+      .select({ key: settings.key })
+      .from(settings)
+      .where(eq(settings.key, 'setup_closed_at'))
+      .limit(1),
+    orm.select({ id: passkey.id }).from(passkey).limit(1),
+  ]);
+  return closed.length > 0 || passkeys.length > 0;
+};
