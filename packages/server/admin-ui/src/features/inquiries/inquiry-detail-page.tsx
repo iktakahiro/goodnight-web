@@ -13,17 +13,15 @@ import {
   Languages,
   ListChecks,
   Mail,
+  MailOpen,
   Reply,
   ShieldAlert,
+  ShieldCheck,
   Trash2,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import type { AdminSubmission } from '../../../../src/features/admin-api/admin-routes.ts';
 import type { AdminFieldEntry } from '../../../../src/features/admin-api/admin-view.ts';
-import {
-  SUBMISSION_STATUSES,
-  isSubmissionStatus,
-} from '../../../../src/features/submissions/submission-status.ts';
 import { ApiError } from '../../shared/api/api-client.ts';
 import { errorMessage } from '../../shared/api/error-message.ts';
 import { useAsync } from '../../shared/api/use-async.ts';
@@ -41,14 +39,6 @@ import { Badge } from '../../shared/ui/badge.tsx';
 import { Button, buttonVariants } from '../../shared/ui/button.tsx';
 import { Card } from '../../shared/ui/card.tsx';
 import { Notice } from '../../shared/ui/notice.tsx';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '../../shared/ui/select.tsx';
 import { Skeleton } from '../../shared/ui/skeleton.tsx';
 import { Spinner } from '../../shared/ui/spinner.tsx';
 import { showToast } from '../../shared/ui/toast.tsx';
@@ -62,9 +52,11 @@ import { fieldValueText, labelText } from './field-value.ts';
 import {
   deleteInquiry,
   fetchInquiry,
-  updateInquiryStatus,
+  updateInquiry,
+  type InquiryUpdate,
 } from './inquiries-api.ts';
-import { StatusBadge } from './status-badge.tsx';
+import { spamReasonText } from './spam-reason.ts';
+import { StatusBadge, SuspectedSpamBadge } from './status-badge.tsx';
 
 const toApiError = (error: unknown) =>
   error instanceof ApiError
@@ -92,7 +84,62 @@ const InfoRow = ({
   </div>
 );
 
-const StatusControl = ({
+/**
+ * A button that sends one change to the inquiry and shows a toast. Used for
+ * the read/unread switch and the suspected spam switch.
+ */
+const UpdateButton = ({
+  inquiry,
+  update,
+  done,
+  failed,
+  onChanged,
+  icon,
+  label,
+  testId,
+}: {
+  inquiry: AdminSubmission;
+  update: InquiryUpdate;
+  done: string;
+  failed: string;
+  onChanged: (next: AdminSubmission) => void;
+  icon: ReactNode;
+  label: string;
+  testId: string;
+}) => {
+  const { t } = useI18n();
+  const { refreshStatus } = useAdminSession();
+  const [busy, setBusy] = useState(false);
+
+  const change = async () => {
+    setBusy(true);
+    try {
+      const next = await updateInquiry(inquiry.id, update);
+      onChanged(next);
+      refreshStatus();
+      showToast(done);
+    } catch (error) {
+      showToast(`${failed} ${errorMessage(t, toApiError(error))}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant='outline'
+      className='w-full'
+      onClick={() => void change()}
+      disabled={busy}
+      data-testid={testId}
+    >
+      {busy ? <Spinner /> : icon}
+      {label}
+    </Button>
+  );
+};
+
+const ReadControl = ({
   inquiry,
   onChanged,
 }: {
@@ -100,54 +147,49 @@ const StatusControl = ({
   onChanged: (next: AdminSubmission) => void;
 }) => {
   const { t } = useI18n();
-  const { refreshStatus } = useAdminSession();
-  const [busy, setBusy] = useState(false);
-  const items = SUBMISSION_STATUSES.map((value) => ({
-    value,
-    label: t(`status.${value}`),
-  }));
-
-  const change = async (value: unknown) => {
-    if (!isSubmissionStatus(value) || value === inquiry.status) return;
-    setBusy(true);
-    try {
-      const next = await updateInquiryStatus(inquiry.id, value);
-      onChanged(next);
-      refreshStatus();
-      showToast(t('detail.statusChanged', { status: t(`status.${value}`) }));
-    } catch (error) {
-      const apiError = toApiError(error);
-      showToast(
-        `${t('detail.statusFailed')} ${errorMessage(t, apiError)}`,
-        'error',
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  const unread = inquiry.status === 'unread';
   return (
-    <Select
-      items={items}
-      value={inquiry.status}
-      onValueChange={(value: unknown) => void change(value)}
-      disabled={busy}
-    >
-      <div className='flex flex-col gap-2'>
-        <SelectLabel>{t('detail.statusLabel')}</SelectLabel>
-        <SelectTrigger data-testid='status-select'>
-          <SelectValue />
-          {busy ? <Spinner className='ml-auto text-primary' /> : null}
-        </SelectTrigger>
-      </div>
-      <SelectContent>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <UpdateButton
+      inquiry={inquiry}
+      update={{ status: unread ? 'read' : 'unread' }}
+      done={unread ? t('detail.markedRead') : t('detail.markedUnread')}
+      failed={t('detail.statusFailed')}
+      onChanged={onChanged}
+      icon={
+        unread ? <MailOpen aria-hidden='true' /> : <Mail aria-hidden='true' />
+      }
+      label={unread ? t('list.markRead') : t('list.markUnread')}
+      testId='read-toggle'
+    />
+  );
+};
+
+const SpamControl = ({
+  inquiry,
+  onChanged,
+}: {
+  inquiry: AdminSubmission;
+  onChanged: (next: AdminSubmission) => void;
+}) => {
+  const { t } = useI18n();
+  const flagged = inquiry.suspectedSpam;
+  return (
+    <UpdateButton
+      inquiry={inquiry}
+      update={{ suspectedSpam: !flagged }}
+      done={flagged ? t('detail.notSpamDone') : t('detail.markSpamDone')}
+      failed={t('detail.spamFailed')}
+      onChanged={onChanged}
+      icon={
+        flagged ? (
+          <ShieldCheck aria-hidden='true' />
+        ) : (
+          <ShieldAlert aria-hidden='true' />
+        )
+      }
+      label={flagged ? t('detail.notSpam') : t('detail.markSpam')}
+      testId='spam-toggle'
+    />
   );
 };
 
@@ -300,16 +342,17 @@ const DetailSkeleton = () => {
 };
 
 /**
- * One inquiry: the message, contact details, status change, and delete with
- * a confirmation dialog. Opening it marks a new inquiry as read (server side).
- * This is the page that Slack notifications link to.
+ * One inquiry: the message, contact details, the read/unread switch, the
+ * suspected spam mark with its reasons, and delete with a confirmation
+ * dialog. Opening it marks an unread inquiry as read (server side). This is
+ * the page that Slack notifications link to.
  */
 export const InquiryDetailPage = ({ id }: { id: string }) => {
   const { locale, t } = useI18n();
   const { refreshStatus } = useAdminSession();
   const inquiry = useAsync(async () => {
     const result = await fetchInquiry(id);
-    // Opening a new inquiry marks it read: update the header count.
+    // Opening an unread inquiry marks it read: update the header count.
     refreshStatus();
     return result;
   }, id);
@@ -382,6 +425,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
           <div className='flex flex-col gap-3 border-b border-border/70 bg-gradient-to-b from-accent/50 to-card px-6 pt-6 pb-5 sm:px-8 sm:pt-8'>
             <div className='flex flex-wrap items-center gap-2'>
               <StatusBadge status={item.status} />
+              {item.suspectedSpam ? <SuspectedSpamBadge /> : null}
             </div>
             <h1 className='text-2xl leading-snug font-bold tracking-tight break-words'>
               {inquiryTitle(item)}
@@ -486,7 +530,8 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
 
         <aside className='flex flex-col gap-4'>
           <Card className='flex flex-col gap-4 p-5'>
-            <StatusControl inquiry={item} onChanged={inquiry.setData} />
+            <ReadControl inquiry={item} onChanged={inquiry.setData} />
+            <SpamControl inquiry={item} onChanged={inquiry.setData} />
             <a
               href={`mailto:${item.email}`}
               className={buttonVariants({
@@ -499,21 +544,37 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
             </a>
             <DeleteControl inquiry={item} />
           </Card>
-          {item.spamScore > 0 || item.status === 'held' ? (
+          {item.suspectedSpam || item.spamScore > 0 ? (
             <Notice
-              tone='warning'
+              tone={item.suspectedSpam ? 'warning' : 'info'}
               icon={<ShieldAlert aria-hidden='true' />}
-              title={`${t('detail.spamScore')}: ${item.spamScore}`}
+              title={
+                item.suspectedSpam
+                  ? t('spam.badge')
+                  : `${t('detail.spamScore')}: ${item.spamScore}`
+              }
+              data-testid='spam-notice'
             >
+              {item.suspectedSpam ? <p>{t('detail.spamNote')}</p> : null}
               {item.spamReasons.length > 0 ? (
-                <p>
-                  {t('detail.spamReasons')}:{' '}
-                  <span className='font-mono text-[0.8125rem]'>
-                    {item.spamReasons.join(', ')}
-                  </span>
-                </p>
-              ) : null}
-              {item.status === 'held' ? <p>{t('detail.spamNote')}</p> : null}
+                <div className='flex flex-col gap-1'>
+                  <p className='font-medium'>{t('detail.spamReasons')}:</p>
+                  <ul className='flex list-disc flex-col gap-0.5 pl-5'>
+                    {item.spamReasons.map((reason) => (
+                      <li key={reason} data-reason={reason}>
+                        {spamReasonText(t, reason)}
+                      </li>
+                    ))}
+                  </ul>
+                  {item.suspectedSpam ? (
+                    <p className='text-[0.8125rem]'>
+                      {t('detail.spamScore')}: {item.spamScore}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p>{t('detail.spamManual')}</p>
+              )}
             </Notice>
           ) : null}
         </aside>

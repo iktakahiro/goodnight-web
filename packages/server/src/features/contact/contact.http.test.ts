@@ -78,7 +78,8 @@ describe('POST /api/contact', () => {
       email: 'hanako@example.org',
       form_version: 1,
       locale: 'ja',
-      status: 'new',
+      status: 'unread',
+      suspected_spam: 0,
       spam_score: 0,
       page_path: '/contact',
     });
@@ -98,18 +99,15 @@ describe('POST /api/contact', () => {
     expect(worker.rateLimitKeys).toEqual([expected]);
   });
 
-  test('a filled honeypot stores nothing and is answered with success', async () => {
-    const worker = createTestWorker();
+  test('a filled honeypot is stored as suspected spam without Slack', async () => {
+    const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
     const logs = captureConsole();
     let response: Response;
     let logged: string;
     try {
       response = await post(
         worker,
-        validBody(
-          { website: 'https://spam.example', turnstileToken: undefined },
-          { f_message: '=HYPERLINK("https://evil.example")' },
-        ),
+        validBody({ gnw_hp_x: 'https://trap.example/filled' }),
       );
       logged = logs.text();
     } finally {
@@ -117,28 +115,88 @@ describe('POST /api/contact', () => {
     }
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(rows(worker)).toHaveLength(0);
-    const dump = dumpDatabase(worker.sqlite);
-    expect(dump).not.toContain('hanako@example.org');
-    expect(dump).not.toContain('HYPERLINK');
+    const [row] = rows(worker);
+    expect(row).toMatchObject({
+      email: 'hanako@example.org',
+      status: 'unread',
+      suspected_spam: 1,
+      spam_score: 0,
+      spam_reasons: '["honeypot"]',
+    });
+    expect(JSON.parse(String(row?.fields))).toEqual(validFields);
+    // The honeypot value itself is never stored.
+    expect(dumpDatabase(worker.sqlite)).not.toContain('trap.example');
     expect(logged).toContain('honeypot');
     expect(logged).not.toContain('hanako@example.org');
-    expect(external.turnstileCalls()).toHaveLength(0);
+    expect(external.turnstileCalls()).toHaveLength(1);
     expect(external.slackCalls()).toHaveLength(0);
+  });
+
+  test('a honeypot hit adds its reason to the spam score reasons', async () => {
+    const worker = createTestWorker();
+    await post(worker, validBody({ gnw_hp_x: 'x', elapsedMs: 100 }));
+    expect(rows(worker)[0]).toMatchObject({
+      suspected_spam: 1,
+      spam_score: 3,
+      spam_reasons: '["honeypot","too_fast"]',
+    });
+  });
+
+  test('a honeypot hit gets the same answer as any other submission', async () => {
+    const answer = async (body: Record<string, unknown>) => {
+      const worker = createTestWorker();
+      const response = await post(worker, body);
+      return { status: response.status, body: await response.json() };
+    };
+    const cases: [Record<string, unknown>, Record<string, unknown>][] = [
+      [{}, {}],
+      [{ email: 'not an address' }, {}],
+      [{}, { f_message: '' }],
+      [{}, { f_unknown: 'x' }],
+      [{ formVersion: 2 }, {}],
+      [{ turnstileToken: '' }, {}],
+    ];
+    for (const [overrides, fields] of cases) {
+      expect(
+        await answer(validBody({ ...overrides, gnw_hp_x: 'filled' }, fields)),
+      ).toEqual(await answer(validBody(overrides, fields)));
+    }
+  });
+
+  test('a honeypot hit that fails validation or Turnstile stores nothing', async () => {
+    const worker = createTestWorker();
+    const invalid = await post(
+      worker,
+      validBody({ gnw_hp_x: 'filled' }, { f_message: '' }),
+    );
+    expect(invalid.status).toBe(400);
+    const noToken = await post(
+      worker,
+      validBody({ gnw_hp_x: 'filled', turnstileToken: undefined }),
+    );
+    expect(noToken.status).toBe(400);
+    expect(rows(worker)).toHaveLength(0);
   });
 
   test('honeypot hits count against the rate limit', async () => {
     const worker = createTestWorker({ rateLimit: 2 });
-    for (let i = 0; i < 4; i++) {
-      const response = await post(worker, validBody({ website: 'x' }));
+    for (let i = 0; i < 2; i++) {
+      const response = await post(worker, validBody({ gnw_hp_x: 'x' }));
       expect(response.status).toBe(200);
     }
     const ipHash = await hmacSha256Hex(SECRETS.IP_HASH_SECRET, CLIENT_IP);
-    expect(worker.rateLimitKeys).toEqual(Array(4).fill(ipHash));
-    expect(rows(worker)).toHaveLength(0);
+    expect(worker.rateLimitKeys).toEqual(Array(2).fill(ipHash));
+    expect(rows(worker)).toHaveLength(2);
     // The same address is now over the limit for a real submission too.
     const real = await post(worker, validBody());
     expect(real.status).toBe(429);
+    expect(rows(worker)).toHaveLength(2);
+  });
+
+  test('the old honeypot name is an unknown key', async () => {
+    const worker = createTestWorker();
+    const response = await post(worker, validBody({ website: '' }));
+    expect(response.status).toBe(400);
     expect(rows(worker)).toHaveLength(0);
   });
 
@@ -303,9 +361,10 @@ describe('POST /api/contact', () => {
 
   test('accepts every key the contact form sends', async () => {
     const worker = createTestWorker();
-    const response = await post(worker, validBody({ website: '' }));
+    const response = await post(worker, validBody({ gnw_hp_x: '' }));
     expect(response.status).toBe(200);
     expect(rows(worker)).toHaveLength(1);
+    expect(rows(worker)[0]?.suspected_spam).toBe(0);
   });
 
   test.each([
@@ -434,7 +493,7 @@ describe('POST /api/contact', () => {
     expect((await en.json()).error.message).toContain('not available');
   });
 
-  test('a high spam score holds the submission and skips Slack', async () => {
+  test('a high spam score flags the submission and skips Slack', async () => {
     const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
     const response = await post(
       worker,
@@ -448,8 +507,12 @@ describe('POST /api/contact', () => {
     );
     expect(response.status).toBe(200);
     const [row] = rows(worker);
-    expect(row?.status).toBe('held');
-    expect(row?.spam_score).toBe(3);
+    expect(row).toMatchObject({
+      status: 'unread',
+      suspected_spam: 1,
+      spam_score: 3,
+      spam_reasons: '["links:3"]',
+    });
     expect(external.slackCalls()).toHaveLength(0);
   });
 
@@ -489,7 +552,7 @@ describe('GET /api/contact/form', () => {
       available: true,
       turnstileSiteKey: SECRETS.TURNSTILE_SITE_KEY,
       turnstileAction: 'contact',
-      honeypotField: 'website',
+      honeypotField: 'gnw_hp_x',
       version: 1,
       email: { maxLength: 254 },
     });

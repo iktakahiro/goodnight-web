@@ -5,11 +5,14 @@ import { singleLine } from '../contact-form/form-values-schema.ts';
 export const CONTACT_TURNSTILE_ACTION = 'contact';
 
 /**
- * Name of the hidden honeypot field. Real visitors leave it empty. When it is
- * filled, the API answers with success, counts the request against the rate
- * limit, and stores nothing.
+ * Name of the hidden honeypot field. Real visitors leave it empty. The name
+ * means nothing to browsers and password managers, so they do not autofill
+ * it. A filled honeypot does not change the response: the submission goes
+ * through Turnstile, the rate limit, and validation like any other, and is
+ * stored as suspected spam with the reason `honeypot` and no Slack
+ * notification.
  */
-export const CONTACT_HONEYPOT_FIELD = 'website';
+export const CONTACT_HONEYPOT_FIELD = 'gnw_hp_x';
 
 /**
  * Largest accepted request body for `POST /api/contact`, in bytes. The stored
@@ -35,7 +38,8 @@ export const CONTACT_FIELD_LIMITS = {
  *   the current version, the API answers 409 `form_outdated`.
  * - `locale`: the language of the page (`ja` or `en`).
  * - `turnstileToken`: the token from the Turnstile widget.
- * - `website`: the honeypot field ({@link CONTACT_HONEYPOT_FIELD}).
+ * - `gnw_hp_x`: the honeypot field ({@link CONTACT_HONEYPOT_FIELD}). It is
+ *   never stored.
  * - `elapsedMs`: milliseconds between showing the form and submitting it.
  *   Used for the spam score.
  * - `pagePath`: the path of the page that holds the form.
@@ -58,7 +62,7 @@ export const contactRequestSchema = z.strictObject({
   formVersion: z.number().int().min(1).optional(),
   locale: z.enum(['ja', 'en']).optional(),
   turnstileToken: z.string().min(1).max(2048),
-  website: z.string().max(500).optional(),
+  [CONTACT_HONEYPOT_FIELD]: z.string().max(500).optional(),
   elapsedMs: z.number().int().min(0).optional(),
   pagePath: z
     .string()
@@ -83,7 +87,8 @@ export interface ContactRequestInput {
   formVersion?: number;
   locale?: 'ja' | 'en';
   turnstileToken: string;
-  website?: string;
+  /** The honeypot ({@link CONTACT_HONEYPOT_FIELD}); send what the field holds. */
+  gnw_hp_x?: string;
   elapsedMs?: number;
   pagePath?: string;
 }

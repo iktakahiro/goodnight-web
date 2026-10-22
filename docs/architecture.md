@@ -93,7 +93,7 @@ together; with only one, the admin areas answer 503.
 
 The contact form first calls `GET /api/contact/form`. It returns
 `available`, the public Turnstile site key, the Turnstile action
-(`contact`), the honeypot field name (`website`), the fixed email field, and
+(`contact`), the honeypot field name (`gnw_hp_x`), the fixed email field, and
 the current form definition: `version` and the fields in order (id, type,
 labels, placeholder, hint, required, resolved `maxLength`, options). It is
 public, read-only, and cached for 30 seconds (`Cache-Control: public,
@@ -112,11 +112,12 @@ fields in the browser, so a form edit needs no build or deploy.
    `Content-Length` and again while reading, so a chunked body cannot bypass
    it. Errors: 403, 415, 413, then 400 for bad JSON. The form is served by the
    same Worker, so the API is same-origin only and sends no CORS headers.
-2. If the honeypot field is filled, count the request against the rate limit,
-   log one line without personal data, store nothing, and return success, so a
-   bot learns nothing. This step runs before Turnstile, so storing a row here
-   would let a bot write to D1 without passing Turnstile
-   ([0007](decisions/0007-honeypot-not-stored.md)).
+2. Note whether the honeypot field (`gnw_hp_x`) is filled, and carry on. A
+   filled honeypot never changes the response: the request still needs
+   Turnstile, counts against the rate limit, and must validate; then it is
+   stored as suspected spam (step 5). The honeypot value is never stored
+   ([0009](decisions/0009-unread-read-status-and-suspected-spam.md), which
+   supersedes [0007](decisions/0007-honeypot-not-stored.md)).
 3. Verify the Turnstile token with siteverify (secret, token, `remoteip`),
    and check that `hostname` is the request's hostname (or one of
    `options.contact.turnstileHostnames`) and that `action` is `contact`. On
@@ -133,12 +134,16 @@ fields in the browser, so a form edit needs no build or deploy.
    400), with required fields, lengths, formats, and option values checked
    and text cleaned. The stored values must be at most 16 KB as JSON (413).
    The definition sent to the browser is never used for validation. Then
-   compute the spam score; a score of 3 or more sets the status to `held`.
+   compute the spam score. A score of 3 or more (`SPAM_SUSPECT_THRESHOLD`)
+   or a filled honeypot sets `suspected_spam`; the reason `honeypot` is
+   added to `spam_reasons` before the score reasons. The status is always
+   `unread`.
 6. Insert the row into D1 (`email`, `fields` keyed by field id,
    `form_version`, `locale`, and the operational columns), then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:
-   - if the status is `new` and `SLACK_WEBHOOK_URL` is a Slack webhook URL,
+   - if the row is not suspected spam and `SLACK_WEBHOOK_URL` is a Slack
+     webhook URL,
      post "1 new inquiry", the received time (a Slack date token), and the
      admin URL to Slack and set `notified_at`. No field value is sent, not
      even a select answer, so nothing the visitor typed reaches Slack.
@@ -183,8 +188,9 @@ the route looked up in the current definition; both are bound parameters.
 
 ### Spam score
 
-`scoreSubmission()` in `spam-score.ts`. The rules only hold a submission for
-review; nothing is thrown away.
+`scoreSubmission()` in `spam-score.ts`. A score of 3 or more
+(`SPAM_SUSPECT_THRESHOLD`) only flags the submission as suspected spam;
+nothing is thrown away.
 
 | Rule            | Points       | Condition                                                                    |
 | --------------- | ------------ | ---------------------------------------------------------------------------- |
@@ -192,8 +198,26 @@ review; nothing is thrown away.
 | `link_in_field` | 3            | a link in a one-line `text` field (such as a name); `url` fields are skipped |
 | `too_fast`      | 3            | sent less than 3 seconds after the form was shown                            |
 
-A filled honeypot field is not scored: the submission is not stored at all
-(step 2 above).
+The honeypot is not part of the score. A filled honeypot flags the
+submission with the reason `honeypot` whatever the score (step 2 above).
+
+### Status and suspected spam
+
+A submission's `status` is `unread` or `read` (check constraint
+`submissions_status_check`). Opening the detail marks it `read` and sets
+`read_at`; an admin can set it back to `unread`, which clears `read_at`.
+`suspected_spam` (integer boolean) is a separate flag, set by the contact
+API and changed by admins with `PATCH`. It is not a status: a suspected spam
+row is unread or read too. Suspected spam never triggers Slack, and the
+unread count covers only rows that are not suspected spam.
+
+The admin list has four views (`SUBMISSION_VIEWS`): `unread`, `read`, and
+`all` leave suspected spam out; `spam` shows only suspected spam. The list
+is sorted by `created_at` only (`dir=asc|desc`). `q` searches the email
+column only: `lower(email) like ? escape '\'` with the term lower-cased and
+`%`, `_`, and `\` escaped (`escapeLike()`), built with Drizzle's `like` in
+the `sql` template. It has no index; the full scan is fine at contact-form
+volume, and old rows are pruned.
 
 ### Retention without Cron
 
@@ -263,19 +287,19 @@ passkey (otherwise 401). The session from setup alone only allows registering
 the first passkey. State-changing requests also need
 the Worker's own `Origin` (CSRF). There is no development bypass.
 
-| Route                                                                               | Result                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/admin/me`                                                                 | the signed-in admin                                                                                                                                                                                                                                                                                                                                                                                               |
-| `GET /api/admin/status`                                                             | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`                                                                                                                                                                                                                                                                      |
-| `GET /api/admin/submissions?status=&version=&field=&value=&sort=&dir=&page=&limit=` | `limit` per page (1–100, default 50); sorted by `received_at` (default), `email`, or `status`, `desc` by default; `columns` (the current form's fields), `total`, and `unreadCount`; field values of the current form, long text cut to 120 characters; runs pruning. `field` + `value` filter on a select or radio option of the current form. Invalid or unknown parameters are 400; there is no keyword search |
-| `GET /api/admin/submissions/:id`                                                    | one submission with `entries`: its values labeled by its own form version, each marked whether it is on the current form; a `new` one becomes `read`                                                                                                                                                                                                                                                              |
-| `PATCH /api/admin/submissions/:id`                                                  | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                                                                                                                                                                                                                                                                            |
-| `DELETE /api/admin/submissions/:id`                                                 | deletes the row                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `GET /api/admin/submissions.csv?status=&version=&field=&value=&lang=`               | CSV with a UTF-8 BOM, streamed in batches of 200 rows (keyset on `created_at`, `id`); fixed columns, then one column per field id the form ever had (archived headers end with ` (vN)`); a cell whose first non-whitespace character is `= + - @`, or that starts with tab or CR, gets a leading `'`                                                                                                              |
-| `GET /api/admin/form`                                                               | `{ current, history }`: the current version with its definition, and the newest 50 versions                                                                                                                                                                                                                                                                                                                       |
-| `PUT /api/admin/form`                                                               | `{ baseVersion, fields }`: validated with `formUpdateSchema`, saved as version `baseVersion + 1`. 409 `form_conflict` when `baseVersion` is not current; 400 for an unknown field id, a type change to another value shape, or an unknown option value. A save without changes adds no version                                                                                                                    |
-| `GET /api/admin/form/versions/:version`                                             | one version with its definition                                                                                                                                                                                                                                                                                                                                                                                   |
-| `POST /api/admin/form/versions/:version/restore`                                    | `{ baseVersion }`: saves that version's fields as a new version                                                                                                                                                                                                                                                                                                                                                   |
+| Route                                                                          | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/admin/me`                                                            | the signed-in admin                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `GET /api/admin/status`                                                        | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `version`, `retentionDays`, `unreadCount` (unread, not suspected spam)                                                                                                                                                                                                                                                                                                                                                                  |
+| `GET /api/admin/submissions?view=&q=&version=&field=&value=&dir=&page=&limit=` | `view` is `unread`, `read`, `all` (default), or `spam`; `q` is a case-insensitive partial match on the email (at most 254 characters); `limit` per page (1–100, default 50); sorted by received time only, `desc` by default; `columns` (the current form's fields), `total`, `unreadCount`, and `suspectedSpamCount`; field values of the current form, long text cut to 120 characters; runs pruning. `field` + `value` filter on a select or radio option of the current form. Invalid or unknown parameters (including `sort`) are 400 |
+| `GET /api/admin/submissions/:id`                                               | one submission with `entries`: its values labeled by its own form version, each marked whether it is on the current form; an `unread` one becomes `read`                                                                                                                                                                                                                                                                                                                                                                                   |
+| `PATCH /api/admin/submissions/:id`                                             | `{ status?, suspectedSpam? }` (at least one): `status` is `unread` or `read`; `suspectedSpam` is a boolean                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `DELETE /api/admin/submissions/:id`                                            | deletes the row                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `GET /api/admin/submissions.csv?view=&q=&version=&field=&value=&lang=`         | the list's filters; CSV with a UTF-8 BOM, streamed in batches of 200 rows (keyset on `created_at`, `id`); fixed columns, then one column per field id the form ever had (archived headers end with ` (vN)`); a cell whose first non-whitespace character is `= + - @`, or that starts with tab or CR, gets a leading `'`                                                                                                                                                                                                                   |
+| `GET /api/admin/form`                                                          | `{ current, history }`: the current version with its definition, and the newest 50 versions                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `PUT /api/admin/form`                                                          | `{ baseVersion, fields }`: validated with `formUpdateSchema`, saved as version `baseVersion + 1`. 409 `form_conflict` when `baseVersion` is not current; 400 for an unknown field id, a type change to another value shape, or an unknown option value. A save without changes adds no version                                                                                                                                                                                                                                             |
+| `GET /api/admin/form/versions/:version`                                        | one version with its definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `POST /api/admin/form/versions/:version/restore`                               | `{ baseVersion }`: saves that version's fields as a new version                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 `ip_hash` is never returned by the admin API.
 
@@ -307,8 +331,8 @@ The UI uses three TanStack libraries, all in the browser only:
   shown; the UI maps each error to `field.required`, `field.invalid`, or
   `field.too_long` in the UI's language.
 - **TanStack Table** (headless) for the inquiry list. Pagination and sorting
-  are manual: the API returns one page of 50, sorted by a fixed column
-  (received time, email, or status). The columns are the fixed ones plus the
+  are manual: the API returns one page of 50, sorted by received time
+  (newest or oldest first). The columns are the fixed ones plus the
   fields of the current form version; `showInList` sets the default
   visibility, and the admin's own choice is kept in `localStorage`.
 - **TanStack Form** also drives the form editor, validated with
@@ -316,13 +340,13 @@ The UI uses three TanStack libraries, all in the browser only:
 
 The UI does not use TanStack Start; the Worker serves the static build.
 
-| Path                    | Screen                                                                                                                                                                                                |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                                                                                                          |
-| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                                                                                                        |
-| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), version and option filters, sortable fixed columns, column visibility, 50 per page, CSV export; the search parameters keep the state |
-| `/admin/inquiries/<id>` | Detail: the fields with the labels of the inquiry's own form version (fields not on the current form are marked archived), status change, reply by email, delete with a confirmation dialog           |
-| `/admin/form`           | Form editor: add, remove (archive), reorder, and edit fields and options; the email row is locked; live preview in ja/en; save as a new version; history with restore                                 |
+| Path                    | Screen                                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                                                                                                                                                                                                                                        |
+| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                                                                                                                                                                                                                                      |
+| `/admin`                | Inquiry list: one segmented control for the views (unread, read, all, suspected spam, with counts), a hint that suspected spam is in its own view, email search, version and option filters, order by received time, a read/unread button per row, column visibility, 50 per page, CSV export; the search parameters keep the state |
+| `/admin/inquiries/<id>` | Detail: the fields with the labels of the inquiry's own form version (fields not on the current form are marked archived), mark unread/read, the suspected spam badge with its reasons, “Not spam” / “Mark as spam”, reply by email, delete with a confirmation dialog                                                              |
+| `/admin/form`           | Form editor: add, remove (archive), reorder, and edit fields and options; the email row is locked; live preview in ja/en; save as a new version; history with restore                                                                                                                                                               |
 
 - **Session.** Before the list or detail screen loads, a route guard (the
   router's `beforeLoad`) calls `GET /api/admin/me` and remembers the admin

@@ -70,8 +70,9 @@ export const getContactForm = async (
  *
  * Pass the field values in `fields` by field id, the form's `version` as
  * `formVersion`, the Turnstile token as `turnstileToken`, the honeypot input
- * as `website`, and `elapsedMs` (time since the form was shown) for the spam
- * score. A honeypot submission also returns `{ ok: true }`.
+ * under `CONTACT_HONEYPOT_FIELD` (`gnw_hp_x`), and `elapsedMs` (time since
+ * the form was shown) for the spam score. A filled honeypot gets the same
+ * response as any other submission.
  *
  * Get a new Turnstile token before retrying after any error: tokens are
  * single-use. After `form_outdated`, read the form again with

@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import * as z from 'zod';
 import packageJson from '../../../package.json' with { type: 'json' };
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
@@ -17,15 +18,16 @@ import {
 } from '../contact-form/form-store.ts';
 import { isSlackWebhookUrl } from '../notify/slack.ts';
 import { getRetentionDays, pruneIfDue } from '../retention/prune.ts';
-import { isSubmissionStatus } from '../submissions/submission-status.ts';
+import { SUBMISSION_STATUSES } from '../submissions/submission-status.ts';
 import {
+  countSuspectedSpam,
   countUnread,
   deleteSubmission,
   getSubmission,
   listSubmissions,
   markRead,
   submissionBatches,
-  updateStatus,
+  updateSubmission,
   type Submission,
   type SubmissionFilter,
 } from '../submissions/submission-store.ts';
@@ -60,7 +62,13 @@ export type AdminSubmission = Omit<Submission, 'ipHash' | 'fields'> & {
  */
 export type AdminSubmissionSummary = Pick<
   Submission,
-  'id' | 'createdAt' | 'email' | 'status' | 'spamScore' | 'formVersion'
+  | 'id'
+  | 'createdAt'
+  | 'email'
+  | 'status'
+  | 'suspectedSpam'
+  | 'spamScore'
+  | 'formVersion'
 > & { fields: Record<string, AdminFieldValue> };
 
 /** A column of the admin list: a field of the current form. */
@@ -84,9 +92,28 @@ export interface AdminSubmissionList {
   page: number;
   pageSize: number;
   total: number;
-  /** Submissions with status `new`, across all pages and filters. */
+  /**
+   * Unread submissions that are not suspected spam, across all pages and
+   * filters.
+   */
   unreadCount: number;
+  /** Suspected spam, read or unread, across all pages and filters. */
+  suspectedSpamCount: number;
 }
+
+/**
+ * Body of `PATCH /api/admin/submissions/:id`: the new status, the suspected
+ * spam flag, or both. At least one is required; other keys are rejected.
+ */
+export const submissionUpdateSchema = z
+  .strictObject({
+    status: z.enum(SUBMISSION_STATUSES).optional(),
+    suspectedSpam: z.boolean().optional(),
+  })
+  .refine(
+    (update) =>
+      update.status !== undefined || update.suspectedSpam !== undefined,
+  );
 
 /** Body of `GET /api/admin/status`. Never contains secret values. */
 export interface AdminStatus {
@@ -173,15 +200,17 @@ const choiceFilter = (
  *
  * - `GET /me`: the signed-in admin.
  * - `GET /status`: {@link AdminStatus}.
- * - `GET /submissions?status=&version=&field=&value=&sort=&dir=&page=&limit=`:
+ * - `GET /submissions?view=&q=&version=&field=&value=&dir=&page=&limit=`:
  *   {@link AdminSubmissionList} (query rules in {@link listQuerySchema}; an
- *   invalid or unknown parameter is 400). Also runs retention pruning
- *   (throttled) in the background. There is no keyword search.
- * - `GET /submissions/:id`: one submission; marks a `new` one as read.
- * - `PATCH /submissions/:id` with `{ status }`: changes the status.
+ *   invalid or unknown parameter is 400). Sorted by received time only;
+ *   `q` searches the email address only. Also runs retention pruning
+ *   (throttled) in the background.
+ * - `GET /submissions/:id`: one submission; marks an unread one as read.
+ * - `PATCH /submissions/:id` with {@link submissionUpdateSchema}: sets the
+ *   status (`unread` or `read`) or the suspected spam flag.
  * - `DELETE /submissions/:id`: deletes it.
- * - `GET /submissions.csv?status=&version=&field=&value=&lang=`: CSV export,
- *   streamed in batches of rows.
+ * - `GET /submissions.csv?view=&q=&version=&field=&value=&lang=`: CSV
+ *   export of the same filters, streamed in batches of rows.
  * - `/form/*`: the contact form definition ({@link formAdminRoutes}).
  */
 export const adminRoutes = new Hono<HonoEnv>()
@@ -219,7 +248,7 @@ export const adminRoutes = new Hono<HonoEnv>()
   .get('/submissions', async (c) => {
     const query = listQuerySchema.safeParse(c.req.query());
     if (!query.success) return apiError(c, 400, 'invalid_input');
-    const { status, version, page, limit, sort, dir } = query.data;
+    const { view, q, version, page, limit, dir } = query.data;
     const current = await getCurrentForm(c.env.DB);
     const choice = choiceFilter(current.definition.fields, query.data);
     if (choice === null) {
@@ -230,15 +259,17 @@ export const adminRoutes = new Hono<HonoEnv>()
         console.error('prune failed:', safeErrorMessage(error));
       }),
     );
-    const [{ items, total }, unreadCount] = await Promise.all([
-      listSubmissions(c.env.DB, {
-        filter: { status, formVersion: version, choice },
-        sort: { column: sort, direction: dir },
-        limit,
-        offset: (page - 1) * limit,
-      }),
-      countUnread(c.env.DB),
-    ]);
+    const [{ items, total }, unreadCount, suspectedSpamCount] =
+      await Promise.all([
+        listSubmissions(c.env.DB, {
+          filter: { view, email: q, formVersion: version, choice },
+          order: dir,
+          limit,
+          offset: (page - 1) * limit,
+        }),
+        countUnread(c.env.DB),
+        countSuspectedSpam(c.env.DB),
+      ]);
     // Option labels come from each row's own version.
     const versions = await getFormVersions(
       c.env.DB,
@@ -263,6 +294,7 @@ export const adminRoutes = new Hono<HonoEnv>()
           createdAt: s.createdAt,
           email: s.email,
           status: s.status,
+          suspectedSpam: s.suspectedSpam,
           spamScore: s.spamScore,
           formVersion: s.formVersion,
           fields,
@@ -274,6 +306,7 @@ export const adminRoutes = new Hono<HonoEnv>()
       pageSize: limit,
       total,
       unreadCount,
+      suspectedSpamCount,
     };
     return c.json(body);
   })
@@ -290,7 +323,8 @@ export const adminRoutes = new Hono<HonoEnv>()
     // The header comes from this version, so rows sent with a version saved
     // during the export (and its new fields) are left for the next export.
     const batches = submissionBatches(c.env.DB, {
-      status: query.data.status,
+      view: query.data.view,
+      email: query.data.q,
       formVersion: query.data.version,
       maxFormVersion: current.version,
       choice,
@@ -338,14 +372,12 @@ export const adminRoutes = new Hono<HonoEnv>()
   })
   .get('/submissions/:id', async (c) => {
     const id = c.req.param('id');
-    const submission = await getSubmission(c.env.DB, id);
+    const found = await getSubmission(c.env.DB, id);
+    const submission =
+      found?.status === 'unread'
+        ? await markRead(c.env.DB, id, Date.now())
+        : found;
     if (!submission) return apiError(c, 404, 'not_found');
-    if (submission.status === 'new') {
-      const now = Date.now();
-      await markRead(c.env.DB, id, now);
-      submission.status = 'read';
-      submission.readAt = now;
-    }
     return c.json(await toAdminSubmission(c, submission));
   })
   .patch('/submissions/:id', async (c) => {
@@ -355,15 +387,10 @@ export const adminRoutes = new Hono<HonoEnv>()
     } catch {
       return apiError(c, 400, 'invalid_json');
     }
-    const status =
-      typeof body === 'object' && body !== null
-        ? (body as Record<string, unknown>).status
-        : undefined;
-    if (!isSubmissionStatus(status)) {
-      return apiError(c, 400, 'invalid_input', { status: 'invalid' });
-    }
+    const update = submissionUpdateSchema.safeParse(body);
+    if (!update.success) return apiError(c, 400, 'invalid_input');
     const id = c.req.param('id');
-    if (!(await updateStatus(c.env.DB, id, status, Date.now()))) {
+    if (!(await updateSubmission(c.env.DB, id, update.data, Date.now()))) {
       return apiError(c, 404, 'not_found');
     }
     const submission = await getSubmission(c.env.DB, id);

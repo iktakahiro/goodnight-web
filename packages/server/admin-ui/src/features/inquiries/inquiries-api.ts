@@ -3,19 +3,21 @@ import type {
   AdminSubmissionList,
 } from '../../../../src/features/admin-api/admin-routes.ts';
 import type { Locale } from '../../../../src/shared/messages.ts';
-import type { SubmissionSortColumn } from '../../../../src/features/submissions/submission-sort.ts';
 import type { SubmissionStatus } from '../../../../src/features/submissions/submission-status.ts';
+import type {
+  SubmissionOrder,
+  SubmissionView,
+} from '../../../../src/features/submissions/submission-view.ts';
 import { apiFetch } from '../../shared/api/api-client.ts';
-
-/** A status filter in the list: one status or every inquiry. */
-export type StatusFilter = SubmissionStatus | 'all';
 
 /** Filters, order, and page of the list. */
 export interface ListQuery {
-  status: StatusFilter;
+  view: SubmissionView;
   page: number;
-  sort: SubmissionSortColumn;
-  dir: 'asc' | 'desc';
+  /** Order by received time. */
+  dir: SubmissionOrder;
+  /** Part of an email address. */
+  q?: string | undefined;
   version?: number | undefined;
   /** A select or radio field id; set together with `value`. */
   field?: string | undefined;
@@ -24,9 +26,8 @@ export interface ListQuery {
 
 const filterParams = (query: Partial<ListQuery>): URLSearchParams => {
   const params = new URLSearchParams();
-  if (query.status && query.status !== 'all') {
-    params.set('status', query.status);
-  }
+  if (query.view && query.view !== 'all') params.set('view', query.view);
+  if (query.q) params.set('q', query.q);
   if (query.version) params.set('version', String(query.version));
   if (query.field && query.value) {
     params.set('field', query.field);
@@ -45,7 +46,6 @@ export const fetchInquiries = (
   query: ListQuery,
 ): Promise<AdminSubmissionList> => {
   const params = filterParams(query);
-  if (query.sort !== 'received_at') params.set('sort', query.sort);
   if (query.dir !== 'desc') params.set('dir', query.dir);
   if (query.page > 1) params.set('page', String(query.page));
   return apiFetch<AdminSubmissionList>(
@@ -53,18 +53,24 @@ export const fetchInquiries = (
   );
 };
 
-/** `GET /api/admin/submissions/:id`. The server marks a new inquiry read. */
+/** `GET /api/admin/submissions/:id`. The server marks an unread inquiry read. */
 export const fetchInquiry = (id: string): Promise<AdminSubmission> =>
   apiFetch<AdminSubmission>(`/api/admin/submissions/${encodeURIComponent(id)}`);
 
-/** `PATCH /api/admin/submissions/:id` with a new status. */
-export const updateInquiryStatus = (
+/** A change to an inquiry: its status, its suspected spam flag, or both. */
+export interface InquiryUpdate {
+  status?: SubmissionStatus;
+  suspectedSpam?: boolean;
+}
+
+/** `PATCH /api/admin/submissions/:id`. Returns the updated inquiry. */
+export const updateInquiry = (
   id: string,
-  status: SubmissionStatus,
+  update: InquiryUpdate,
 ): Promise<AdminSubmission> =>
   apiFetch<AdminSubmission>(
     `/api/admin/submissions/${encodeURIComponent(id)}`,
-    { method: 'PATCH', body: JSON.stringify({ status }) },
+    { method: 'PATCH', body: JSON.stringify(update) },
   );
 
 /** `DELETE /api/admin/submissions/:id`. */
@@ -74,8 +80,8 @@ export const deleteInquiry = (id: string): Promise<{ ok: true }> =>
   });
 
 /**
- * URL of the CSV export for the list's filters, with headers and option
- * labels in `lang`. The browser downloads it.
+ * URL of the CSV export for the list's view, search, and filters, with
+ * headers and option labels in `lang`. The browser downloads it.
  */
 export const csvExportUrl = (
   query: Partial<ListQuery>,

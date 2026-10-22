@@ -13,7 +13,7 @@ description: 管理画面、最初の管理者の作成、問い合わせフォ�
 
 - **安全側に倒します。** 必要な設定やシークレットが足りないときは、それを必要とする機能を止めます。`TURNSTILE_SECRET` がなければ、問い合わせ API は 503 を返します。
 - **ログインなしで管理画面を開かせません。** 開発用の抜け道、既定のアカウント、共有のキーはありません。
-- **問い合わせを失いません。** 応答の前に保存します。スパムスコアが高い問い合わせは捨てずに保留します。
+- **問い合わせを失いません。** 応答の前に保存します。スパムの疑いがある問い合わせ（honeypot が埋まっている、スパムスコアが高い）も捨てずに保存し、別に表示します。
 - **個人情報を Cloudflare の外に出しません。** 通知に個人情報を含めず、生の IP アドレスも保存しません。
 
 ## 管理画面
@@ -88,8 +88,8 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id
 
 - Turnstile はサーバー側で検証し、`hostname` と `action` も確認します。
 - 本文を読む前に、`Origin`、`Content-Type`、本文のサイズを確認します。
-- honeypot 欄が入力されていたら、通常の成功の応答を返しますが、何も保存しません。そのリクエストも回数制限に数えます。
-- スパムスコアが高い送信は `held` にします。
+- honeypot 欄が入力されていても、応答は変えません。その送信も Turnstile と回数制限と検証を通す必要があり、通ればスパムの疑いとして保存します。honeypot 欄の値そのものは保存しません。
+- スパムスコアが高い送信には、スパムの疑いの印を付けます。スパムの疑いがある送信は Slack に通知せず、管理画面では別に表示します。
 - Rate Limiting binding で、`ip_hash` ごとに送信回数を制限します。
 - ページに API キーを入れません。ブラウザが読めるキーは秘密ではないので、守っているという誤解を生むだけです。
 
@@ -102,6 +102,7 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id
 - すべてのクエリで [Drizzle ORM](https://orm.drizzle.team/) のクエリビルダーを使います。管理画面の一覧の件数とオフセットも含めて、値はバインドされたパラメーターとして D1 に送ります。
 - URL から来る数値は、クエリに渡す前にルートで確認します。`page` は 1 から 100,000、`limit` は 1 から 100 で、数字だけで書かれている必要があります。`1; DROP TABLE submissions`、`-1`、`1e9`、`50 OFFSET 0` のような値には 400 を返します。
 - 生の SQL は Drizzle の `sql` テンプレートでだけ書けます。このテンプレートも値をバインドします。サーバーのコードが `sql.raw()` や D1 の `prepare()` を直接呼ぶと、CI のチェックが失敗します。
+- メールアドレスの検索では、`%`、`_`、`\` をエスケープし、パターンを 1 つのバインドされたパラメーターとして `ESCAPE '\'` 付きで送ります。
 - テストでは、一覧の API にインジェクション用の文字列を送って 400 になることを確かめます。また、データベースに送った文を記録して、入力がパラメーターにだけ現れることを確かめます。
 
 ```ts
@@ -114,30 +115,34 @@ const boundedInteger = (max: number) =>
     .transform(Number)
     .pipe(z.number().int().min(1).max(max));
 
-export const listQuerySchema = z.object({
-  status: statusParam,
+export const listQuerySchema = z.strictObject({
+  view: viewParam, // unread, read, all, or spam
+  q: emailSearchParam, // at most 254 characters
+  dir: z.enum(['asc', 'desc']).default('desc'),
   page: boundedInteger(ADMIN_MAX_PAGE).default(1),
   limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
+  // ... and the version and option filters
 });
 
 // packages/server/src/features/submissions/submission-store.ts
 orm
   .select()
   .from(submissions)
-  .where(statusIs(status))
-  .orderBy(...NEWEST_FIRST)
+  .where(and(viewIs(view), email ? emailContains(email) : undefined))
+  .orderBy(by(submissions.createdAt), by(submissions.id))
   .limit(limit)
   .offset(offset);
 ```
 
 ```sql
 select "id", "created_at", ... from "submissions"
-where "submissions"."status" = ?
+where (("submissions"."status" = ? and "submissions"."suspected_spam" = ?)
+  and lower("submissions"."email") like ? escape '\')
 order by "submissions"."created_at" desc, "submissions"."id" desc
 limit ? offset ?
 ```
 
-SQL の文字列は、状態、ページ、件数が何であっても同じです。変わるのはパラメーターだけです。[データベースとマイグレーション](/ja/docs/database/)を参照してください。
+SQL の文字列は、検索する文字、ページ、件数が何であっても同じです。変わるのはパラメーターだけです。[データベースとマイグレーション](/ja/docs/database/)を参照してください。
 
 ## シークレット
 
@@ -164,7 +169,7 @@ SQL の文字列は、状態、ページ、件数が何であっても同じで�
 - あなたのパスキーが入った端末を、ほかの人が使うこと。
 - 公式アップデートではない PR をマージすること。
 - あなたが自分のサイトに載せる内容と、starter に加えた変更のコード。
-- Turnstile と回数制限をすり抜けるスパム。保留やスパムとして扱いますが、完全には防げません。
+- Turnstile と回数制限をすり抜けるスパム。honeypot とスパムスコアで多くにスパムの疑いの印を付けますが、通常の一覧に届くものもあります。
 
 ## 脆弱性の報告
 

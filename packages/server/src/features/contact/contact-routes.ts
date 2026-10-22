@@ -21,7 +21,6 @@ import {
 } from '../notify/slack.ts';
 import { pruneIfDue } from '../retention/prune.ts';
 import { insertSubmission } from '../submissions/submission-store.ts';
-import type { SubmissionStatus } from '../submissions/submission-status.ts';
 import { getContactAvailability } from './contact-availability.ts';
 import {
   CONTACT_FIELD_LIMITS,
@@ -31,7 +30,7 @@ import {
   contactFieldErrors,
   contactRequestSchema,
 } from './contact-schema.ts';
-import { SPAM_HOLD_THRESHOLD, scoreSubmission } from './spam-score.ts';
+import { SPAM_SUSPECT_THRESHOLD, scoreSubmission } from './spam-score.ts';
 import { verifyTurnstile } from './turnstile.ts';
 import { safeErrorMessage } from '../../shared/log-error.ts';
 
@@ -183,16 +182,13 @@ export const contactRoutes = new Hono<HonoEnv>()
     };
     const origin = new URL(c.req.url).origin;
 
-    // 2. Honeypot: pretend success and store nothing. Turnstile has not run
-    //    yet, so a stored row would let a bot write to D1 without passing it.
-    //    The request still counts against the rate limit, so the same
-    //    address cannot follow up with real submissions at full speed.
-    const honeypot = input[CONTACT_HONEYPOT_FIELD];
-    if (typeof honeypot === 'string' && honeypot.trim() !== '') {
-      await limiter.limit({ key: ipHash });
-      console.info('contact: honeypot filled; nothing stored');
-      return c.json({ ok: true });
-    }
+    // 2. Honeypot: note it and carry on. A filled honeypot changes nothing
+    //    in the response; the submission still needs Turnstile, counts
+    //    against the rate limit, and must validate before it is stored as
+    //    suspected spam (docs/decisions/0009).
+    const honeypotValue = input[CONTACT_HONEYPOT_FIELD];
+    const honeypot =
+      typeof honeypotValue === 'string' && honeypotValue.trim() !== '';
 
     // 3. Turnstile, including hostname and action. Failure stores nothing.
     const token = input.turnstileToken;
@@ -255,8 +251,8 @@ export const contactRoutes = new Hono<HonoEnv>()
       values: values.data,
       elapsedMs: data.elapsedMs,
     });
-    const status: SubmissionStatus =
-      spam.score >= SPAM_HOLD_THRESHOLD ? 'held' : 'new';
+    const suspectedSpam = honeypot || spam.score >= SPAM_SUSPECT_THRESHOLD;
+    const spamReasons = honeypot ? ['honeypot', ...spam.reasons] : spam.reasons;
 
     // 6. Save before responding.
     const id = ulid(now);
@@ -268,9 +264,10 @@ export const contactRoutes = new Hono<HonoEnv>()
         fields: values.data,
         formVersion: form.version,
         locale: data.locale ?? null,
-        status,
+        status: 'unread',
+        suspectedSpam,
         spamScore: spam.score,
-        spamReasons: spam.reasons,
+        spamReasons,
         ...meta,
         pagePath: data.pagePath ?? null,
         consentAt: now,
@@ -279,10 +276,13 @@ export const contactRoutes = new Hono<HonoEnv>()
       console.error('contact: insert failed:', safeErrorMessage(error));
       return apiError(c, 500, 'server_error');
     }
+    if (honeypot)
+      console.info('contact: honeypot filled; stored as suspected spam');
 
-    // 7. After the response: notification and pruning.
+    // 7. After the response: notification (never for suspected spam) and
+    //    pruning.
     const webhookUrl = env.SLACK_WEBHOOK_URL;
-    if (status === 'new' && isSlackWebhookUrl(webhookUrl)) {
+    if (!suspectedSpam && isSlackWebhookUrl(webhookUrl)) {
       runInBackground(c, 'slack', () =>
         sendSlackNotification({
           db: env.DB,

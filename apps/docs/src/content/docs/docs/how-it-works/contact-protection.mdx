@@ -1,28 +1,73 @@
 ---
 title: Contact form protection
-description: The contact API checks origin and size, a honeypot field, Turnstile on the server, and a per-IP rate limit, then saves the submission before it replies.
+description: The contact API checks origin and size, Turnstile on the server, and a per-IP rate limit, validates against the stored form, and saves the submission before it replies. A honeypot and a rule-based score flag suspected spam without dropping it.
 ---
 
 ## What it does
 
 `POST /api/contact` applies these checks in order. Each check is cheaper than the next, so most junk is stopped early.
 
-| Check                                                                                           | On failure                                                                                                        |
-| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `Origin` is the site's own origin, `Content-Type` is as expected, and the body is at most 32 KB | Rejected before the body is parsed                                                                                |
-| The hidden honeypot field is empty                                                              | Nothing saved; counted against the rate limit; the reply still says success                                       |
-| Turnstile siteverify: `success`, `hostname`, and `action` match                                 | 400, nothing saved                                                                                                |
-| Rate Limiting binding, keyed by `ip_hash` (for example 5 requests per 60 seconds)               | 429                                                                                                               |
-| zod validation of the fields against the current form definition, then a spam score             | Invalid input or an unknown field is 400; a page with an old form version is 409; a high score sets status `held` |
+| Check                                                                                           | On failure                                                                                          |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Origin` is the site's own origin, `Content-Type` is as expected, and the body is at most 32 KB | Rejected before the body is parsed                                                                  |
+| Turnstile siteverify: `success`, `hostname`, and `action` match                                 | 400, nothing saved                                                                                  |
+| Rate Limiting binding, keyed by `ip_hash` (for example 5 requests per 60 seconds)               | 429                                                                                                 |
+| zod validation of the fields against the current form definition                                | Invalid input or an unknown field is 400; a page with an old form version is 409                    |
+| Honeypot and spam score                                                                         | Never a failure: the submission is saved, flagged as suspected spam, and gets no Slack notification |
 
 After the checks, the submission is inserted into D1, and only then does the API reply with 200.
 
+## Spam protection
+
+There are three layers. Turnstile keeps most bots out. The honeypot and the spam score do not refuse anything: they flag a submission as **suspected spam**. A suspected spam submission is saved like any other, but it gets no Slack notification and the admin screen lists it apart, under **Suspected spam**. An admin can open it and choose **Not spam**, or mark any inquiry as spam.
+
+### 1. Honeypot
+
+The form has a text field that people cannot see: it is moved off screen, hidden from screen readers (`aria-hidden`), and skipped by the Tab key (`tabindex="-1"`). Some bots fill in every field.
+
+```html title="templates/starter/src/features/contact/contact-form.astro"
+<input
+  id="contact-gnw-hp-x"
+  name="gnw_hp_x"
+  data-contact-honeypot
+  type="text"
+  tabindex="-1"
+  autocomplete="off"
+  data-1p-ignore
+  data-lpignore="true"
+  data-bwignore
+  data-form-type="other"
+/>
+```
+
+- The field is named `gnw_hp_x`, a name that means nothing to browsers and password managers. A name such as `website` or `url` invites autofill, and an autofilled honeypot would flag a real person's inquiry. `autocomplete="off"` and the `data-*` attributes ask the common password managers (1Password, LastPass, Bitwarden, and others) to leave the field alone.
+- A filled honeypot does not change the response. The submission still needs a valid Turnstile token, counts against the rate limit, and must pass validation, exactly like any other. If it passes, it is saved with the reason `honeypot`. If it does not, the client gets the same error as without the honeypot, and nothing is saved. A bot cannot tell from the response that it hit the trap.
+- The value of the honeypot field itself is never stored.
+
+### 2. Turnstile
+
+Cloudflare Turnstile runs in the page and gives the form a token. The Worker sends the token to siteverify and checks `success`, the `hostname` (the site's own host), and the `action` (`contact`). Without this server-side call, a bot could skip the widget. Checking `hostname` and `action` stops a token made for another site or another form from being reused here.
+
+Turnstile fails closed: without `TURNSTILE_SECRET` and `TURNSTILE_SITE_KEY`, the contact API answers 503 and the form says it is not available yet. See [Set up Turnstile](/docs/setup/turnstile/).
+
+### 3. Rule-based spam score
+
+After validation, `scoreSubmission()` in `spam-score.ts` adds points with a few documented rules. The rules follow the current form: they look at the field types, not at fixed field names.
+
+| Rule (stored reason) | Points                                                | Applies to                                                     |
+| -------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| `links:N`            | 1 per link (`http://`, `https://`, `www.`), at most 3 | All `textarea` fields together                                 |
+| `link_in_field`      | 3                                                     | A link in any one-line `text` field, such as a name or company |
+| `too_fast`           | 3                                                     | Sent less than 3 seconds after the form was shown              |
+
+`url` fields are expected to hold links and are not counted. A score of 3 or more (`SPAM_SUSPECT_THRESHOLD`) flags the submission as suspected spam. One link in a message does not; three links, a link in the name field, or a form sent in under 3 seconds do. The score and the reasons (`spam_reasons`, together with `honeypot` when the trap was hit) are stored and shown in the inquiry detail.
+
 ## Why it is built this way
 
-- **Turnstile is verified on the server.** The widget in the page only produces a token. Without the siteverify call, a bot could skip the widget. Checking `hostname` and `action` stops a token made for another site or another form from being reused here.
-- **The honeypot pretends to succeed and stores nothing.** A bot that gets an error tries again with changes. A bot that gets a success moves on. The honeypot check runs before Turnstile, so storing the submission would let a bot write to D1 without passing Turnstile. The request still counts against the rate limit, so the same address cannot follow up with many real-looking submissions. Only a one-line log entry without personal data remains.
+- **Doubtful submissions are flagged, not dropped.** A missed inquiry costs more than a little spam. A real person can trip a rule (a message with three links, a password manager that fills a hidden field), so suspected spam is saved and kept apart. The admin decides.
+- **Suspected spam is listed apart.** If it were mixed into the normal list, spam would bury real inquiries and the unread count would include it. The unread count and the Slack notification cover only inquiries that are not suspected spam. See [Customizing the contact form](/docs/contact-form/).
+- **The honeypot is checked after Turnstile.** Storing a honeypot hit before Turnstile would let a bot write to D1 without passing it. Because the honeypot hit goes through Turnstile, the rate limit, and validation first, a bot can store no more than the rate limit allows, and every stored row is a validated one.
 - **The fields are checked against the server's own definition.** Admins edit the form fields in the admin screen, and the definition is stored in D1. On every submission the server builds the zod schema from that stored definition. It accepts only the current field ids, so a hand-made request cannot add fields; it checks required fields, lengths, formats, and option values; and the stored values of one inquiry are limited to 16 KB. See [Customizing the contact form](/docs/contact-form/).
-- **Doubtful submissions are held, not dropped.** A missed inquiry costs more than a little spam, so a high spam score moves a submission to `held` instead of deleting it. Held submissions do not trigger a notification.
 - **The rate limit uses Cloudflare's binding.** The Rate Limiting binding is shared across Worker instances and works on the free plan. Better Auth's built-in in-memory limiter does not count across instances, so it is not used for this.
 - **No key in the page.** An API key embedded in the contact page would be readable by anyone, so it would protect nothing. Protection comes from Turnstile and the rate limit.
 - **Off without Turnstile.** If `TURNSTILE_SECRET` is missing, the API returns 503. See [Set up Turnstile](/docs/setup/turnstile/).

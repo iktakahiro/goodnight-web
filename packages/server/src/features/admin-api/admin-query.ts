@@ -3,8 +3,11 @@ import {
   FIELD_ID_PATTERN,
   OPTION_VALUE_PATTERN,
 } from '../contact-form/form-definition.ts';
-import { SUBMISSION_SORT_COLUMNS } from '../submissions/submission-sort.ts';
-import { SUBMISSION_STATUSES } from '../submissions/submission-status.ts';
+import {
+  DEFAULT_SUBMISSION_VIEW,
+  EMAIL_SEARCH_MAX_LENGTH,
+  SUBMISSION_VIEWS,
+} from '../submissions/submission-view.ts';
 
 /** Submissions per page in the admin list when `limit` is not given. */
 export const ADMIN_PAGE_SIZE = 50;
@@ -27,11 +30,21 @@ const boundedInteger = (max: number) =>
     .transform(Number)
     .pipe(z.number().int().min(1).max(max));
 
-/** `?status=`: a submission status; empty or `all` means every status. */
-const statusParam = z
-  .enum(['', 'all', ...SUBMISSION_STATUSES])
+/** `?view=`: a view of the list; empty means the default view. */
+const viewParam = z
+  .enum(['', ...SUBMISSION_VIEWS])
   .optional()
-  .transform((value) => (value === '' || value === 'all' ? undefined : value));
+  .transform((value) => (value ? value : DEFAULT_SUBMISSION_VIEW));
+
+/**
+ * `?q=`: part of an email address, at most
+ * {@link EMAIL_SEARCH_MAX_LENGTH} characters. Trimmed; empty means no search.
+ */
+const emailSearchParam = z
+  .string()
+  .max(EMAIL_SEARCH_MAX_LENGTH)
+  .optional()
+  .transform((value) => value?.trim() || undefined);
 
 /** Largest accepted `version` filter. */
 const ADMIN_MAX_FORM_VERSION = 1_000_000;
@@ -39,16 +52,19 @@ const ADMIN_MAX_FORM_VERSION = 1_000_000;
 /**
  * Filters shared by the list and the CSV export:
  *
- * - `status`: one status; empty or `all` means every status.
+ * - `view`: `unread`, `read`, `all` (default), or `spam`. Every view but
+ *   `spam` leaves suspected spam out; `spam` shows only suspected spam.
+ * - `q`: a case-insensitive partial match on the email address.
  * - `version`: one form version.
  * - `field` and `value`: a select or radio field id of the current form and
  *   one of its option values. Both or neither. The route looks the id up in
  *   the definition; the patterns here only reject malformed input early.
  *
- * There is no keyword search parameter. Unknown parameters are rejected.
+ * There is no search on other fields. Unknown parameters are rejected.
  */
 const filterShape = {
-  status: statusParam,
+  view: viewParam,
+  q: emailSearchParam,
   version: boundedInteger(ADMIN_MAX_FORM_VERSION).optional(),
   field: z.string().max(40).regex(FIELD_ID_PATTERN).optional(),
   value: z.string().max(64).regex(OPTION_VALUE_PATTERN).optional(),
@@ -66,16 +82,15 @@ export const exportQuerySchema = z
   .refine(bothOrNeither);
 
 /**
- * Query of `GET /api/admin/submissions`: the filters, `sort`
- * (`received_at`, `email`, or `status`; default `received_at`), `dir` (`asc`
- * or `desc`; default `desc`), `page` (1 to {@link ADMIN_MAX_PAGE}, default
- * 1), and `limit` (1 to {@link ADMIN_MAX_PAGE_SIZE}, default
- * {@link ADMIN_PAGE_SIZE}). Form fields cannot be sorted on.
+ * Query of `GET /api/admin/submissions`: the filters, `dir` (`asc` or
+ * `desc`; default `desc`) for the order by received time, `page` (1 to
+ * {@link ADMIN_MAX_PAGE}, default 1), and `limit` (1 to
+ * {@link ADMIN_MAX_PAGE_SIZE}, default {@link ADMIN_PAGE_SIZE}). The list is
+ * sorted by received time only.
  */
 export const listQuerySchema = z
   .strictObject({
     ...filterShape,
-    sort: z.enum(SUBMISSION_SORT_COLUMNS).default('received_at'),
     dir: z.enum(['asc', 'desc']).default('desc'),
     page: boundedInteger(ADMIN_MAX_PAGE).default(1),
     limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),

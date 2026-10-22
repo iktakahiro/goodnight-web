@@ -217,18 +217,29 @@ const notices = [
     {/* The script renders the email field and the form's fields here. */}
     <div data-contact-fields class='space-y-6'></div>
 
-    {/* Honeypot: hidden from people, filled in by some bots. */}
+    {
+      /*
+       * Honeypot: hidden from people, filled in by some bots. A filled one is
+       * stored as suspected spam, so the name and the data-* attributes keep
+       * browsers and password managers from autofilling it.
+       */
+    }
     <div
       class='absolute -left-[9999px] h-px w-px overflow-hidden'
       aria-hidden='true'
     >
-      <label for='contact-website'>{text.honeypot}</label>
+      <label for='contact-gnw-hp-x'>{text.honeypot}</label>
       <input
-        id='contact-website'
+        id='contact-gnw-hp-x'
+        name='gnw_hp_x'
         data-contact-honeypot
         type='text'
         tabindex='-1'
         autocomplete='off'
+        data-1p-ignore
+        data-lpignore='true'
+        data-bwignore
+        data-form-type='other'
       />
     </div>
 

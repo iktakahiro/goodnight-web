@@ -1,8 +1,11 @@
 import type { FormField } from '../contact-form/form-definition.ts';
 import type { FieldValues } from '../contact-form/form-values-schema.ts';
 
-/** A submission with this score or more is saved with status `held`. */
-export const SPAM_HOLD_THRESHOLD = 3;
+/**
+ * A submission with this score or more is saved as suspected spam: it is
+ * listed apart from the others and not sent to Slack.
+ */
+export const SPAM_SUSPECT_THRESHOLD = 3;
 
 /** Submissions sent faster than this after the form was shown score points. */
 export const SPAM_MIN_ELAPSED_MS = 3000;
@@ -19,8 +22,9 @@ const HAS_LINK = /https?:\/\/|www\./i;
 
 /**
  * Scores a validated submission with simple, documented rules. Higher means
- * more likely spam. The rules only hold a submission for review; nothing is
- * thrown away.
+ * more likely spam. A score of {@link SPAM_SUSPECT_THRESHOLD} or more only
+ * flags the submission as suspected spam; it is still stored and an admin
+ * can clear the flag. Nothing is thrown away.
  *
  * - `links:N`: N links (`http://`, `https://`, `www.`) in `textarea` fields
  *   add N points, at most 3.
@@ -30,7 +34,9 @@ const HAS_LINK = /https?:\/\/|www\./i;
  * - `too_fast`: sent less than {@link SPAM_MIN_ELAPSED_MS} after the form was
  *   shown adds 3 points.
  *
- * The honeypot is handled before scoring and never stores anything.
+ * The honeypot is not part of the score. The contact API checks it
+ * separately: a filled honeypot flags the submission as suspected spam with
+ * the reason `honeypot`, whatever the score.
  *
  * @param fields - The form fields the values were validated against.
  */
