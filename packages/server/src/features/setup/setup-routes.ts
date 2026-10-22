@@ -7,17 +7,28 @@ import { isAllowedOrigin, readBodyWithLimit } from '../../shared/request.ts';
 import { isAdminEmail } from '../auth/admin-emails.ts';
 import { getAuth, isAuthConfigured } from '../auth/auth.ts';
 import { setupInputSchema } from './setup-schema.ts';
-import { isSetupClosed, isSetupConfigured } from './setup-state.ts';
+import {
+  isSetupClosed,
+  isSetupConfigured,
+  setupProblems,
+  type SetupProblem,
+} from './setup-state.ts';
 
 /** Body of `GET /api/setup`. */
 export interface SetupState {
   /**
    * `SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`,
-   * and the `CONTACT_RATE_LIMITER` binding are set.
+   * and the `CONTACT_RATE_LIMITER` binding are set, and the three secrets
+   * are long enough.
    */
   configured: boolean;
   /** Setup can run now: configured and no passkey was ever registered. */
   open: boolean;
+  /**
+   * The settings that keep setup off, by name. Empty once setup is closed,
+   * because they no longer matter then.
+   */
+  problems: SetupProblem[];
 }
 
 const MAX_SETUP_BODY_BYTES = 4 * 1024;
@@ -33,10 +44,12 @@ const MAX_SETUP_BODY_BYTES = 4 * 1024;
  */
 export const setupRoutes = new Hono<HonoEnv>()
   .get('/', async (c) => {
-    const configured = isSetupConfigured(c.env) && isAuthConfigured(c.env);
+    const problems = setupProblems(c.env);
+    const closed = await isSetupClosed(c.env.DB);
     const state: SetupState = {
-      configured,
-      open: configured && !(await isSetupClosed(c.env.DB)),
+      configured: problems.length === 0,
+      open: problems.length === 0 && !closed,
+      problems: closed ? [] : problems,
     };
     return c.json(state);
   })

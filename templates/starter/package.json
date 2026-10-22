@@ -29,7 +29,7 @@
   "cloudflare": {
     "bindings": {
       "SETUP_TOKEN": {
-        "description": "A long random string. You enter it once on the admin screen (`/admin`) to create the first admin. Create one with `openssl rand -base64 32`.\n\n最初の管理者を作るときに管理画面（`/admin`）で一度だけ入力する、長いランダムな文字列です。`openssl rand -base64 32` で作れます。"
+        "description": "A random string of **32 characters or more**. You enter it once on the admin screen (`/admin`) to create the first admin. Create one with `openssl rand -base64 32`.\n\n最初の管理者を作るときに管理画面（`/admin`）で一度だけ入力する、**32 文字以上**のランダムな文字列です。`openssl rand -base64 32` で作れます。"
       },
       "ADMIN_EMAILS": {
         "description": "Email addresses that may become admins, separated by commas, for example `you@example.com,colleague@example.com`.\n\n管理者になれるメールアドレスです。複数ある場合はカンマで区切ります（例: `you@example.com,colleague@example.com`）。"
@@ -38,7 +38,7 @@
         "description": "A random string of **32 characters or more**. It signs admin sign-in sessions. Create one with `openssl rand -base64 32`.\n\n管理画面のログイン情報の署名に使う、**32 文字以上**のランダムな文字列です。`openssl rand -base64 32` で作れます。"
       },
       "IP_HASH_SECRET": {
-        "description": "A long random string. IP addresses are stored only as an HMAC made with this key, **never as they are**. Create one with `openssl rand -base64 32`.\n\nIP アドレスはこの鍵で作った HMAC としてだけ保存し、**そのままの値は保存しません**。長いランダムな文字列を入れてください。`openssl rand -base64 32` で作れます。"
+        "description": "A random string of **32 characters or more**. IP addresses are stored only as an HMAC made with this key, **never as they are**. Create one with `openssl rand -base64 32`.\n\nIP アドレスはこの鍵で作った HMAC としてだけ保存し、**そのままの値は保存しません**。**32 文字以上**のランダムな文字列を入れてください。`openssl rand -base64 32` で作れます。"
       },
       "TURNSTILE_SECRET": {
         "description": "The Turnstile **secret key** (Cloudflare dashboard > Turnstile). Until both this and `TURNSTILE_SITE_KEY` are set, the contact form does not accept messages.\n\nTurnstile の**シークレットキー**です（Cloudflare ダッシュボード > Turnstile）。これと `TURNSTILE_SITE_KEY` の両方を設定するまで、お問い合わせフォームは受け付けを停止します。"

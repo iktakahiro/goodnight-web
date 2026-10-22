@@ -13,10 +13,10 @@ export const CLIENT_IP = '203.0.113.42';
 
 /** Secrets for tests. */
 export const SECRETS = {
-  SETUP_TOKEN: 'test-setup-token-0123456789',
+  SETUP_TOKEN: 'test-setup-token-0123456789abcdefghij',
   ADMIN_EMAILS: 'admin@example.com, Second@Example.com',
   BETTER_AUTH_SECRET: 'test-better-auth-secret-0123456789abcdef',
-  IP_HASH_SECRET: 'test-ip-hash-secret',
+  IP_HASH_SECRET: 'test-ip-hash-secret-0123456789abcdef',
   TURNSTILE_SECRET: 'test-turnstile-secret',
   TURNSTILE_SITE_KEY: 'test-site-key',
 } as const;

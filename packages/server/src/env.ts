@@ -14,13 +14,19 @@ export interface GoodnightEnv {
   ASSETS?: Fetcher;
   /** Rate Limiting binding for contact submissions and setup attempts. */
   CONTACT_RATE_LIMITER?: RateLimit;
-  /** Secret that must be presented to create the first admin. */
+  /**
+   * Secret that must be presented to create the first admin. At least 32
+   * characters.
+   */
   SETUP_TOKEN?: string;
   /** Comma-separated list of addresses that may be admins. */
   ADMIN_EMAILS?: string;
   /** Better Auth signing secret. At least 32 characters. */
   BETTER_AUTH_SECRET?: string;
-  /** HMAC key for `ip_hash`. Raw IP addresses are never stored. */
+  /**
+   * HMAC key for `ip_hash`. At least 32 characters. Raw IP addresses are
+   * never stored.
+   */
   IP_HASH_SECRET?: string;
   /** Turnstile secret key for server-side verification. */
   TURNSTILE_SECRET?: string;
@@ -28,4 +34,16 @@ export interface GoodnightEnv {
   TURNSTILE_SITE_KEY?: string;
   /** Optional Slack incoming webhook URL for new-inquiry notifications. */
   SLACK_WEBHOOK_URL?: string;
+  /**
+   * Optional Cloudflare Access application audience (AUD) tag. With
+   * `ACCESS_TEAM_DOMAIN`, the Worker verifies the `Cf-Access-Jwt-Assertion`
+   * header on the admin UI, the admin API, setup, and Better Auth. Several
+   * tags may be given, separated by commas.
+   */
+  ACCESS_AUD?: string;
+  /**
+   * Optional Cloudflare Access team domain, such as
+   * `your-team.cloudflareaccess.com`. Set it together with `ACCESS_AUD`.
+   */
+  ACCESS_TEAM_DOMAIN?: string;
 }
