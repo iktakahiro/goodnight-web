@@ -1,7 +1,8 @@
 ---
 /**
  * Links to this page in the other languages. When a page does not exist in a
- * language, the link goes to that language's home page.
+ * language, the link goes to that language's home page. Small screens show
+ * the language code (`JA`, `EN`) instead of the name.
  */
 import { localeNames, localizePath } from '../../i18n/locales';
 import { ui } from '../../i18n/ui';
@@ -26,9 +27,15 @@ const { locale, alternates } = Astro.props;
               lang={l}
               hreflang={l}
               aria-current={l === locale ? 'true' : undefined}
-              class='block rounded-full px-3 py-1 font-bold text-muted no-underline hover:text-primary-strong aria-[current=true]:bg-primary aria-[current=true]:text-primary-foreground'
+              aria-label={localeNames[l]}
+              class='block rounded-full px-2.5 py-1 font-bold whitespace-nowrap text-muted no-underline hover:text-primary-strong aria-[current=true]:bg-primary aria-[current=true]:text-primary-foreground sm:px-3'
             >
-              {localeNames[l]}
+              <span aria-hidden='true' class='sm:hidden'>
+                {l.toUpperCase()}
+              </span>
+              <span aria-hidden='true' class='hidden sm:inline'>
+                {localeNames[l]}
+              </span>
             </a>
           </li>
         ))}
