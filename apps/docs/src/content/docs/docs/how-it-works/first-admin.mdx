@@ -21,40 +21,58 @@ The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and h
 Someone else who had the token earlier could have run setup with the same address and kept the session. These rules make sure such a session never becomes an admin session:
 
 - Running setup again for an address that already has a user deletes that user's earlier sessions.
-- Registering the first passkey deletes every session in the database. Until then, the only sessions are the ones setup created. The setup screen registers the passkey with `createSession`, so you get a new session, created after the passkey, and stay signed in.
+- Registering the first passkey first claims setup: one database statement writes `setup_closed_at` only if it is not there yet. If two first passkeys are registered at the same time, only one claim succeeds; the other registration gets 403. Then every session in the database is deleted. Until then, the only sessions are the ones setup created. The setup screen registers the passkey with `createSession`, so you get a new session, created after the passkey, and stay signed in.
+- If the passkey cannot be saved after the claim, the claim is removed again, so you can run setup again. The removal only matches that claim and only while no passkey exists.
+- Setup checks again that it is still open after it creates its session. If a passkey registration claimed setup in the meantime, setup deletes that session and answers 403.
 - Once setup is closed, a user without a passkey cannot register one.
-- The admin API rejects (401) a session created before the user's first passkey.
+- The admin API rejects (401) a session created before the user's first passkey. Registering another passkey needs such a session too, so an old setup session cannot add a passkey either.
 
 ```ts
 // packages/server/src/features/setup/first-passkey.ts
 export const beforePasskeySaved = async (
   db: D1Database,
-  userId: string,
+  { userId, sessionCreatedAt, request }: PasskeyRegistration,
 ): Promise<void> => {
-  const orm = getDatabase(db);
-  const existing = await orm
-    .select({ id: passkey.id })
-    .from(passkey)
-    .where(eq(passkey.userId, userId))
-    .get();
-  if (existing) return;
+  const state = await checkPasskeySession(
+    db,
+    userId,
+    sessionCreatedAt ?? new Date(0),
+  );
+  if (state === 'ok') return;
+  if (state === 'too_old') {
+    throw new APIError('UNAUTHORIZED', { message: 'passkey session required' });
+  }
   if (await isSetupClosed(db)) {
     throw new APIError('FORBIDDEN', { message: 'setup closed' });
   }
-  await orm.delete(session);
+  const claim = await claimSetup(db);
+  if (!claim) throw new APIError('FORBIDDEN', { message: 'setup closed' });
+  claims.set(request, claim);
+  await getDatabase(db).delete(sessionTable);
 };
 
-// packages/server/src/features/auth/require-admin.ts
-const first = await getDatabase(c.env.DB)
+// packages/server/src/features/setup/setup-state.ts
+export const claimSetup = async (db: D1Database): Promise<string | null> => {
+  const value = String(Date.now());
+  const rows = await getDatabase(db)
+    .insert(settings)
+    .values({ key: SETUP_CLOSED_AT, value })
+    .onConflictDoNothing()
+    .returning({ value: settings.value });
+  return rows.length === 1 ? value : null;
+};
+
+// packages/server/src/features/auth/passkey-session.ts
+const first = await getDatabase(db)
   .select({ createdAt: passkey.createdAt })
   .from(passkey)
-  .where(and(eq(passkey.userId, user.id), isNotNull(passkey.createdAt)))
+  .where(and(eq(passkey.userId, userId), isNotNull(passkey.createdAt)))
   .orderBy(asc(passkey.createdAt))
   .get();
-if (!first?.createdAt) return apiError(c, 403, 'passkey_required');
-if (session.createdAt.getTime() < first.createdAt.getTime()) {
-  return apiError(c, 401, 'unauthorized');
-}
+if (!first?.createdAt) return 'no_passkey';
+return sessionCreatedAt.getTime() < first.createdAt.getTime()
+  ? 'too_old'
+  : 'ok';
 ```
 
 ## The setup screen

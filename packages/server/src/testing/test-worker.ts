@@ -3,7 +3,7 @@ import type { RateLimit } from '@cloudflare/workers-types';
 import { createGoodnightWorker } from '../app.ts';
 import type { GoodnightEnv } from '../env.ts';
 import type { GoodnightWorkerOptions } from '../options.ts';
-import { createTestD1 } from './sqlite-d1.ts';
+import { createTestD1, type StatementPause } from './sqlite-d1.ts';
 
 /** Origin used by test requests. */
 export const ORIGIN = 'https://example.com';
@@ -41,6 +41,8 @@ export interface TestWorker {
   env: GoodnightEnv;
   sqlite: Database;
   rateLimitKeys: string[];
+  /** Holds the next D1 statement matching `pattern` (see `createTestD1`). */
+  pauseAt: (pattern: RegExp) => StatementPause;
   /** Calls the Worker and waits for its `ctx.waitUntil` tasks. */
   fetch: (path: string, init?: RequestInit) => Promise<Response>;
 }
@@ -58,7 +60,7 @@ export const createTestWorker = ({
   options?: GoodnightWorkerOptions;
   rateLimit?: number;
 } = {}): TestWorker => {
-  const { d1, sqlite } = createTestD1();
+  const { d1, sqlite, pauseAt } = createTestD1();
   const { limiter, keys } = createTestRateLimiter(rateLimit);
   const env = {
     DB: d1,
@@ -71,6 +73,7 @@ export const createTestWorker = ({
     env,
     sqlite,
     rateLimitKeys: keys,
+    pauseAt,
     fetch: async (path, init = {}) => {
       const tasks: Promise<unknown>[] = [];
       const ctx = {
