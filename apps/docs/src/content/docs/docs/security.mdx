@@ -1,50 +1,65 @@
 ---
 title: Security model
 icon: ShieldCheck
-description: What protects the admin screen, the first admin setup, and the contact form, how secrets are kept, and what goodnight-web does not protect against.
+description: How goodnight-web protects the admin screen, the contact form, and your secrets, and what it does not protect against.
 ---
+
+This page explains what goodnight-web protects and how, and what you need to do when you run a site. What it cannot protect against is in [What this does not protect against](#limits).
+
+## What you do [#checklist]
+
+- Use random values of at least 32 characters for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` ([Secrets](#secrets)).
+- Delete `SETUP_TOKEN` after setup. It is not needed again.
+- Put Cloudflare Access on the admin paths. It is optional but strongly recommended ([Cloudflare Access](#cloudflare-access)).
+- Turn off `workers.dev` and preview URLs once your own domain works.
+- Turn on **Always Use HTTPS** for your zone ([HTTPS](#https)).
+- Keep your repository private, and merge only pull requests that have the official update comment ([Updates and your repository](#updates)).
 
 ## Principles
 
-- **Fail closed.** When a required setting or secret is missing, the feature that needs it is turned off. Without `TURNSTILE_SECRET`, the contact API returns 503.
+- **Fail closed.** When a required setting or secret is missing, the feature that needs it is turned off. For example, without `TURNSTILE_SECRET` the contact API returns 503.
 - **Never open the admin screen without sign-in.** There is no development bypass, default account, or shared key.
 - **Do not lose inquiries.** An inquiry is saved before the reply. Suspected spam (a filled honeypot or a high spam score) is saved and listed apart, not dropped.
-- **Keep personal data inside Cloudflare.** Notifications carry no personal data, and raw IP addresses are not stored.
+- **Keep personal data inside Cloudflare.** Notifications carry no personal data. Raw IP addresses are not stored.
 
 ## Admin screen
 
-| Topic                          | How it is handled                                                                                                                                                                                                                                                                                                       |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign-in                        | Better Auth with passkeys. Email and password sign-in is off. Password hashing can exceed the Workers free plan's CPU limit ([better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)); see [Passkey sign-in](/docs/how-it-works/passkeys/).                                                          |
-| Sessions                       | The admin API accepts only a session created at or after the user's first passkey, that is, a session from a passkey sign-in or from registering the first passkey. A session from setup is never an admin session. See [Sessions and setup](#sessions-and-setup).                                                      |
-| `ADMIN_EMAILS`                 | Read again on every request. Removing an address locks its sessions out at the next request. See [Removing an admin](#removing-an-admin).                                                                                                                                                                               |
-| HTTPS                          | The admin screen, the admin API, setup, and sign-in work only over `https://`. See [HTTPS](#https).                                                                                                                                                                                                                     |
-| Cloudflare Access              | Strongly recommended, but optional. Put an Access application on the admin paths, for example with a Google login or a one-time code by email. Access is free for up to 50 users. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. See [Cloudflare Access](#cloudflare-access). |
-| First admin                    | Requires `SETUP_TOKEN` and an address in `ADMIN_EMAILS`. With the two Access settings set, setup also requires a valid Access token. Setup closes once the first passkey is registered. See [First admin setup](/docs/how-it-works/first-admin/).                                                                       |
-| `workers.dev` and preview URLs | These addresses are easy to leave out of an Access policy. Turn them off once your own domain works. Even without Access, the admin screen still requires a passkey sign-in.                                                                                                                                            |
-| CSRF                           | `Origin` checks and `SameSite` cookies.                                                                                                                                                                                                                                                                                 |
-| Headers                        | A Content Security Policy and other security headers on Worker responses. The Worker decides which headers apply after it normalizes the path, so `/%61dmin`, `//admin`, and `/admin/..%2f` get the same headers as `/admin`.                                                                                           |
+| Topic                          | How it is handled                                                                                                                                                                                                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in                        | Passkeys through Better Auth, nothing else. Email and password sign-in is off, because password hashing can exceed the Workers free plan's CPU limit ([better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)). See [Passkey sign-in](/docs/how-it-works/passkeys/). |
+| Sessions                       | The admin API accepts only a session created at or after the user's first passkey. A session from setup is never an admin session. See [Sessions and setup](#sessions-and-setup).                                                                                                       |
+| `ADMIN_EMAILS`                 | Read again on every request. Removing an address locks its sessions out at the next request. See [Removing an admin](#removing-an-admin).                                                                                                                                               |
+| HTTPS                          | The admin screen, the admin API, setup, and sign-in work only over `https://`. See [HTTPS](#https).                                                                                                                                                                                     |
+| Cloudflare Access              | Optional, but strongly recommended. Free for up to 50 users. See [Cloudflare Access](#cloudflare-access).                                                                                                                                                                               |
+| First admin                    | Requires `SETUP_TOKEN` and an address in `ADMIN_EMAILS`. Setup closes for good once the first passkey is registered. See [First admin setup](/docs/how-it-works/first-admin/).                                                                                                          |
+| `workers.dev` and preview URLs | These addresses are easy to leave out of an Access policy. Turn them off once your own domain works. Even without Access, the admin screen still requires a passkey sign-in.                                                                                                            |
+| CSRF                           | `Origin` checks and `SameSite` cookies.                                                                                                                                                                                                                                                 |
+| Headers                        | A Content Security Policy and other security headers on Worker responses. The Worker picks the headers after it normalizes the path, so `/%61dmin`, `//admin`, and `/admin/..%2f` get the same headers as `/admin`.                                                                     |
 
-The admin UI's page shell can load without a session, but every data request needs one.
+The admin screen's page itself can load without a session, but every data request needs one.
 
 ### Sessions and setup [#sessions-and-setup]
 
-- When setup runs again for an address that already has a user, the user's earlier sessions are deleted first.
-- Registering the first passkey closes setup and deletes every session in the database. The browser gets a new session from the registration itself, created after the passkey.
+Only a session from a passkey sign-in or from registering the first passkey can be an admin session. These rules make sure of that:
+
+- When setup runs again for an address that already has a user, that user's earlier sessions are deleted first.
+- Registering the first passkey closes setup and deletes every session in the database. The browser gets a new session from the passkey registration itself.
 - Once setup is closed, a user without a passkey cannot register one. A session left over from setup cannot create another admin.
-- The admin API answers 401 for a session created before the user's first passkey, even if it was not deleted.
+- The admin API answers 401 for a session created before the user's first passkey, even if that session was not deleted.
 
 ### HTTPS [#https]
 
-Over plain HTTP, the setup token, session cookies, and passkey requests would cross the network in clear text. So for `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`:
+Over plain HTTP, the setup token, session cookies, and passkey requests would cross the network in clear text. So `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` require `https://`:
 
 - `GET` and `HEAD` over `http://` are redirected to the same URL on `https://` (308).
 - Other methods over `http://` get 403 with the code `https_required`. They are not redirected, because the body was already sent.
-- `localhost`, `127.0.0.1`, and `[::1]` are exempt, for `wrangler dev`.
+- `localhost`, `127.0.0.1`, and `[::1]` are exempt, so that `wrangler dev` works.
 
-The site and the contact form are not affected. Turn on **Always Use HTTPS** for your zone (Cloudflare dashboard > SSL/TLS > Edge Certificates) to cover them too.
+The site and the contact form are not covered. To require HTTPS for them too, turn on **Always Use HTTPS** for your zone (Cloudflare dashboard > SSL/TLS > Edge Certificates).
 
 ### Cloudflare Access [#cloudflare-access]
+
+Cloudflare Access adds a second sign-in in front of the passkey, for example a Google login or a one-time code by email. It is free for up to 50 users.
 
 Put the Access application on these paths:
 
@@ -55,23 +70,25 @@ Put the Access application on these paths:
 
 Keep `/api/contact` public. Visitors send the contact form there.
 
-When both settings below are set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the same paths ([Cloudflare: validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)): the RS256 signature with a key from `https://<team domain>/cdn-cgi/access/certs` (the keys are cached in the Worker for an hour), the issuer, the audience, `exp`, and `nbf`.
+To have the Worker check the Access token as well, set both of these:
 
 | Setting              | Value                                                                                                        |
 | -------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `ACCESS_AUD`         | The Access application's **Application Audience (AUD) Tag**. Several tags can be given, separated by commas. |
 | `ACCESS_TEAM_DOMAIN` | Your team domain, such as `your-team.cloudflareaccess.com`.                                                  |
 
+With both set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the paths above, so setup of the first admin also needs a valid token. It checks the RS256 signature, the issuer, the audience, `exp`, and `nbf` ([Cloudflare: validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)). The signing keys come from `https://<team domain>/cdn-cgi/access/certs`, and the Worker caches them for an hour.
+
 - A missing or invalid token gets 403 (`access_denied`).
-- When only one of the two settings is set, `ACCESS_TEAM_DOMAIN` is not a plain host name, or the keys cannot be fetched, those paths answer 503 (`access_unavailable`).
+- Those paths answer 503 (`access_unavailable`) when only one of the two settings is set, when `ACCESS_TEAM_DOMAIN` is not a plain host name, or when the keys cannot be fetched.
 - Without either setting, the Worker does not check Access tokens. Access in front of the site still works; the Worker just does not double-check it.
 - Passkey sign-in is still required with Access.
 
 ### Removing an admin [#removing-an-admin]
 
-The Worker reads `ADMIN_EMAILS` on every request. When you remove an address, its sessions get 403 on their next request, and a new passkey sign-in does not help.
+To remove an admin, delete their address from `ADMIN_EMAILS`. The Worker reads `ADMIN_EMAILS` on every request, so that admin's sessions get 403 on their next request. A new passkey sign-in does not help.
 
-The user, its sessions, and its passkeys stay in D1, though. If the address is added again later, they work again. To remove them, run this yourself (replace the address):
+The user, its sessions, and its passkeys stay in D1, so adding the address again later makes them work again. To delete them for good, run this yourself (replace the address):
 
 ```sh
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
@@ -81,24 +98,26 @@ This does not open setup again: `settings.setup_closed_at` stays.
 
 ## Contact form
 
-- Turnstile is verified on the server, including `hostname` and `action`.
-- `Origin`, `Content-Type`, and the body size are checked before the body is parsed.
-- A filled honeypot field does not change the reply. The submission still needs Turnstile, counts against the rate limit, and must pass validation; then it is stored as suspected spam. The honeypot value itself is not stored.
-- A high spam score flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed apart in the admin screen.
-- The Rate Limiting binding limits submissions per `ip_hash`.
-- There is no API key in the page. A key that the browser can read is not a secret, so it would give a false sense of protection.
+The contact API checks a submission like this before it saves it. [Contact form protection](/docs/how-it-works/contact-protection/) explains how each check works.
 
-See [Contact form protection](/docs/how-it-works/contact-protection/).
+- `Origin`, `Content-Type`, and the body size are checked before the body is parsed.
+- Turnstile is verified on the server, including `hostname` and `action`.
+- The Rate Limiting binding limits submissions per `ip_hash`.
+- A filled honeypot field does not change the reply. The submission is stored as suspected spam only if it passes Turnstile, the rate limit, and validation. The honeypot value itself is not stored.
+- A high spam score also flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed apart in the admin screen.
+- There is no API key in the page. A key that the browser can read is not a secret, so it would only give a false sense of protection.
 
 ## SQL injection [#sql-injection]
 
-The server never puts input into SQL text.
+The server never puts input into SQL text. Every value goes to D1 as a bound parameter.
 
-- Every query uses the [Drizzle ORM](https://orm.drizzle.team/) query builder. Values, including the page size and offset of the admin list, are sent to D1 as bound parameters.
+- Every query uses the [Drizzle ORM](https://orm.drizzle.team/) query builder. The page size and offset of the admin list are parameters too.
 - Numbers from the URL are checked at the route before they reach a query. `page` must be 1 to 100,000 and `limit` 1 to 100, written with digits only. Values such as `1; DROP TABLE submissions`, `-1`, `1e9`, or `50 OFFSET 0` get a 400 response.
-- Raw SQL is allowed only through Drizzle's `sql` template, which also binds its values. A check in CI fails when the server code calls `sql.raw()` or D1's `prepare()` directly, or reaches the D1 binding through Drizzle's `$client` (`bun run check:sql`; see [Database](/docs/database/#how-queries-are-written)).
-- The email search escapes `%`, `_`, and `\` and sends the pattern as one bound parameter, with `ESCAPE '\'`.
-- Tests send injection strings to the admin list and check the 400 responses, and record the statements sent to the database to check that input appears only in the parameters.
+- Raw SQL is allowed only through Drizzle's `sql` template, which binds its values. A CI check (`bun run check:sql`) fails when the server code calls `sql.raw()` or D1's `prepare()` directly, or reaches the D1 binding through Drizzle's `$client` (see [Database](/docs/database/#how-queries-are-written)).
+- The email search escapes `%`, `_`, and `\`. It sends the pattern as one bound parameter, with `ESCAPE '\'`.
+- Tests send injection strings to the admin list and check for 400. They also record the statements sent to the database and check that input appears only in the parameters.
+
+The route passes URL numbers through this schema, which turns a digits-only string into a bounded integer:
 
 ```ts title="packages/server/src/features/admin-api/admin-query.ts"
 const boundedInteger = (max: number) =>
@@ -121,7 +140,9 @@ export const listQuerySchema = z
   .refine(bothOrNeither);
 ```
 
-`filterShape` holds `view` (`unread`, `read`, `all`, or `spam`), `q` (the email search, at most 254 characters), and the version and option filters, each with its own zod schema. The store then builds the query with Drizzle (see [Database](/docs/database/#how-queries-are-written)). For `?view=unread&q=50%_off&page=3`, the test suite's recording D1 shows this statement and these parameters:
+`filterShape` holds `view` (`unread`, `read`, `all`, or `spam`), `q` (the email search, at most 254 characters), and the version and option filters, each with its own zod schema. The store then builds the query with Drizzle (see [Database](/docs/database/#how-queries-are-written)).
+
+For example, for `?view=unread&q=50%_off&page=3`, the test suite's recording D1 receives this statement and these parameters:
 
 ```sql
 select "id", "created_at", "email", "status", "suspected_spam", ... from "submissions"
@@ -135,14 +156,14 @@ limit ? offset ?
 ["unread", 0, "%50\\%\\_off%", 50, 100]
 ```
 
-The SQL text is the same for every search term, page, and page size; only the parameters change. See [Database](/docs/database/).
+The SQL text is the same for every search term, page, and page size. Only the parameters change. See [Database](/docs/database/).
 
-## Secrets
+## Secrets [#secrets]
 
 - All secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`, `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL`) are Worker secrets.
-- `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. A shorter value turns its features off, the same as a missing one: setup, sign-in, or the contact form answers 503. While setup is open, `GET /api/setup` lists the names of the settings that are missing or too short (never the values). The admin screen says when `IP_HASH_SECRET` is too short.
-- Delete `SETUP_TOKEN` after setup. It is not needed again.
-- They are never sent to the browser and never written to D1. The admin screen does not show the Slack webhook URL.
+- Secrets are never sent to the browser and never written to D1. The admin screen does not show the Slack webhook URL.
+- `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. A shorter value counts as missing, so setup, sign-in, or the contact form answers 503.
+- While setup is open, `GET /api/setup` lists the names of the settings that are missing or too short (never the values). The admin screen also says when `IP_HASH_SECRET` is too short.
 - There is no update button in the admin screen, because it would need a token that can write to your GitHub repository.
 
 ## CSV export
@@ -150,19 +171,19 @@ The SQL text is the same for every search term, page, and page size; only the pa
 - The export reads 200 rows per query and streams them, so a large table never sits in the Worker's memory as one file.
 - A cell whose first non-whitespace character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return, gets a leading `'`. Spreadsheet apps then show it as text instead of running it as a formula.
 
-## Updates and your repository
+## Updates and your repository [#updates]
 
 - Fixes arrive as Dependabot pull requests. Merge only pull requests that have the official update comment. See [Distribution and updates](/docs/distribution/).
 - Keep your repository private. The starter's visibility check fails while it is public.
-- goodnight-web keeps its own dependencies small and pinned to exact versions.
+- goodnight-web keeps its own dependencies few and pinned to exact versions.
 
-## What this does not protect against
+## What this does not protect against [#limits]
 
 - Someone with access to your Cloudflare account or your GitHub repository.
-- A device that has one of your passkeys, used by someone else.
+- Someone else using a device that holds one of your passkeys.
 - Merging a pull request that is not an official update.
 - Content that you publish on your own site, and the code of any change you make to the starter.
-- Spam that passes Turnstile and the rate limit. The honeypot and the spam score flag much of it as suspected spam, but some will reach the normal list.
+- Spam that passes Turnstile and the rate limit. The honeypot and the spam score flag much of it, but some will reach the normal list.
 
 ## Reporting a vulnerability
 

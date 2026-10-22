@@ -12,11 +12,13 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
+import { AdminScreen } from './admin-screen';
 import { ArchitectureDiagram } from './architecture-diagram';
 
 /**
- * Standard Fumadocs components, the architecture diagram, and the icons that
- * cards pass to `<Card icon={...}>`, available to all English and Japanese MDX.
+ * Standard Fumadocs components, the architecture diagram, admin screenshots
+ * (`<AdminScreen>`), and the icons that cards pass to `<Card icon={...}>`,
+ * available to all English and Japanese MDX.
  */
 export const mdxComponents = {
   ...defaultComponents,
@@ -25,6 +27,7 @@ export const mdxComponents = {
   Steps,
   Step,
   Link,
+  AdminScreen,
   ArchitectureDiagram,
   Inbox,
   KeyRound,

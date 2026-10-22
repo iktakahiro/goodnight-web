@@ -105,5 +105,6 @@ bun run build        # builds admin-ui/ and writes the two .gen files
 bun run test         # unit and HTTP tests (in-memory D1 stand-in) and admin UI unit tests
 bun run test:e2e     # wrangler dev + the admin UI in Chromium with passkeys; needs `bunx playwright install chromium`
 bun run screenshots <dir>  # admin UI screenshots with fictional sample data
+bun run screenshots:docs   # the docs site's admin figures (apps/docs/public/images/admin/)
 bun run deploy:check
 ```

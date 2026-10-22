@@ -1,6 +1,6 @@
 # goodnight-web starter
 
-A company website with news, a blog, and a contact form. It runs on
+A website with news, a blog, and a contact form. It runs on
 Cloudflare only: one Worker serves the pages, the contact form API, and an
 admin screen for reading inquiries, and one D1 database stores the inquiries.
 

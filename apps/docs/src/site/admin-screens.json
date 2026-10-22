@@ -1,0 +1,112 @@
+{
+  "setup": {
+    "ja": {
+      "width": 496,
+      "height": 722
+    },
+    "en": {
+      "width": 496,
+      "height": 722
+    }
+  },
+  "sign-in": {
+    "ja": {
+      "width": 496,
+      "height": 501
+    },
+    "en": {
+      "width": 496,
+      "height": 501
+    }
+  },
+  "inquiry-list": {
+    "ja": {
+      "width": 1024,
+      "height": 682
+    },
+    "en": {
+      "width": 1024,
+      "height": 682
+    }
+  },
+  "inquiry-spam": {
+    "ja": {
+      "width": 1024,
+      "height": 697
+    },
+    "en": {
+      "width": 1024,
+      "height": 697
+    }
+  },
+  "inquiry-search": {
+    "ja": {
+      "width": 1024,
+      "height": 856
+    },
+    "en": {
+      "width": 1024,
+      "height": 856
+    }
+  },
+  "inquiry-detail": {
+    "ja": {
+      "width": 1024,
+      "height": 1325
+    },
+    "en": {
+      "width": 1024,
+      "height": 1325
+    }
+  },
+  "inquiry-delete": {
+    "ja": {
+      "width": 1024,
+      "height": 720
+    },
+    "en": {
+      "width": 1024,
+      "height": 720
+    }
+  },
+  "form-editor": {
+    "ja": {
+      "width": 1024,
+      "height": 1120
+    },
+    "en": {
+      "width": 1024,
+      "height": 1141
+    }
+  },
+  "form-preview": {
+    "ja": {
+      "width": 384,
+      "height": 1080
+    },
+    "en": {
+      "width": 384,
+      "height": 1038
+    }
+  },
+  "form-field": {
+    "ja": {
+      "width": 636,
+      "height": 531
+    },
+    "en": {
+      "width": 636,
+      "height": 510
+    }
+  },
+  "turnstile-notice": {
+    "ja": {
+      "width": 1024,
+      "height": 273
+    },
+    "en": {
+      "width": 1024,
+      "height": 273
+    }
+  }
+}

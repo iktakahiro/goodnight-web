@@ -1,12 +1,14 @@
 ---
 title: Getting started
 icon: Rocket
-description: Set up your site with the Deploy to Cloudflare button. Create a private copy of the starter, enter the secrets, set up Turnstile, add your domain, and create the first admin.
+description: Set up your site with the Deploy to Cloudflare button and create the first admin.
 ---
+
+These steps create a private copy of the starter, enter the secrets, add your own domain, set up Turnstile, and create the first admin.
 
 ## What you need
 
-- A Cloudflare account. The free plan is enough for a small company site.
+- A Cloudflare account. The free plan is enough for a small website.
 - A GitHub account.
 - A domain name, if you want the site on your own domain. Decide this before you register a passkey (see [Add your domain](#custom-domain)).
 
@@ -16,11 +18,15 @@ description: Set up your site with the Deploy to Cloudflare button. Create a pri
 
 ### Press the Deploy to Cloudflare button
 
-The button is in the starter's README. Cloudflare asks you to connect GitHub, then copies the starter into a new repository in your account, creates the D1 database, and builds and deploys the Worker with Workers Builds ([Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)).
+The button is in the README of the starter repository, the base of your site. It opens a Cloudflare setup form, which asks you to connect GitHub. When you fill in the form and continue, Cloudflare does the rest ([Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)):
+
+- copies the starter into a new repository in your account
+- creates the D1 database
+- builds and deploys the Worker with Workers Builds
 
 In the setup form, **tick "Create private Git repository"**. Your repository must be private; [Distribution and updates](/docs/distribution/#private-repository) explains why.
 
-If the repository was created as public, make it private in GitHub: **Settings > General > Danger Zone > Change visibility**, then choose private. The starter's visibility check workflow fails on every push until you do.
+If the repository was created as public, open **Settings > General > Danger Zone > Change visibility** in GitHub and choose private. Until you do, the starter's visibility check workflow fails on every push.
 
 </Step>
 
@@ -28,7 +34,7 @@ If the repository was created as public, make it private in GitHub: **Settings >
 
 ### Enter the secrets
 
-The Deploy form asks for these values. You can also set them later in the Cloudflare dashboard, in the Worker's settings under variables and secrets.
+The same setup form asks for these values. You can also set them later in the Cloudflare dashboard, in the Worker's settings under variables and secrets.
 
 | Name                 | What to enter                                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -36,24 +42,18 @@ The Deploy form asks for these values. You can also set them later in the Cloudf
 | `ADMIN_EMAILS`       | The email addresses that may become admins, separated by commas.                                              |
 | `BETTER_AUTH_SECRET` | A random string of 32 characters or more. Better Auth uses it to sign sessions.                               |
 | `IP_HASH_SECRET`     | A random string of 32 characters or more. Used to hash IP addresses so that raw IPs are never stored.         |
-| `TURNSTILE_SECRET`   | The Turnstile secret key. You can leave it empty now and add it in the next step.                             |
+| `TURNSTILE_SECRET`   | The Turnstile secret key. You can leave it empty now and add it in a later step.                              |
 | `SLACK_WEBHOOK_URL`  | Optional. A Slack incoming webhook URL for new-inquiry notifications.                                         |
 
-A shorter value turns its features off, the same as a missing one. One way to make a random string of 44 characters on your computer:
+A value shorter than 32 characters counts as missing, and the features that use it stay off.
+
+To make a random string that meets this rule (44 characters), run this in a terminal on your computer:
 
 ```sh
 openssl rand -base64 32
 ```
 
-Do not reuse a value for two secrets, and do not commit secrets to the repository.
-
-</Step>
-
-<Step>
-
-### Set up Turnstile
-
-Create a Turnstile widget. Put its site key in `wrangler.jsonc` (`TURNSTILE_SITE_KEY`) and its secret key in the `TURNSTILE_SECRET` secret. Until you do, the contact form shows that it is not available yet and refuses submissions. Follow [Set up Turnstile](/docs/setup/turnstile/).
+Do not reuse one value for two secrets. Do not commit secrets to the repository.
 
 </Step>
 
@@ -61,7 +61,9 @@ Create a Turnstile widget. Put its site key in `wrangler.jsonc` (`TURNSTILE_SITE
 
 ### Check the first deploy
 
-Open the site at the address that Workers Builds shows. The pages should load. The deploy script applies the D1 migrations before each deploy, so the database tables exist.
+Open the site at the address that Workers Builds shows, and check that the pages load.
+
+The database tables exist too, because the `deploy` script applies the D1 migrations before each deploy.
 
 </Step>
 
@@ -69,11 +71,22 @@ Open the site at the address that Workers Builds shows. The pages should load. T
 
 ### Add your domain before you register a passkey [#custom-domain]
 
-A passkey belongs to one domain (its relying party ID). A passkey registered on a `workers.dev` address does not work after you move the admin screen to your own domain, so add the domain first.
+A passkey works only on the domain it was registered on (its WebAuthn relying party ID). A passkey registered on a `workers.dev` address stops working when you move the admin screen to your own domain.
 
-In the Cloudflare dashboard, add a custom domain to the Worker. Then turn off the `workers.dev` address and preview URLs, so that the admin screen is reachable only on your domain.
+Setup is closed by then, so you cannot register a new passkey on the new domain either. There is no recovery procedure for this yet. So add the domain first.
 
-If you already registered a passkey on another address, you will need to register again on the new domain. How to recover an admin account is still an open question.
+1. In the Cloudflare dashboard, add a custom domain to the Worker.
+2. Turn off the `workers.dev` address and preview URLs. The admin screen is then reachable only on your domain.
+
+</Step>
+
+<Step>
+
+### Set up Turnstile
+
+Create a Turnstile widget. For its hostname, use the domain that serves your site. Put its site key in `wrangler.jsonc` (`TURNSTILE_SITE_KEY`) and its secret key in the `TURNSTILE_SECRET` secret.
+
+Until you do, the contact form shows "The contact form is not available yet" and refuses submissions. Follow [Set up Turnstile](/docs/setup/turnstile/).
 
 </Step>
 
@@ -81,7 +94,19 @@ If you already registered a passkey on another address, you will need to registe
 
 ### Create the first admin
 
-Open `https://<your domain>/admin/`. The admin screen works only over `https://`. The setup screen asks for the `SETUP_TOKEN` and an email address from `ADMIN_EMAILS`. Then your browser or password manager creates a passkey. After the first passkey is registered, setup closes; delete the `SETUP_TOKEN` secret then. [First admin setup](/docs/how-it-works/first-admin/) explains the rules.
+The admin screen works only over `https://`.
+
+1. Open `https://<your domain>/admin/`. No admin exists yet, so the setup screen (`/admin/setup`) opens.
+2. Enter the value of `SETUP_TOKEN` as the **Setup token** and an address from `ADMIN_EMAILS` as the **Email address**, then select **Continue**.
+3. Select **Register a passkey** and create the passkey with your browser or password manager. Save it where it syncs across your devices, such as iCloud Keychain, Google Password Manager, or a password manager app. The admin screen has no page to add a second passkey yet ([Passkey sign-in](/docs/how-it-works/passkeys/)).
+
+<AdminScreen
+  name='setup'
+  alt='The first-admin setup screen with the setup token and an email address filled in.'
+  caption='Step 1 of setup. The next step registers a passkey.'
+/>
+
+After the first passkey is registered, setup closes and the setup screen no longer works. Then delete the `SETUP_TOKEN` secret. [First admin setup](/docs/how-it-works/first-admin/) explains the rules.
 
 </Step>
 
@@ -89,11 +114,25 @@ Open `https://<your domain>/admin/`. The admin screen works only over `https://`
 
 ### Optional: put Cloudflare Access in front of the admin screen
 
-Cloudflare Access adds a second sign-in, for example with a one-time code sent by email. It is free for up to 50 users. It is recommended but not required: the admin screen always requires a passkey sign-in, with or without Access.
+Cloudflare Access adds a second sign-in, for example a one-time code sent by email. It is free for up to 50 users.
 
-Put the Access application on `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. Keep `/api/contact` public, because visitors send the contact form there.
+It is recommended but not required. The admin screen always requires a passkey sign-in, with or without Access.
 
-To have the Worker check the Access token as well, set two more variables: `ACCESS_AUD` (the application's **Application Audience (AUD) Tag**) and `ACCESS_TEAM_DOMAIN` (for example `your-team.cloudflareaccess.com`). Set both or neither; with only one, the admin paths answer 503. See [Security model](/docs/security/#cloudflare-access).
+Put the Access application on these paths:
+
+- `/admin`, `/admin/*`
+- `/api/admin/*`
+- `/api/setup`
+- `/api/auth/*`
+
+Keep `/api/contact` public. Visitors send the contact form there.
+
+To have the Worker check the Access token as well, add two variables:
+
+- `ACCESS_AUD`: the application's **Application Audience (AUD) Tag**
+- `ACCESS_TEAM_DOMAIN`: for example `your-team.cloudflareaccess.com`
+
+Set both or neither. With only one, the admin paths answer 503. See [Security model](/docs/security/#cloudflare-access).
 
 </Step>
 
@@ -101,7 +140,15 @@ To have the Worker check the Access token as well, set two more variables: `ACCE
 
 ### Edit your site
 
-Change the company details and the three theme colors in `site.config.ts`, the pages in `src/pages`, and the posts in `src/content`, in Japanese and English. The contact form fields are not in the code: change them in the admin screen. See [Customizing the contact form](/docs/contact-form/). Review the privacy policy template with a professional before you publish. [Privacy notes](/docs/privacy/) lists what the template covers.
+The site has Japanese and English pages. Edit both:
+
+- Company details and the three theme colors: `site.config.ts`
+- Pages: `src/pages`
+- Posts: `src/content`
+
+The contact form fields are not in the code. Change them in the admin screen ([Customizing the contact form](/docs/contact-form/)).
+
+Have a professional review the privacy policy template before you publish. [Privacy notes](/docs/privacy/) lists what the template covers.
 
 </Step>
 

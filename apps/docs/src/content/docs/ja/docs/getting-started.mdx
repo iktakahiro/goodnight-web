@@ -1,14 +1,16 @@
 ---
 title: はじめかた
 icon: Rocket
-description: Deploy to Cloudflare ボタンを使う手順です。starter の private なコピーを作り、シークレットを入力し、Turnstile を設定し、ドメインを追加して、最初の管理者を作ります。
+description: Deploy to Cloudflare ボタンでサイトを用意し、最初の管理者を作るまでの手順です。
 ---
+
+この手順で、starter の private なコピーを作り、シークレットを入力し、独自ドメインを追加し、Turnstile を設定して、最初の管理者を作ります。
 
 ## 必要なもの
 
-- Cloudflare のアカウント。小さな会社のサイトなら無料プランで足ります。
+- Cloudflare のアカウント。小さなWebサイトなら無料プランで足ります。
 - GitHub のアカウント。
-- 独自ドメインでサイトを公開するなら、そのドメイン名。パスキーを登録する前に決めてください（[ドメインを追加する](#custom-domain)を参照）。
+- 独自ドメインで公開するなら、そのドメイン名。パスキーを登録する前に決めてください（[ドメインを追加する](#custom-domain)を参照）。
 
 <Steps>
 
@@ -16,11 +18,15 @@ description: Deploy to Cloudflare ボタンを使う手順です。starter の p
 
 ### Deploy to Cloudflare ボタンを押す
 
-ボタンは、サイトのひな形である starter リポジトリの README にあります。Cloudflare が GitHub との連携を求めた後、starter をあなたのアカウントの新しいリポジトリにコピーし、D1 データベースを作り、Workers Builds で Worker をビルドしてデプロイします（[Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)）。
+ボタンは、サイトのひな形である starter リポジトリの README にあります。押すと Cloudflare の設定フォームが開き、GitHub との連携を求められます。フォームに入力して進めると、Cloudflare が次のことを自動で行います（[Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)）。
 
-設定フォームでは **「Create private Git repository」にチェックを入れてください**。リポジトリは private にする必要があります。理由は[配布と更新のしくみ](/ja/docs/distribution/#private-repository)で説明しています。
+- starter を、あなたのアカウントの新しいリポジトリにコピーする
+- D1 データベースを作る
+- Workers Builds で Worker をビルドしてデプロイする
 
-public で作られてしまった場合は、GitHub で private に変えてください。**Settings > General > Danger Zone > Change visibility** を開き、private を選びます。private にするまで、starter の公開範囲チェックのワークフローは push のたびに失敗します。
+設定フォームでは **「Create private Git repository」にチェックを入れてください**。リポジトリは private にする必要があります。理由は[配布と更新のしくみ](/ja/docs/distribution/#private-repository)にあります。
+
+public で作られてしまったら、GitHub で **Settings > General > Danger Zone > Change visibility** を開き、private を選びます。private にするまで、starter の公開範囲チェックのワークフローは push のたびに失敗します。
 
 </Step>
 
@@ -28,7 +34,7 @@ public で作られてしまった場合は、GitHub で private に変えてく
 
 ### シークレットを入力する
 
-Deploy のフォームで次の値を求められます。後から Cloudflare のダッシュボードで、Worker の設定の変数とシークレットから設定することもできます。
+前の手順と同じ設定フォームで、次の値を入力します。後から Cloudflare のダッシュボードで、Worker の設定の変数とシークレットから入れることもできます。
 
 | 名前                 | 入力するもの                                                                                               |
 | -------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -36,32 +42,28 @@ Deploy のフォームで次の値を求められます。後から Cloudflare �
 | `ADMIN_EMAILS`       | 管理者になれるメールアドレス。複数ならカンマで区切ります。                                                 |
 | `BETTER_AUTH_SECRET` | 32 文字以上のランダムな文字列。Better Auth がセッションの署名に使います。                                  |
 | `IP_HASH_SECRET`     | 32 文字以上のランダムな文字列。生の IP アドレスを保存しないよう、IP アドレスをハッシュにするのに使います。 |
-| `TURNSTILE_SECRET`   | Turnstile のシークレットキー。ここでは空のままにして、次の手順で入れても構いません。                       |
+| `TURNSTILE_SECRET`   | Turnstile のシークレットキー。ここでは空のままにして、後の手順で入れても構いません。                       |
 | `SLACK_WEBHOOK_URL`  | 任意。新しい問い合わせを通知する Slack の Incoming Webhook の URL。                                        |
 
-32 文字より短い値は設定されていないものとみなされ、その値を使う機能は止まります。44 文字のランダムな文字列は、たとえば手元のパソコンのターミナルで次のコマンドを実行すると作れます。
+32 文字より短い値は、設定していないのと同じ扱いです。その値を使う機能は止まります。
+
+手元のパソコンのターミナルで次のコマンドを実行すると、条件を満たす 44 文字のランダムな文字列を作れます。
 
 ```sh
 openssl rand -base64 32
 ```
 
-同じ値を 2 つのシークレットに使わないでください。シークレットをリポジトリにコミットしないでください。
+1 つの値を 2 つのシークレットに使い回さないでください。シークレットはリポジトリにコミットしないでください。
 
 </Step>
 
 <Step>
 
-### Turnstile を設定する
+### 最初のデプロイを確かめる
 
-Turnstile のウィジェットを作り、サイトキーを `wrangler.jsonc`（`TURNSTILE_SITE_KEY`）に、シークレットキーをシークレット `TURNSTILE_SECRET` に入れます。それまで、問い合わせフォームは「まだ利用できません」と表示し、送信を受け付けません。[Turnstile を設定する](/ja/docs/setup/turnstile/)の手順に従ってください。
+Workers Builds に表示されるアドレスでサイトを開き、ページが表示されることを確かめます。
 
-</Step>
-
-<Step>
-
-### 最初のデプロイを確認する
-
-Workers Builds に表示されるアドレスでサイトを開き、ページが表示されることを確かめます。`deploy` スクリプトがデプロイの前に D1 のマイグレーションを適用するので、データベースのテーブルもできています。
+データベースのテーブルもできています。`deploy` スクリプトが、デプロイの前に D1 のマイグレーションを適用するからです。
 
 </Step>
 
@@ -69,11 +71,22 @@ Workers Builds に表示されるアドレスでサイトを開き、ページ�
 
 ### パスキーを登録する前にドメインを追加する [#custom-domain]
 
-パスキーは、登録したときのドメイン（WebAuthn の relying party ID）に結びつきます。`workers.dev` のアドレスで登録したパスキーは、管理画面を独自ドメインに移したあとは使えません。先に独自ドメインを追加してください。
+パスキーは、登録したときのドメイン（WebAuthn の relying party ID）でしか使えません。`workers.dev` のアドレスで登録したパスキーは、管理画面を独自ドメインに移すと使えなくなります。
 
-Cloudflare のダッシュボードで、Worker にカスタムドメインを追加します。その後、`workers.dev` のアドレスとプレビュー URL を無効にして、管理画面に独自ドメインからしか入れないようにします。
+そのときはセットアップがもう閉じているので、新しいドメインで登録し直すこともできません。この場合の復旧の手順は、まだありません。だから、先に独自ドメインを追加します。
 
-別のアドレスでパスキーを登録してしまった場合は、新しいドメインで登録し直す必要があります。管理者アカウントの復旧方法は、まだ決まっていません。
+1. Cloudflare のダッシュボードで、Worker にカスタムドメインを追加します。
+2. `workers.dev` のアドレスとプレビュー URL を無効にします。これで、管理画面には独自ドメインからしか入れなくなります。
+
+</Step>
+
+<Step>
+
+### Turnstile を設定する
+
+Turnstile のウィジェットを作ります。ウィジェットのホスト名には、サイトを公開するドメインを入れます。サイトキーは `wrangler.jsonc` の `TURNSTILE_SITE_KEY` に、シークレットキーはシークレット `TURNSTILE_SECRET` に入れます。
+
+設定するまで、問い合わせフォームは「お問い合わせフォームは準備中です」と表示し、送信を受け付けません。手順は [Turnstile を設定する](/ja/docs/setup/turnstile/)を見てください。
 
 </Step>
 
@@ -81,7 +94,19 @@ Cloudflare のダッシュボードで、Worker にカスタムドメインを�
 
 ### 最初の管理者を作る
 
-`https://<独自ドメイン>/admin/` を開きます。管理画面は `https://` でだけ動きます。セットアップ画面で、`SETUP_TOKEN` と、`ADMIN_EMAILS` に入れたメールアドレスを入力します。続けて、ブラウザやパスワード管理アプリでパスキーを作ります。最初のパスキーを登録するとセットアップは完了し、それ以降セットアップ画面は使えなくなります。完了したら、シークレットの `SETUP_TOKEN` を削除してください。決まりは[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)で説明しています。
+管理画面は `https://` でだけ動きます。
+
+1. `https://<独自ドメイン>/admin/` を開きます。管理者がまだいないので、セットアップ画面（`/admin/setup`）が開きます。
+2. **セットアップトークン** に `SETUP_TOKEN` の値を、**メールアドレス** に `ADMIN_EMAILS` に入れたアドレスを入力し、**次へ** を選びます。
+3. **パスキーを登録** を選び、ブラウザやパスワード管理アプリでパスキーを作ります。保存先は、端末の間で同期されるもの（iCloud キーチェーン、Google パスワードマネージャー、パスワード管理アプリなど）を選んでください。2 つ目のパスキーを追加する画面は、まだありません（[パスキーでのログイン](/ja/docs/how-it-works/passkeys/)）。
+
+<AdminScreen
+  name='setup'
+  alt='セットアップトークンとメールアドレスを入力した、最初の管理者の登録画面'
+  caption='セットアップの 1 段階目。次の段階でパスキーを登録します。'
+/>
+
+最初のパスキーを登録するとセットアップは完了し、セットアップ画面はそれ以降使えなくなります。完了したら、シークレットの `SETUP_TOKEN` を削除してください。決まりは[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)にあります。
 
 </Step>
 
@@ -89,11 +114,25 @@ Cloudflare のダッシュボードで、Worker にカスタムドメインを�
 
 ### 任意: 管理画面の前に Cloudflare Access を置く
 
-Cloudflare Access を使うと、もう 1 段のログインを置けます。たとえばメールで届くワンタイムコードです。50 ユーザーまで無料です。推奨しますが必須ではありません。Access があってもなくても、管理画面には必ずパスキーでのログインが必要です。
+Cloudflare Access で、ログインをもう 1 段増やせます。たとえば、メールで届くワンタイムコードです。50 ユーザーまで無料です。
 
-Access のアプリケーションは `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` に設定します。`/api/contact` は公開したままにしてください。訪問者は問い合わせフォームからここに送信します。
+推奨しますが、必須ではありません。Access があってもなくても、管理画面には必ずパスキーでのログインが必要です。
 
-Worker にも Access のトークンを確認させるには、変数を 2 つ追加します。`ACCESS_AUD`（アプリケーションの **Application Audience (AUD) Tag**）と `ACCESS_TEAM_DOMAIN`（たとえば `your-team.cloudflareaccess.com`）です。両方設定するか、両方とも設定しないでください。片方だけだと、管理用のパスは 503 を返します。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。
+Access のアプリケーションは、次のパスに設定します。
+
+- `/admin`、`/admin/*`
+- `/api/admin/*`
+- `/api/setup`
+- `/api/auth/*`
+
+`/api/contact` は公開したままにしてください。訪問者は問い合わせフォームからここに送信します。
+
+Worker にも Access のトークンを確かめさせるには、変数を 2 つ追加します。
+
+- `ACCESS_AUD`: アプリケーションの **Application Audience (AUD) Tag**
+- `ACCESS_TEAM_DOMAIN`: たとえば `your-team.cloudflareaccess.com`
+
+2 つは両方設定するか、両方とも設定しないでください。片方だけだと、管理用のパスは 503 を返します。詳しくは[セキュリティモデル](/ja/docs/security/#cloudflare-access)を見てください。
 
 </Step>
 
@@ -101,7 +140,15 @@ Worker にも Access のトークンを確認させるには、変数を 2 つ�
 
 ### サイトを編集する
 
-会社の情報とテーマの 3 色は `site.config.ts`、ページは `src/pages`、記事は `src/content` で、日本語と英語の両方を編集します。問い合わせフォームの項目はコードにはありません。管理画面で変えてください。[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)を参照してください。プライバシーポリシーの雛形は、公開する前に専門家に確認してもらってください。雛形の内容は[プライバシーについて](/ja/docs/privacy/)にまとめています。
+サイトには日本語と英語のページがあります。両方を編集します。
+
+- 会社の情報とテーマの 3 色: `site.config.ts`
+- ページ: `src/pages`
+- 記事: `src/content`
+
+問い合わせフォームの項目はコードにはありません。管理画面で変えます（[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)）。
+
+プライバシーポリシーの雛形は、公開する前に専門家に確認してもらってください。雛形の内容は[プライバシーについて](/ja/docs/privacy/)にまとめています。
 
 </Step>
 
@@ -109,4 +156,4 @@ Worker にも Access のトークンを確認させるには、変数を 2 つ�
 
 ## Deploy ボタンを使わない場合
 
-`npm create cloudflare`（C3）でプロジェクトを作ることもできます。C3 が作るのは手元のプロジェクトだけです。GitHub のリポジトリは自分で作るので、**private で作ってください**。
+`npm create cloudflare`（C3）でもプロジェクトを作れます。C3 が作るのは手元のプロジェクトだけです。GitHub のリポジトリは自分で作るので、**private で作ってください**。

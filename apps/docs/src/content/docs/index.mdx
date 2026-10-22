@@ -1,43 +1,47 @@
 ---
 title: Overview
-description: goodnight-web is a template for a company website with a blog and a contact form. It runs on one Cloudflare Worker and one D1 database.
+description: A template for a website, a blog, and a contact form that runs on one Cloudflare Worker and one D1 database.
 hero:
-  title: A company website, a blog, and a contact form on Cloudflare
+  title: A website, a blog, and a contact form on Cloudflare
   tagline: One Worker serves the pages, receives inquiries, and runs a small admin screen. One D1 database stores the inquiries. There is no server or runtime for you to patch.
 ---
 
 <Callout type='warn'>
   **Work in progress (M1).** Nothing is published yet: no npm package, no
-  starter repository, no Deploy button. The server package and the starter are
-  in the repository and tested locally, and these pages describe that code.
+  starter repository, no Deploy button. These pages describe the server package
+  and the starter in the repository. Both are tested locally.
 </Callout>
 
-## What it is
+## What you get
 
-goodnight-web gives a small company the three things most company sites need:
+goodnight-web gives you the three things most websites need:
 
 - **Pages and a blog.** An Astro site with a home page, company profile, services, news, blog, contact page, and privacy policy, in Japanese and English. Blog posts are Markdown files in the repository.
-- **A contact form.** Submissions are checked with Turnstile, rate limited, and saved to D1 before the visitor sees a reply.
-- **An admin screen for inquiries.** Admins sign in with a passkey, read inquiries, mark them unread or read, search them by email address, check suspected spam apart from the rest, delete them, and export them as CSV.
+- **A contact form.** You add, remove, and reorder its fields in the admin screen, with no code changes and no deploy. Submissions are checked with Turnstile and rate limited. Each one is saved to D1 before the visitor sees a reply.
+- **An admin screen for inquiries.** Admins sign in with a passkey. They can read inquiries, mark them unread or read, search by email address, check suspected spam separately, delete inquiries, export them as CSV, and edit the form fields.
 
-Everything runs on Cloudflare: one Worker with Static Assets and one D1 database. The only other service is GitHub, where your copy of the site lives. A Slack notification is optional.
+## What it runs on
+
+Everything runs on Cloudflare: one Worker with Static Assets and one D1 database.
+
+The only other service is GitHub, where your copy of the site lives. Slack notifications are optional.
 
 ## Who it is for
 
 - A developer or a small web agency that sets up and hands over sites for clients.
-- A person at a small company or startup who looks after the company site, often without an engineering background, and edits it with AI tools.
+- A person at a small company or startup who looks after the website, often without an engineering background, and edits it with AI tools.
 
-You do not need to write server code. The contact API and the admin screen come from an npm package that you do not edit.
+You do not write server code. The contact API and the admin screen come from an npm package that you do not edit.
 
 ## What you still maintain
 
-goodnight-web removes server and runtime maintenance. Some maintenance remains, and you should plan for it:
+Server and runtime maintenance go away. Some work remains, and you should plan for it:
 
 - **Review and merge dependency update pull requests.** Fixes to goodnight-web arrive as Dependabot pull requests in your repository. Nobody merges them for you.
 - **Update the site's own dependencies**, such as Astro and Tailwind CSS. These also arrive as Dependabot pull requests.
 - **Follow Cloudflare changes**, such as a new `compatibility_date` or a change to a free plan limit.
-- **Keep your repository private** and your Worker secrets safe.
-- **Check your privacy policy** with a professional before you publish it.
+- **Keep your repository private.** Keep your Worker secrets safe too.
+- **Have a professional check your privacy policy.** Do this before you publish it.
 
 ## Where to go next
 

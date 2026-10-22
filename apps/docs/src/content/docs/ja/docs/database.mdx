@@ -1,23 +1,29 @@
 ---
 title: データベース
 icon: Database
-description: D1 データベースのテーブル、クエリの書き方、マイグレーションが npm パッケージに入ってデプロイのスクリプトで適用される流れ、スキーマの変更がサイトに届く流れをまとめます。
+description: D1 のテーブル、クエリの書き方、マイグレーションの配布と適用、スキーマの変更がサイトに届く流れです。
 ---
+
+このページでは、D1 データベースに何が入っているか、マイグレーションがいつ適用されるか、適用を取り消す方法がわかります。
 
 ## テーブル
 
-サイトごとに D1 データベースが 1 つあります。`@goodnight-web/server` は、すべてのテーブルを 1 つのスキーマファイル `packages/server/src/db/schema.ts` に [Drizzle ORM](https://orm.drizzle.team/) で定義しています。
+サイトごとに D1 データベースが 1 つあります。すべてのテーブルは、`@goodnight-web/server` の `packages/server/src/db/schema.ts` に [Drizzle ORM](https://orm.drizzle.team/) で定義しています。
 
 | テーブル                                                | 中身                                                                                                                                                                                                                                                            |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `submissions`                                           | 問い合わせフォームの送信内容。メールアドレス、`fields`（フォームの値。項目 ID をキーにした JSON）、`form_version`、`locale`、状態（`unread` か `read`）、`suspected_spam`、スパムスコアと理由、`ip_hash`（IP アドレスの HMAC。IP アドレスそのものは入れません） |
-| `form_definitions`                                      | 問い合わせフォームの定義のバージョン。追記だけで、保存したバージョンごとに 1 行。変更も削除もしません                                                                                                                                                           |
+| `form_definitions`                                      | 問い合わせフォームの定義のバージョン。保存したバージョンごとに 1 行を追記するだけで、変更も削除もしません                                                                                                                                                       |
 | `settings`                                              | `retention_days`、`last_cleanup_at`（[データの自動削除](/ja/docs/how-it-works/data-pruning/)用）、`setup_closed_at`                                                                                                                                             |
 | `user`、`session`、`account`、`verification`、`passkey` | Better Auth の管理者、セッション、パスキー                                                                                                                                                                                                                      |
 
-時刻は Unix ミリ秒で保存します。Better Auth のテーブルは、Better Auth の CLI で Drizzle アダプター用に生成しています。そのため、Better Auth とサーバーのほかの部分は、同じスキーマと同じマイグレーションの履歴を使います。
+時刻は Unix ミリ秒で保存します。
 
-問い合わせの状態と、スパムの疑いの印は別の列です。`SUBMISSION_STATUSES` は `['unread', 'read']` です。
+Better Auth のテーブルは、Better Auth の CLI で Drizzle アダプター用に生成しています。Better Auth もサーバーのほかの部分も、同じスキーマと同じマイグレーションの履歴を使います。
+
+### 状態とスパムの疑い
+
+問い合わせの状態と、スパムの疑いの印は、別々の列です。状態は `SUBMISSION_STATUSES`（`['unread', 'read']`）のどちらかです。
 
 ```ts title="packages/server/src/db/schema.ts"
 status: text('status', { enum: SUBMISSION_STATUSES })
@@ -33,7 +39,7 @@ suspectedSpam: integer('suspected_spam', { mode: 'boolean' })
   .default(false),
 ```
 
-CHECK 制約により、データベースもこのリストにある値しか受け付けません。インデックスは、未読件数と、「未読」と「既読」のタブに使います。
+CHECK 制約があるので、データベースもこの 2 つの値しか受け付けません。インデックスは、未読の件数と、管理画面の「未読」「既読」のタブで使います。
 
 ```ts title="packages/server/src/db/schema.ts"
 // Unread count and the unread and read views.
@@ -47,7 +53,9 @@ check(
 
 ## 問い合わせフォームの項目
 
-問い合わせフォームの項目は列ではありません。管理者が管理画面で編集し、保存するたびに、次の `version` 番号と JSON の定義を持つ行が `form_definitions` に増えます。いちばん大きいバージョンが現在のフォームです。2 つのトリガーで、このテーブルを追記だけにしています。
+フォームの項目は、テーブルの列ではありません。管理者は管理画面の「フォーム」で項目を編集します。保存するたびに、`form_definitions` に行が 1 つ増えます。行には、次の `version` 番号と、JSON の定義が入ります。
+
+いちばん大きいバージョンが、現在のフォームです。2 つのトリガーが、このテーブルへの変更を拒否します。1 つは `UPDATE` 用、もう 1 つは `DELETE` 用です。
 
 ```sql title="migrations/0004_form_definition_seed.sql"
 CREATE TRIGGER `form_definitions_no_update` BEFORE UPDATE ON `form_definitions`
@@ -56,13 +64,17 @@ BEGIN
 END;
 ```
 
-（`DELETE` にも同じトリガーがあります。）送信内容は、値を `f_name` のような変わらない項目 ID をキーにして `submissions.fields` に、確かめたときのバージョンを `submissions.form_version` に保存します。古い問い合わせは、いつもそのバージョンの定義で読みます。[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)を参照してください。
+送信内容の値は `submissions.fields` に入ります。キーは `f_name` のような、変わらない項目 ID です。送信を確かめたときのフォームのバージョンは `submissions.form_version` に入ります。
+
+古い問い合わせは、いつもそのバージョンの定義で表示します。詳しくは[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)を参照してください。
 
 ## クエリの書き方 [#how-queries-are-written]
 
-サーバーは、入力から SQL の文字列を組み立てません。すべてのクエリは Drizzle のクエリビルダーを通り、値はバインドされたパラメーターとして D1 に送られます。`packages/server/src/db/database.ts` の `getDatabase(env.DB)` が binding 用の Drizzle のデータベースを返し、アプリのコードはこれを通してだけ D1 を使います。
+サーバーは、入力から SQL の文字列を組み立てません。すべてのクエリは Drizzle のクエリビルダーを通ります。値は、バインドされたパラメーターとして D1 に送られます。
 
-管理画面の一覧が典型的な例です。絞り込みの条件、1 ページの件数、オフセットはすべてバインドします。一覧と総数は、1 回のバッチで D1 に送ります。
+アプリのコードは、`packages/server/src/db/database.ts` の `getDatabase(env.DB)` を通してだけ D1 を使います。この関数は、D1 の binding につないだ Drizzle のデータベースを返します。
+
+管理画面の一覧が典型的な例です。絞り込みの条件、1 ページの件数、オフセットは、すべてバインドします。一覧と総数は、1 回のバッチで D1 に送ります。
 
 ```ts title="packages/server/src/features/submissions/submission-store.ts"
 const orm = getDatabase(db);
@@ -79,7 +91,7 @@ const [rows, [counted]] = await orm.batch([
 ]);
 ```
 
-CI のチェックで、この書き方を守ります。`bun run check:sql`（`bun run validate` に含まれます）は `packages/server` を調べ、テスト用のヘルパー以外で次の書き方があれば失敗します。
+この書き方は CI で確かめます。`bun run check:sql`（`bun run validate` に含まれます）は `packages/server` を調べます。テスト用のヘルパー以外で次の書き方が見つかると、失敗します。
 
 ```ts title="scripts/check-sql.ts"
 export const SQL_RULES: readonly SqlRule[] = [
@@ -101,9 +113,61 @@ export const SQL_RULES: readonly SqlRule[] = [
 ];
 ```
 
-入力の確認と、D1 が受け取る SQL は、セキュリティモデルのページの [SQL インジェクション](/ja/docs/security/#sql-injection)を参照してください。
+入力の確認と、D1 が受け取る SQL は、[セキュリティモデルの「SQL インジェクション」](/ja/docs/security/#sql-injection)で説明しています。
 
 ## マイグレーションの配布と適用
+
+マイグレーションは npm パッケージに入っていて、`deploy` スクリプトが新しいコードを公開する前に適用します。サイト側でマイグレーションを書く必要はありません。
+
+### 適用のしくみ
+
+サイトの `wrangler.jsonc` では、D1 の binding がパッケージ内のマイグレーションのディレクトリを指しています。
+
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "migrations_dir": "node_modules/@goodnight-web/server/migrations"
+  }
+]
+```
+
+`deploy` スクリプトの中身は次のとおりです。
+
+```sh
+wrangler d1 migrations apply DB --remote && wrangler deploy
+```
+
+wrangler はファイルを名前順に適用し、適用したファイルをデータベースの `d1_migrations` テーブルに記録します。記録済みのファイルは飛ばすので、もう一度実行しても何も起きません。
+
+ファイルの途中で失敗すると、D1 はそのファイルを取り消します。デプロイは `wrangler deploy` の前で止まります。
+
+`wrangler d1 migrations create` は実行しないでください。`node_modules` の中にファイルを作ってしまいます。
+
+## スキーマの変更がサイトに届くまで [#how-a-schema-change-reaches-your-site]
+
+1. goodnight-web がスキーマを変え、`0007_add_note.sql` のような新しいマイグレーションを生成して、`@goodnight-web/server` の新しいバージョンを公開します。公開したマイグレーションのファイルは、編集も名前の変更もしません。
+2. Dependabot が、あなたのリポジトリに `@goodnight-web/server` を更新する PR を作ります。[配布と更新のしくみ](/ja/docs/distribution/)を参照してください。
+3. あなたがマージします。`deploy` スクリプトが `0007_add_note.sql` を適用し、それから新しいコードを公開します。
+
+2 つのコマンドの間は、古いバージョンの Worker が新しいスキーマで動きます。スキーマの変更は追加（新しいテーブルと列）だけで、クエリは列名を指定しています。そのため、この間も古いバージョンは動き続けます。
+
+PR のプレビュービルドは `deploy` スクリプトを実行しません。プレビューは、新しいマイグレーションを適用していないデータベースを使います。新しいスキーマが必要な画面は、プレビューでは失敗することがあります。
+
+## Time Travel でマイグレーションを取り消す
+
+D1 の Time Travel で、データベース全体を過去の時点（分単位）に戻せます。Workers の無料プランでは 7 日前まで、有料プランでは 30 日前までです（[Cloudflare: Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)）。
+
+```sh
+wrangler d1 time-travel info DB --timestamp=2026-10-22T09:00:00Z
+wrangler d1 time-travel restore DB --timestamp=2026-10-22T09:00:00Z
+```
+
+復元すると、その時点より後の問い合わせとログインもすべて消えます。公開中のコードは変わりません。
+
+マイグレーションより前の時点に戻したら、それに合う古いバージョンのサイトもデプロイしてください。そうしないと、次のデプロイでマイグレーションがもう一度適用されます。
+
+## パッケージに入っているマイグレーション
 
 パッケージには、drizzle-kit が生成した SQL のマイグレーションが入っています。
 
@@ -118,54 +182,23 @@ node_modules/@goodnight-web/server/migrations/
   0006_unread_read_status.sql
 ```
 
-`0003` から `0005` は、問い合わせの項目を列からフォームの定義に移します。
+`0003` から `0006` は、最初のリリースより前に、問い合わせの項目と状態の持ち方を変えたものです。
+
+`0003` から `0005` は、問い合わせの項目を、列からフォームの定義に移しました。
 
 1. `0003_form_definitions.sql` は `form_definitions` を作り、`submissions` に `locale`、`fields`、`form_version` を足します。
-2. `0004_form_definition_seed.sql`（手で書いたもの）は、それまでのフォームの項目（`f_name`、`f_company`、`f_phone`、`f_category`、`f_message`）でフォームのバージョン 1 を保存し、既存の送信内容の `name`、`company`、`phone`、`category`、`body` をその ID で `fields` に写し、追記だけにするトリガーを作ります。
-3. `0005_drop_fixed_contact_columns.sql` は古い列を削除します。
+2. `0004_form_definition_seed.sql` は手で書いたマイグレーションです。次の 3 つを行います。
+   - それまでの項目（`f_name`、`f_company`、`f_phone`、`f_category`、`f_message`）で、フォームのバージョン 1 を保存します。
+   - 既存の送信内容の `name`、`company`、`phone`、`category`、`body` を、この ID をキーにして `fields` に写します。
+   - 追記だけにするトリガーを作ります。
+3. `0005_drop_fixed_contact_columns.sql` は、古い列を削除します。
 
-列の削除は、スキーマの変更を追加だけにするという決まりの例外です。最初のリリースより前に入れたので、この列に書き込む Worker はどこにもデプロイされていません。
+[スキーマの変更は追加だけにする決まり](#how-a-schema-change-reaches-your-site)ですが、この列の削除は例外です。最初のリリースより前に入れたので、この列に書き込む Worker はどこにもデプロイされていません。
 
-`0006_unread_read_status.sql` は、状態を `unread` と `read` だけにし、`suspected_spam` の印を足します。SQLite で CHECK 制約を変えるにはテーブルを作り直す必要があるので、drizzle-kit は `submissions` を新しいテーブルに写します。生成された SQL のうち行を写す部分は手で直し、古い状態を新しい状態に置き換えるようにしました。`new` は `unread` に、それ以外の状態はすべて `read` にし、`held` か `spam` だった行には `suspected_spam = 1` を付けます。`0005` と同じく、最初のリリースより前に入れます。
+`0006_unread_read_status.sql` は、状態を `unread` と `read` だけにし、`suspected_spam` の印を足します。SQLite では、CHECK 制約を変えるとテーブルの作り直しになります。そのため drizzle-kit は、`submissions` を新しいテーブルに写します。
 
-サイトの `wrangler.jsonc` では、D1 の binding がこのディレクトリを指します。
+行を写す部分は、生成された SQL を手で直し、古い状態を次のように置き換えました。
 
-```jsonc
-"d1_databases": [
-  {
-    "binding": "DB",
-    "migrations_dir": "node_modules/@goodnight-web/server/migrations"
-  }
-]
-```
-
-`deploy` スクリプトは、新しいコードを公開する前にマイグレーションを適用します。
-
-```sh
-wrangler d1 migrations apply DB --remote && wrangler deploy
-```
-
-wrangler はファイルを名前順に並べ、適用したファイルをデータベースの `d1_migrations` テーブルに記録します。記録済みのファイルは飛ばすので、もう一度実行しても何も起きません。ファイルの途中で失敗すると D1 はそのファイルを取り消し、デプロイは `wrangler deploy` の前で止まります。
-
-サイト側でマイグレーションを書く必要はありません。`wrangler d1 migrations create` は実行しないでください。`node_modules` の中にファイルを作ってしまいます。
-
-## スキーマの変更がサイトに届くまで
-
-1. goodnight-web がスキーマを変え、`0007_add_note.sql` のような新しいマイグレーションを生成して、`@goodnight-web/server` の新しいバージョンを公開します。公開したマイグレーションのファイルは、編集も名前の変更もしません。
-2. Dependabot が、あなたのリポジトリに `@goodnight-web/server` を更新するプルリクエストを作ります。[配布と更新](/ja/docs/distribution/)を参照してください。
-3. あなたがマージします。`deploy` スクリプトが `0007_add_note.sql` を適用してから、新しいコードを公開します。
-
-2 つのコマンドの間は、古いバージョンの Worker が新しいスキーマに対して動きます。goodnight-web はスキーマの変更を追加だけ（新しいテーブルと列）にとどめ、クエリは列名を指定しているので、その間も古いバージョンは動き続けます。
-
-プルリクエストのプレビュービルドは `deploy` スクリプトを実行しないので、新しいマイグレーションを適用していないデータベースを使います。新しいスキーマが必要な画面は、プレビューでは失敗することがあります。
-
-## Time Travel でマイグレーションを取り消す
-
-D1 の Time Travel を使うと、データベース全体を過去の時点（分単位）に戻せます。Workers の無料プランでは 7 日前まで、有料プランでは 30 日前までです（[Cloudflare: Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)）。
-
-```sh
-wrangler d1 time-travel info DB --timestamp=2026-10-22T09:00:00Z
-wrangler d1 time-travel restore DB --timestamp=2026-10-22T09:00:00Z
-```
-
-復元すると、その時点より後の問い合わせとログインもすべて消えます。また、公開中のコードは変わりません。マイグレーションより前の時点に戻したときは、それに合う古いバージョンのサイトもデプロイしてください。そうしないと、次のデプロイでマイグレーションがもう一度適用されます。
+- `new` は `unread` にします。
+- それ以外の状態は、すべて `read` にします。
+- `held` か `spam` だった行には、`suspected_spam = 1` を付けます。
