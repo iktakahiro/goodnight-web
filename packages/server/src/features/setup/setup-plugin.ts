@@ -4,6 +4,7 @@ import { setSessionCookie } from 'better-auth/cookies';
 import * as z from 'zod';
 import type { GoodnightEnv } from '../../env.ts';
 import { isAdminEmail } from '../auth/admin-emails.ts';
+import { isSetupClosed } from './setup-state.ts';
 
 /**
  * Better Auth plugin with one server-only endpoint, `createFirstAdmin`, that
@@ -36,10 +37,7 @@ export const createSetupPlugin = (env: GoodnightEnv) =>
           if (!isAdminEmail(env.ADMIN_EMAILS, email)) {
             throw new APIError('FORBIDDEN', { message: 'email not allowed' });
           }
-          const passkeys = await ctx.context.adapter.count({
-            model: 'passkey',
-          });
-          if (passkeys > 0) {
+          if (await isSetupClosed(env.DB)) {
             throw new APIError('FORBIDDEN', { message: 'setup closed' });
           }
           const adapter = ctx.context.internalAdapter;

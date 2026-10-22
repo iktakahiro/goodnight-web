@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
-import { hmacSha256Hex, timingSafeEqual } from '../../shared/crypto.ts';
+import { timingSafeEqual } from '../../shared/crypto.ts';
+import { limitByIpHash } from '../../shared/ip-rate-limit.ts';
 import { isAllowedOrigin, readBodyWithLimit } from '../../shared/request.ts';
 import { isAdminEmail } from '../auth/admin-emails.ts';
 import { getAuth, isAuthConfigured } from '../auth/auth.ts';
@@ -10,9 +11,12 @@ import { isSetupClosed, isSetupConfigured } from './setup-state.ts';
 
 /** Body of `GET /api/setup`. */
 export interface SetupState {
-  /** `SETUP_TOKEN`, `ADMIN_EMAILS`, and `BETTER_AUTH_SECRET` are set. */
+  /**
+   * `SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`,
+   * and the `CONTACT_RATE_LIMITER` binding are set.
+   */
   configured: boolean;
-  /** Setup can run now: configured and no passkey exists yet. */
+  /** Setup can run now: configured and no passkey was ever registered. */
   open: boolean;
 }
 
@@ -29,9 +33,9 @@ const setupBodySchema = z.object({
  *
  * - `GET /`: {@link SetupState}.
  * - `POST /` with `{ token, email, name? }`: checks `Origin`, the rate limit,
- *   that no passkey exists, `SETUP_TOKEN` (constant-time), and `ADMIN_EMAILS`.
- *   Then it creates the user and a session cookie. The browser registers a
- *   passkey next, and setup closes.
+ *   that setup is not closed, `SETUP_TOKEN` (constant-time), and
+ *   `ADMIN_EMAILS`. Then it creates the user and a session cookie. The browser
+ *   registers a passkey next, and setup closes for good.
  */
 export const setupRoutes = new Hono<HonoEnv>()
   .get('/', async (c) => {
@@ -65,16 +69,9 @@ export const setupRoutes = new Hono<HonoEnv>()
       return apiError(c, 400, 'invalid_json');
     }
 
-    if (env.CONTACT_RATE_LIMITER && env.IP_HASH_SECRET) {
-      const ipHash = await hmacSha256Hex(
-        env.IP_HASH_SECRET,
-        c.req.header('cf-connecting-ip') ?? 'unknown',
-      );
-      const { success } = await env.CONTACT_RATE_LIMITER.limit({
-        key: `setup:${ipHash}`,
-      });
-      if (!success) return apiError(c, 429, 'rate_limited');
-    }
+    const limit = await limitByIpHash(env, c.req.raw, 'setup');
+    if (limit === 'unavailable') return apiError(c, 503, 'setup_unavailable');
+    if (limit === 'limited') return apiError(c, 429, 'rate_limited');
 
     if (await isSetupClosed(env.DB)) return apiError(c, 403, 'setup_closed');
 

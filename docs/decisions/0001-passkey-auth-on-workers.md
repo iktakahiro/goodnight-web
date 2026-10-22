@@ -201,8 +201,10 @@ What costs CPU:
   `database: env.DB` and email and password disabled. Keep `nodejs_compat`.
 - Create the first admin with a Better Auth plugin endpoint as tested above.
   `/api/setup` forwards to it. It checks `Origin`, compares `SETUP_TOKEN` in
-  constant time, checks `ADMIN_EMAILS` case-insensitively, and closes once any
-  passkey exists. The browser then calls `passkey.addPasskey()`.
+  constant time, checks `ADMIN_EMAILS` case-insensitively, and closes once the
+  first passkey is registered. A `passkey` insert trigger records
+  `settings.setup_closed_at`, so deleting every passkey later does not reopen
+  setup. The browser then calls `passkey.addPasskey()`.
 - The admin API requires a session whose user has at least one passkey. The
   session from setup is only useful for registering the first passkey.
 - Ask for resident keys and user verification at registration, and reject

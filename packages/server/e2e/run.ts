@@ -297,6 +297,14 @@ const main = async () => {
       closed.status === 403,
       closed,
     );
+    const closedFlag = await query(
+      "SELECT 1 AS found FROM settings WHERE key = 'setup_closed_at'",
+    );
+    check(
+      'the passkey insert recorded setup_closed_at',
+      closedFlag.length === 1,
+      closedFlag,
+    );
 
     await gnw(page, 'signOut');
     const signedOut = await gnw(page, 'call', '/api/admin/submissions');

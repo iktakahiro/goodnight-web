@@ -15,7 +15,7 @@ Right after a deploy, the site has no admin. The setup endpoint `/api/setup` cre
 - the request includes the correct `SETUP_TOKEN` (compared in constant time), and
 - the email address is in `ADMIN_EMAILS` (upper and lower case do not matter).
 
-Setup attempts are also rate-limited. The new admin is signed in and then registers a passkey. Once any passkey exists, the setup endpoint closes and stays closed. Until then, setup can run again, so a person who left before registering a passkey is not locked out.
+Setup attempts are also rate-limited, and setup is turned off when the rate limit cannot run (the Rate Limiting binding or `IP_HASH_SECRET` is missing). The new admin is signed in and then registers a passkey. Once the first passkey is registered, the setup endpoint closes and stays closed, even if every passkey is deleted later. Until then, setup can run again, so a person who left before registering a passkey is not locked out.
 
 The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session from setup alone is only good for registering the first passkey.
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { hmacSha256Hex } from '../../shared/crypto.ts';
 import { signInAsAdmin } from '../../testing/admin-session.ts';
 import {
   CLIENT_IP,
@@ -8,6 +9,7 @@ import {
   SECRETS,
   type TestWorker,
 } from '../../testing/test-worker.ts';
+import { getAuth } from '../auth/auth.ts';
 
 const setup = (
   worker: TestWorker,
@@ -103,6 +105,37 @@ describe('/api/setup', () => {
     });
   });
 
+  test('stays closed after every passkey is deleted', async () => {
+    const worker = createTestWorker();
+    await signInAsAdmin(worker);
+    worker.sqlite.exec('DELETE FROM passkey');
+    expect(await (await worker.fetch('/api/setup')).json()).toEqual({
+      configured: true,
+      open: false,
+    });
+    const response = await setup(worker, {
+      token: SECRETS.SETUP_TOKEN,
+      email: 'second@example.com',
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe('setup_closed');
+    expect(userCount(worker)).toBe(1);
+  });
+
+  test('the server-only setup endpoint also refuses once setup closed', async () => {
+    const worker = createTestWorker();
+    await signInAsAdmin(worker);
+    worker.sqlite.exec('DELETE FROM passkey');
+    const auth = getAuth(worker.env, ORIGIN);
+    await expect(
+      auth.api.createFirstAdmin({
+        body: { email: 'second@example.com', name: 'Second' },
+        headers: new Headers({ origin: ORIGIN }),
+      }),
+    ).rejects.toThrow('setup closed');
+    expect(userCount(worker)).toBe(1);
+  });
+
   test('can run again while no passkey is registered', async () => {
     const worker = createTestWorker();
     await signInAsAdmin(worker, { passkey: false });
@@ -141,14 +174,22 @@ describe('/api/setup', () => {
     expect((await setup(worker, body)).status).toBe(403);
     expect((await setup(worker, body)).status).toBe(403);
     expect((await setup(worker, body)).status).toBe(429);
+    const ipHash = await hmacSha256Hex(SECRETS.IP_HASH_SECRET, CLIENT_IP);
+    expect(worker.rateLimitKeys).toEqual(Array(3).fill(`setup:${ipHash}`));
   });
 
   test.each([
     ['SETUP_TOKEN', 'setup_unavailable'],
     ['ADMIN_EMAILS', 'setup_unavailable'],
+    ['IP_HASH_SECRET', 'setup_unavailable'],
+    ['CONTACT_RATE_LIMITER', 'setup_unavailable'],
     ['BETTER_AUTH_SECRET', 'auth_unavailable'],
   ])('fails closed with 503 without %s', async (name, code) => {
     const worker = createTestWorker({ env: { [name]: undefined } });
+    expect(await (await worker.fetch('/api/setup')).json()).toEqual({
+      configured: false,
+      open: false,
+    });
     const response = await setup(worker, {
       token: SECRETS.SETUP_TOKEN,
       email: 'admin@example.com',
@@ -156,5 +197,6 @@ describe('/api/setup', () => {
     expect(response.status).toBe(503);
     expect((await response.json()).error.code).toBe(code);
     expect(userCount(worker)).toBe(0);
+    expect(worker.rateLimitKeys).toEqual([]);
   });
 });
