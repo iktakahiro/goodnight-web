@@ -135,21 +135,23 @@ Web フォントはどこでも読み込みません。サイトでも、管理�
 
 ```css title="templates/starter/src/styles/global.css"
 :root {
-  --site-primary: #7357c8;
-  --site-background: #fcfbff;
-  --site-foreground: #2f2a40;
+  --site-primary: #2f6b4e;
+  --site-background: #fbfaf5;
+  --site-foreground: #253229;
 }
 
 @theme inline {
+  /* Fonts: the visitor's system fonts. The site loads no web fonts. */
   --font-sans:
-    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
-    'BIZ UDPGothic', Meiryo, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans',
+    'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', Meiryo,
+    sans-serif;
 
   --color-background: var(--site-background);
   --color-foreground: var(--site-foreground);
 ```
 
-管理画面は `@goodnight-web/server` の中に独自のデザイントークンを持っているので、サイトの色を変えても管理画面の色は変わりません。
+管理画面は `@goodnight-web/server` の中に、ライトとダークのモードを含む独自のデザイントークンを持っているので、サイトの色を変えても管理画面の色は変わりません。
 
 ## 関連ページ
 

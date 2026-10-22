@@ -379,9 +379,12 @@ The UI does not use TanStack Start; the Worker serves the static build.
   separate from the starter's colors (the starter owns its colors in
   `site.config.ts` and `src/styles/global.css`). All colors are tokens in
   `admin-ui/src/styles.css`: light values in `@theme`, dark values under
-  `:root.dark`; components use only token classes. `theme-contrast.test.ts` reads that file and checks
-  WCAG AA for the main pairs in both modes (4.5:1 text, 3:1 control borders
-  and focus rings).
+  `:root.dark`; components use only token classes. The inquiry table's
+  sticky columns use opaque `table-*` tokens so scrolled cells do not show
+  through, and the sticky-column shadow is the `--shadow-sticky` token.
+  `theme-contrast.test.ts` reads that file and checks WCAG AA for the main
+  pairs in both modes (4.5:1 text, 3:1 control borders and focus rings),
+  including the warning, badge, and table row colors.
 - **Fonts.** No web fonts. `--font-sans` and `--font-mono` in
   `admin-ui/src/styles.css` are system font stacks, so the admin UI
   requests no font files and the CSP needs no font host or `font-src`.
