@@ -3,25 +3,26 @@ import type { Renderer } from './render.ts';
 
 /**
  * The 16 px favicon frame, drawn by hand on top of the violet tile, because a
- * rasterised SVG blurs the moon and the cat together at this size. `w` is
+ * rasterised SVG blurs the moon and the cat together at this size. It
+ * follows the favicon silhouette: the moon, and the cat with two ears. `w` is
  * white, `+` and `-` are partly transparent white, and `.` shows the tile.
  */
 export const FAVICON_16: readonly string[] = [
   '................',
-  '................',
-  '.....-+w+.......',
-  '...-ww+-........',
-  '..+ww-..w..w....',
-  '..ww-...wwww....',
-  '.+ww....wwww-...',
-  '.www...wwwwwww..',
-  '.www...wwwwwww+.',
-  '.www+...wwwwww..',
-  '.+ww+...........',
-  '..www+......+w+.',
-  '..-wwwww++wwww-.',
-  '...-wwwwwwwww-..',
-  '.....-+www+-....',
+  '......-+ww-.....',
+  '....-www+-......',
+  '...+ww-.........',
+  '..-ww...........',
+  '..ww.+..+.......',
+  '.-ww.wwww.......',
+  '.+ww.wwwww+w-...',
+  '.+ww.wwwwwwww...',
+  '.+ww..wwwwwww.+.',
+  '..ww+..wwwww..w.',
+  '..+ww-......+ww.',
+  '...+wwwwwwwwww-.',
+  '....-wwwwwwww-..',
+  '......-+++-.....',
   '................',
 ];
 
