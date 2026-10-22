@@ -1,0 +1,16 @@
+{
+  "title": "ドキュメント",
+  "pages": [
+    "index",
+    "---はじめに---",
+    "getting-started",
+    "setup",
+    "---考え方---",
+    "architecture",
+    "distribution",
+    "how-it-works",
+    "---リファレンス---",
+    "security",
+    "privacy"
+  ]
+}

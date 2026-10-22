@@ -1,0 +1,122 @@
+---
+title: Getting started
+icon: Rocket
+description: The planned setup with the Deploy to Cloudflare button. Create a private copy of the starter, enter the secrets, set up Turnstile, add your domain, and create the first admin.
+---
+
+<Callout type='warn' title='Draft / not verified yet'>
+  This guide describes the planned setup. The starter repository and the Deploy
+  button do not exist yet, and nobody has run these steps end to end. They will
+  be tested in M2. Screen and field names may differ from what you see.
+</Callout>
+
+## What you need
+
+- A Cloudflare account. The free plan is enough for a small company site.
+- A GitHub account.
+- A domain name, if you want the site on your own domain. Decide this before you register a passkey (see [Add your domain](#custom-domain)).
+
+<Steps>
+
+<Step>
+
+### Press the Deploy to Cloudflare button
+
+The button is in the starter's README. Cloudflare asks you to connect GitHub, then copies the starter into a new repository in your account, creates the D1 database, and builds and deploys the Worker with Workers Builds ([Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)).
+
+In the setup form, **tick "Create private Git repository"**. Your repository must be private; [Distribution and updates](/docs/distribution/#private-repository) explains why.
+
+<Callout type='warn' title='Not verified yet'>
+  Cloudflare's documentation says that you can choose the repository name, but
+  it does not say anything about repository visibility. The checkbox name
+  "Create private Git repository", and the report that it may start unticked
+  (which creates a public repository), come from a third-party guide. We have
+  not confirmed them yet.
+</Callout>
+
+If the repository was created as public, make it private in GitHub: **Settings > General > Danger Zone > Change visibility**, then choose private. The starter's visibility check workflow fails on every push until you do.
+
+</Step>
+
+<Step>
+
+### Enter the secrets
+
+The Deploy form asks for these values. You can also set them later in the Cloudflare dashboard, in the Worker's settings under variables and secrets.
+
+| Name                 | What to enter                                                                     |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `SETUP_TOKEN`        | A long random string. You need it once, to create the first admin.                |
+| `ADMIN_EMAILS`       | The email addresses that may become admins, separated by commas.                  |
+| `BETTER_AUTH_SECRET` | A long random string. Better Auth uses it to sign sessions.                       |
+| `IP_HASH_SECRET`     | A long random string. Used to hash IP addresses so that raw IPs are never stored. |
+| `TURNSTILE_SECRET`   | The Turnstile secret key. You can leave it empty now and add it in the next step. |
+| `SLACK_WEBHOOK_URL`  | Optional. A Slack incoming webhook URL for new-inquiry notifications.             |
+
+One way to make a random string on your computer:
+
+```sh
+openssl rand -base64 32
+```
+
+Do not reuse a value for two secrets, and do not commit secrets to the repository.
+
+</Step>
+
+<Step>
+
+### Set up Turnstile
+
+Create a Turnstile widget and enter its site key and secret key. Until you do, the contact form shows that it is not available yet and refuses submissions. Follow [Set up Turnstile](/docs/setup/turnstile/).
+
+</Step>
+
+<Step>
+
+### Check the first deploy
+
+Open the site at the address that Workers Builds shows. The pages should load. The deploy script applies the D1 migrations before each deploy, so the database tables exist.
+
+</Step>
+
+<Step>
+
+### Add your domain before you register a passkey [#custom-domain]
+
+A passkey belongs to one domain (its relying party ID). A passkey registered on a `workers.dev` address does not work after you move the admin screen to your own domain, so add the domain first.
+
+In the Cloudflare dashboard, add a custom domain to the Worker. Then turn off the `workers.dev` address and preview URLs, so that the admin screen is reachable only on your domain.
+
+If you already registered a passkey on another address, you will need to register again on the new domain. How to recover an admin account is still an open question.
+
+</Step>
+
+<Step>
+
+### Create the first admin
+
+Open `/admin/` on your domain. The setup screen asks for the `SETUP_TOKEN` and an email address from `ADMIN_EMAILS`. Then your browser or password manager creates a passkey. After the first admin exists, setup closes. [First admin setup](/docs/how-it-works/first-admin/) explains the rules.
+
+</Step>
+
+<Step>
+
+### Optional: put Cloudflare Access in front of the admin screen
+
+Cloudflare Access adds a second sign-in in front of `/admin/*` and `/api/admin/*`, for example with a one-time code sent by email. It is free for up to 50 users. It is recommended but not required: the admin screen always requires a passkey sign-in, with or without Access.
+
+</Step>
+
+<Step>
+
+### Edit your site
+
+Change the company details in `site.config.ts`, the pages in `src/pages`, and the posts in `src/content`, in Japanese and English. Review the privacy policy template with a professional before you publish. [Privacy notes](/docs/privacy/) lists what the template covers.
+
+</Step>
+
+</Steps>
+
+## Without the Deploy button
+
+You can also create a project with `npm create cloudflare` (C3). C3 only creates a local project. You create the GitHub repository yourself, so **create it as private**.

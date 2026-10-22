@@ -1,0 +1,33 @@
+---
+title: Privacy notes
+description: Where inquiries are stored, how long deleted data can still be restored, what the privacy policy template covers, and what goodnight-web does to limit personal data.
+---
+
+<Callout type='warn'>
+  This page is not legal advice. Have a professional review your privacy policy
+  before you publish your site.
+</Callout>
+
+## What is stored
+
+A contact submission stores what the visitor typed (name, email address, company, phone number, category, and message), the time they agreed to the privacy policy, the page they sent it from, the user agent, the country that Cloudflare reports, and an `ip_hash`. The raw IP address is not stored. See [No raw IP addresses](/docs/how-it-works/ip-hashing/).
+
+Inquiries are deleted after the retention period, 180 days by default. See [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/).
+
+## Data is stored outside Japan
+
+D1 lets you restrict where data is stored only to the EU, FedRAMP, or the US. You cannot pin a database to Japan ([Cloudflare: D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/)). The privacy policy template therefore says that data is stored on servers in other countries (such as the United States), and it describes those countries and their privacy rules. Japan's Act on the Protection of Personal Information asks a business that handles personal data abroad to understand that environment.
+
+## Deleted data can be restored for a while
+
+D1 Time Travel can restore a database to an earlier point in time: up to 7 days back on the Workers free plan and up to 30 days on the paid plan ([Cloudflare: Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)). A deleted inquiry is therefore fully gone only after that period. The template says that deletion takes effect fully after up to 7 days on the free plan; change it to 30 if you use the paid plan.
+
+## Third parties
+
+- **Turnstile.** The contact form uses Cloudflare Turnstile. The template mentions it.
+- **Slack.** If you turn on Slack notifications, the message contains only the count, the category, and a link. No personal data is sent to Slack.
+
+<Callout type='warn' title='Draft / not verified yet'>
+  The privacy policy template is part of the starter, which is not written yet.
+  This page will link to it when it lands.
+</Callout>

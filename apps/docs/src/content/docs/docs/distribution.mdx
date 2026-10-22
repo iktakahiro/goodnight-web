@@ -1,0 +1,59 @@
+---
+title: Distribution and updates
+icon: Package
+description: The contact API and admin screen come from an npm package that you do not edit. The Astro site is yours. Updates arrive as Dependabot pull requests in your private repository.
+---
+
+<Callout type='warn' title='Draft / not verified yet'>
+  The package, the starter repository, and the workflows described here are
+  planned for M2. Nothing is published yet.
+</Callout>
+
+## Two parts, split by who edits them
+
+|                  | `@goodnight-web/server` (npm package)                                                                                                                                           | Your site (the starter)                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Who edits it     | goodnight-web maintainers. You do not edit it.                                                                                                                                  | You, or an AI tool working for you                                                                                                |
+| What it contains | The Worker factory, the contact API, Better Auth with passkeys, the admin API, the prebuilt admin UI with Japanese and English strings, security headers, and the D1 migrations | Astro pages, Markdown content (ja and en), `site.config.ts`, styles, `wrangler.jsonc`, and a `src/worker.ts` of about three lines |
+| How it changes   | New versions, following semver                                                                                                                                                  | Your own commits                                                                                                                  |
+
+The starter's `src/worker.ts` only calls the factory, so the server code stays inside the package. The starter also has an `AGENTS.md` and a `CLAUDE.md` that tell AI tools which files to edit (`src/pages`, `src/content`, `site.config.ts`, `src/styles`) and which to leave alone (the factory call, the binding names, and `@goodnight-web/*`).
+
+## How you get a copy
+
+The Deploy to Cloudflare button copies the public starter repository into a **new repository in your own GitHub account**. It is a copy, not a fork. Your copy does not follow the starter repository; the server code reaches you through the npm package instead. See [Getting started](/docs/getting-started/).
+
+## How updates reach you
+
+1. goodnight-web publishes a new version of `@goodnight-web/server`. If it fixes a vulnerability, a GitHub security advisory comes with it.
+2. The starter ships a `.github/dependabot.yml` that groups `@goodnight-web/*` updates and sets a cooldown of a few days. Dependabot only proposes a version after it has been public for that long. Security updates are not delayed by the cooldown.
+3. Dependabot opens one pull request in your repository.
+4. Workers Builds builds the pull request and shows a preview.
+5. You check the preview and merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
+
+There is no one-click update in the admin screen. It would need a token that can write to your GitHub repository, stored in the Worker, and goodnight-web avoids giving the Worker that power.
+
+### The update check workflow
+
+A pull request that says "update" is not always an update from goodnight-web. The starter includes `.github/workflows/update-check.yml`, which comments on every pull request so that you can tell them apart.
+
+A pull request counts as an **official update** only if all of these are true:
+
+- The author is `dependabot[bot]` and the account type is `Bot`.
+- The branch is in your own repository, not in a fork.
+- The only changed files are `package.json` and lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`).
+- Every changed dependency is a `@goodnight-web/*` package.
+
+For an official update, the workflow posts: "Official goodnight-web update. Safe to merge after checking the preview." For anything else it posts: "This is not an official update. If you don't understand the changes, don't merge." The comment is in Japanese and English, and the workflow updates the same comment instead of adding new ones.
+
+**Merge only pull requests that have the official update comment.**
+
+The workflow runs on `pull_request_target`, so it has the permission to comment, but it never checks out or runs code from the pull request. It reads only the pull request's metadata and its list of changed files through the GitHub API.
+
+## Your repository must be private [#private-repository]
+
+Keep your copy of the site in a **private** repository. A public repository shows anyone your full site source, your configuration, and the history of every change, including anything committed by mistake. It also lets strangers open pull requests, which is exactly the situation the update check workflow warns about.
+
+The starter includes `.github/workflows/visibility-check.yml`. It runs on every push (and can be started by hand). If the repository is public, the job fails with an error in Japanese and English that tells you to make it private. It needs no token and no permissions.
+
+To make a GitHub repository private: **Settings > General > Danger Zone > Change visibility**, then choose private.
