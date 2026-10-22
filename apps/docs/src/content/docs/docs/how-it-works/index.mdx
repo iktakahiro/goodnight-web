@@ -1,15 +1,15 @@
 ---
 title: How it works
-description: One page for each part of goodnight-web, with what it does, how, and why it is built that way.
+description: How each part of goodnight-web works, the code behind it, and why it is built that way.
 ---
 
-Each page covers one part of goodnight-web: what it does, the code that does it, and why it is built that way.
+Each page covers one part of goodnight-web: what it does, the code behind it, and why it is built that way.
 
-The code excerpts are short and copied from the repository. The file path is shown above each one, so you can read the whole file there.
+The code excerpts are short and copied as is from the repository. Each excerpt shows its file path at the top, so you can find the whole file in the repository.
 
 - [Contact form protection](/docs/how-it-works/contact-protection/): Turnstile verified on the server, a honeypot field, a rule-based spam score, and the Rate Limiting binding.
-- [Passkey sign-in](/docs/how-it-works/passkeys/): why admins use passkeys and not passwords.
+- [Passkey sign-in](/docs/how-it-works/passkeys/): how admins sign in with passkeys through Better Auth, and why there are no passwords.
 - [First admin setup](/docs/how-it-works/first-admin/): how `SETUP_TOKEN` and `ADMIN_EMAILS` stop a stranger from becoming the first admin.
 - [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/): how the retention period works with no scheduled job.
-- [Slack notifications](/docs/how-it-works/notifications/): a short message after the reply, with no personal data.
-- [No raw IP addresses](/docs/how-it-works/ip-hashing/): why only an HMAC of the IP address is stored.
+- [Slack notifications](/docs/how-it-works/notifications/): a short message after the response, with no personal data.
+- [No raw IP addresses](/docs/how-it-works/ip-hashing/): how and why only an HMAC of the IP address is stored.

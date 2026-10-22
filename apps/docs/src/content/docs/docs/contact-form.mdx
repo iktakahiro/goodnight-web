@@ -4,33 +4,33 @@ icon: ListChecks
 description: Edit the contact form fields in the admin screen, read inquiries in the list, and export them as CSV.
 ---
 
-You can add, remove, and reorder the contact form fields in the admin screen. A saved change reaches your site in about 30 seconds, with no code change and no deploy.
+You can add, remove, and reorder the contact form fields in the admin screen. Saved changes appear on your website within about 30 seconds, with no code change and no deploy.
 
-This page also covers the inquiry list, the inquiry detail, and the CSV export.
+This page also covers the inquiry list, the inquiry detail page, and the CSV export.
 
 ## Edit the form
 
 1. Sign in to the admin screen and open **Form** (フォーム in Japanese) in the menu. The **Contact form** page lists the fields in order.
-2. Edit the fields. The list below shows what you can change.
+2. Edit the fields. What you can change is listed after the screenshot.
 3. Select **Save as version N**. The fields are saved as a new version.
 
 <AdminScreen
   name='form-editor'
   alt='The form editor with the fixed email row, five fields with move buttons, the fixed privacy consent row, Add a field, and the live preview.'
-  caption='The first version. The save button at the top right is off until you change something.'
+  caption='Version 1 of the form. The save button at the top right stays disabled until you make a change.'
 />
 
 In the editor, you can:
 
 - **Add a field**, **Remove** it, and move it up or down
-- set its **Type**, its **Label**, and whether it is **Required**
-- set an optional placeholder and help text (**Placeholder and help text**), each in Japanese and English
-- set the **Maximum length** of text fields
-- add, remove, and reorder the **Choices** of dropdown, radio button, and checkbox fields
-- choose whether the field is a column in the inquiry list (**Show in the inquiry list**)
+- Set its **Type**, its **Label**, and whether it is **Required**
+- Set an optional placeholder and help text (**Placeholder and help text**), each in Japanese and English
+- Set the **Maximum length** of text fields
+- Add, remove, and reorder the **Choices** of dropdown, radio button, and checkbox fields
+- Choose whether the field is a column in the inquiry list (**Show in the inquiry list**)
 - **Preview** the form in Japanese or English
 
-The contact page reads the current version when a visitor opens it. The form may be cached for up to 30 seconds, so the change reaches visitors in about that time. You do not edit `site.config.ts`.
+The contact page reads the current version when a visitor opens it. The form may be cached for up to 30 seconds, so visitors see the change within about that time. You do not edit `site.config.ts`.
 
 The first version matches the form that comes with the starter: name (required), company, phone, category (a dropdown with five choices), and message (required).
 
@@ -38,28 +38,28 @@ The first version matches the form that comes with the starter: name (required),
 
 These parts are always on the form and cannot be edited:
 
-| Part                     | Why it is fixed                                                                                                                                                     |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Email address (required) | It is the address you reply to, and the one column every inquiry has. The list, the detail, the CSV, and the reply button rely on it, whatever else the form holds. |
-| Privacy policy consent   | The API refuses a submission without it, and stores the time of consent.                                                                                            |
-| Honeypot field           | A hidden field that only bots fill in. See [Contact form protection](/docs/how-it-works/contact-protection/).                                                       |
-| Turnstile                | The bot check that the server verifies before it saves anything.                                                                                                    |
+| Part                     | Why it is fixed                                                                                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Email address (required) | It is the address you reply to, and every inquiry stores it in its own column. The list, the detail page, the CSV, and the reply button rely on it, whatever the other fields are. |
+| Privacy policy consent   | The API rejects a submission without it, and stores the time of consent.                                                                                                           |
+| Honeypot field           | A hidden field that only bots fill in. See [Contact form protection](/docs/how-it-works/contact-protection/).                                                                      |
+| Turnstile                | The bot check that the server verifies before it saves anything.                                                                                                                   |
 
 In the editor, the email and consent rows are marked **Fixed**, with a short explanation.
 
 ## Field types and limits
 
-| Type       | Shown in the admin screen as | Stored value                          | Notes                                                    |
-| ---------- | ---------------------------- | ------------------------------------- | -------------------------------------------------------- |
-| `text`     | Single-line text             | Text on one line                      | Control characters are removed and spaces trimmed        |
-| `textarea` | Multi-line text              | Text with line breaks                 |                                                          |
-| `tel`      | Phone number                 | Text                                  | Digits, `+`, `-`, `(`, `)`, spaces; full-width digits OK |
-| `url`      | URL                          | Text                                  | `http://` or `https://` only                             |
-| `number`   | Number                       | A number                              |                                                          |
-| `date`     | Date                         | `YYYY-MM-DD`                          | Must be a real date                                      |
-| `select`   | Dropdown                     | One choice value                      | Must be one of the field's choices                       |
-| `radio`    | Radio buttons                | One choice value                      | Must be one of the field's choices                       |
-| `checkbox` | Checkboxes                   | A list of choice values (one or more) | Each must be one of the field's choices                  |
+| Type       | Shown in the admin screen as | Stored value                          | Notes                                                         |
+| ---------- | ---------------------------- | ------------------------------------- | ------------------------------------------------------------- |
+| `text`     | Single-line text             | Text on one line                      | Control characters are removed and spaces trimmed             |
+| `textarea` | Multi-line text              | Text with line breaks                 |                                                               |
+| `tel`      | Phone number                 | Text                                  | Digits, `+`, `-`, `(`, `)`, spaces; full-width digits allowed |
+| `url`      | URL                          | Text                                  | `http://` or `https://` only                                  |
+| `number`   | Number                       | A number                              |                                                               |
+| `date`     | Date                         | `YYYY-MM-DD`                          | Must be a real date                                           |
+| `select`   | Dropdown                     | One choice value                      | Must be one of the field's choices                            |
+| `radio`    | Radio buttons                | One choice value                      | Must be one of the field's choices                            |
+| `checkbox` | Checkboxes                   | A list of choice values (one or more) | Each must be one of the field's choices                       |
 
 | Limit                                                       | Value                  |
 | ----------------------------------------------------------- | ---------------------- |
@@ -75,45 +75,45 @@ In the editor, the email and consent rows are marked **Fixed**, with a short exp
 
 A label needs text in at least one language. When one language is empty, the other one is shown.
 
-## Field ids
+## Field IDs
 
-When you rename a field, its answers stay connected. Values are stored under a fixed id, not under the label.
+When you rename a field, its answers stay connected. Values are stored under a fixed ID, not under the label.
 
-An id looks like `f_k3v9q2m8x1b7c4d6`. The server creates it when the field is first saved, and it never changes. Only the fields of the first version have fixed ids such as `f_name`. [The form definition](#form-definition) shows the shape.
+An ID looks like `f_k3v9q2m8x1b7c4d6`. The server creates it when the field is first saved, and it never changes. Only the fields of version 1 have readable IDs such as `f_name`. [The form definition](#form-definition) shows the data structure.
 
-The editor shows the id in small type on saved fields (`ID f_…`). You cannot type or change it. A field that is not saved yet is marked **New** instead.
+The editor shows the ID in small type on saved fields (`ID f_…`). You cannot type or change it. A field that is not saved yet is marked **New** instead.
 
 <AdminScreen
   name='form-field'
   alt="A new field's settings: Japanese and English labels, type, maximum length, Required, Show in the inquiry list, and Remove."
-  caption='A newly added Budget field. Its id is assigned when you save.'
+  caption='A newly added Budget field. Its ID is assigned when you save.'
 />
 
-Because of these ids:
+Because of these IDs:
 
-- **Renaming a label keeps the data.** A field labeled "Company" that you rename to "Organization" keeps its id, so old and new answers stay in one column.
-- **A new field never takes an old field's place.** If you remove "Budget" and later add a new field called "Budget", the new one gets a new id. Old and new answers stay apart, even though the labels are the same.
-- **The browser cannot pick an id.** The editor sends new fields without an id. An id that no version of the form ever had is refused with 400.
-- **Types change only within the same kind of value.** `text`, `textarea`, `tel`, and `url` can change into each other, and so can `select` and `radio`. Other changes (for example `text` to `number`) are refused, because the values already stored under the id would not fit the new type. Add a new field instead.
-- **Choice values are generated too.** New choices get a value such as `o_p4n8w2k6c1`. You edit only the choice labels.
+- **Renaming a label keeps the data.** A field labeled "Company" that you rename to "Organization" keeps its ID, so old and new answers stay in one column.
+- **A new field never takes an old field's place.** If you remove "Budget" and later add a new field called "Budget", the new one gets a new ID. Old and new answers stay apart, even though the labels are the same.
+- **The server picks the ID.** The editor sends new fields without an ID, and the server assigns one. An ID that no version of the form ever had is rejected with 400.
+- **Types change only within the same kind of value.** You can switch among `text`, `textarea`, `tel`, and `url`, or between `select` and `radio`. Other changes (for example `text` to `number`) are rejected, because the values already stored under the ID would not fit the new type. Add a new field instead.
+- **Choice values are generated too.** New choices get an internal value such as `o_p4n8w2k6c1`. You edit only the choice labels.
 
 ## Versions and history
 
-Each save adds a version: 1, 2, 3, and so on. Any change to a label, a type, a choice, the order, or a setting creates one. A save without changes does not.
+Each save adds a version: 1, 2, 3, and so on. Changing a label, a type, a choice, the order, or a setting creates a new version. Saving without changes does not.
 
 - **Version history** lists each version with its number, the time, and the admin who saved it.
-- **Restore** saves the fields of an older version as a new version. It does not go back in history or remove anything. The restored fields keep their ids, so their data lines up again.
-- If someone else saved while you were editing, your save is refused (409 `form_conflict`). Reload and make your change again.
+- **Restore** saves the fields of an older version as a new version. It does not rewrite history or delete anything. The restored fields keep their IDs, so their old and new answers line up again.
+- If someone else saved while you were editing, your save is rejected (409 `form_conflict`). Reload and make your change again.
 
-A saved version never changes. The `form_definitions` table is append-only: database triggers refuse `UPDATE` and `DELETE` on it.
+A saved version never changes. The `form_definitions` table is append-only: database triggers reject `UPDATE` and `DELETE` on it.
 
 ## Remove and put back fields
 
 A removed field is archived when you save. Nothing is deleted:
 
 - The field stays in every older version, and its stored answers stay in the inquiries.
-- The definition keeps a list of archived fields, with their last labels and the last version that had them.
-- The editor lists them under **Archived fields**. **Put back** adds a field to the form again with its old id.
+- The definition keeps a list of archived fields, with their last labels and the last version they appeared in.
+- The editor lists them under **Archived fields**. **Put back** returns a field to the form with its old ID.
 
 ## The inquiry list
 
@@ -122,18 +122,18 @@ Open **Inquiries** in the admin screen to see the inquiries you received.
 <AdminScreen
   name='inquiry-list'
   alt='The inquiry list in the Unread view with three unread inquiries, the view tabs, the email search box, and the Download CSV button.'
-  caption='The Unread view. Suspected spam is kept apart under its own tab.'
+  caption='The Unread tab selected. Suspected spam has its own tab.'
 />
 
 ### Unread and read
 
 An inquiry has one of two statuses: **unread** or **read**.
 
-- A new inquiry is unread. Opening its detail marks it read.
-- To change it, use the envelope button next to the status in the list (**Mark as read** / **Mark as unread**), or the buttons in the detail. Set an inquiry back to unread if you want to handle it later.
+- A new inquiry is unread. Opening it marks it read.
+- To change the status, use the envelope button next to the status in the list (**Mark as read** / **Mark as unread**), or the buttons on the detail page. Mark an inquiry unread again if you want to handle it later.
 - There are no other statuses. To keep a record of what was done, reply by email or export the CSV.
 
-**Suspected spam** is not a status. It is a separate mark, set by the honeypot or the spam score (see [Contact form protection](/docs/how-it-works/contact-protection/)), or by an admin with **Mark as spam** in the detail. If it is a real inquiry, choose **Not spam** in the detail to remove the mark. A suspected spam inquiry is also unread or read.
+**Suspected spam** is not a status. It is a separate mark. The honeypot or the spam score sets it automatically (see [Contact form protection](/docs/how-it-works/contact-protection/)), and an admin can set it with **Mark as spam** on the detail page. If it is a real inquiry, choose **Not spam** on the detail page to remove the mark. A suspected spam inquiry is also unread or read.
 
 The unread count in the header counts unread inquiries that are not suspected spam.
 
@@ -141,7 +141,7 @@ The unread count in the header counts unread inquiries that are not suspected sp
 
 The list has three fixed columns: **Received**, **Email**, and **Status** (with the suspected spam badge when it applies). After them come the fields of the current version.
 
-- Fields with **Show in the inquiry list** turned on are shown from the start. In the first version, these are name, company, and message. Long text is cut to 120 characters.
+- Fields with **Show in the inquiry list** turned on are shown by default. In version 1, these are name, company, and message. Long text is truncated to 120 characters.
 - Use **Columns** to show or hide each column. That choice is saved in your browser only (`localStorage`).
 - Archived fields are not shown in the list.
 
@@ -169,7 +169,7 @@ Within a view, you can also filter by:
 
 The list is sorted by received time only: newest first by default, oldest first when you select the **Received** column header.
 
-It cannot be sorted by email address, status, or a form field, because the received time is what admins look for.
+It cannot be sorted by email address, status, or a form field, because inquiries are usually read in the order they arrive. To find a specific inquiry, use the tabs, the filters, or the email search.
 
 ### Search by email address
 
@@ -183,7 +183,7 @@ To find inquiries by the value of a form field, use **Filter by answer** or the 
 
 ## The inquiry detail
 
-Select an inquiry in the list to open its detail. Opening it marks it read.
+Select an inquiry in the list to open its detail page. Opening it marks it read.
 
 <AdminScreen
   name='inquiry-detail'
@@ -197,7 +197,7 @@ The buttons on the right:
 - **Reply by email**: write a reply to the fixed email address in your mail app.
 - **Delete**: delete it after a confirmation. See [Privacy notes](/docs/privacy/#deleted-data).
 
-The detail shows an inquiry with the labels and field order of the version it was sent with. A label that you rename later does not change how an old inquiry reads.
+The detail page shows an inquiry with the labels and field order of the version it was sent with. A label that you rename later does not change how an old inquiry reads.
 
 Values of fields that are no longer on the current form are still shown, marked "From version N · archived".
 
@@ -207,13 +207,13 @@ Select **Download CSV** in the list to export inquiries.
 
 The CSV starts with the fixed columns: `id`, `received_at`, `status` (`unread` or `read`), `suspected_spam` (`1` or `0`), `email`, `locale`, `form_version`, `page_path`, `country`, `spam_score`, `spam_reasons`.
 
-Then comes one column for every field id the form ever had: the current fields in form order, then archived fields.
+Then comes one column for every field ID the form ever had: the current fields in form order, then archived fields.
 
 - Headers are labels in the current language (Japanese or English).
 - An archived field's header ends with the last version that had it, for example `Budget (v3)`. A new field with the same label has its own column, `Budget`.
-- If two headers are still the same, the field id is added in brackets.
+- If two headers are still the same, the field ID is added in brackets.
 - Dropdown, radio button, and checkbox values are written as choice labels.
-- A cell that starts like a spreadsheet formula gets a leading `'`: one whose first non-whitespace character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return.
+- So that a spreadsheet app does not run a value as a formula, a leading `'` is added to any cell whose first non-whitespace character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return.
 - The export follows the list's view, email search, and filters. The All view leaves suspected spam out; export the Suspected spam view to get it.
 - The file is read 200 rows at a time and streamed, so a large table is never held in memory.
 
@@ -221,20 +221,18 @@ The export holds inquiries sent with the form version that was current when it s
 
 ## Why it is built this way
 
-- **The definition is in D1, so people who do not write code can change it.** A small company often runs its site without an engineer at hand. Adding a "Budget" field should not need a code change, a build, and a deploy.
-- **The server trusts only its own definition.** The definition from `GET /api/contact/form` is for drawing the form. On submit, the server reads the definition from D1 again and validates against that. A changed page or a hand-made request cannot add fields or skip checks.
-- **One JSON column instead of one column per field.** A column per field would need a schema migration for every form edit, and migrations ship only with package releases. A JSON column with values keyed by field id needs none.
-- **Fixed ids and versions keep data apart.** Labels change and fields come and go. Values are keyed by an id that is never reused, and every inquiry records its version. So answers to different questions never share a column, and every inquiry can be shown as the visitor saw the form.
-- **Email is fixed.** Every inquiry needs a way to reply. Keeping it as a real column lets the list search it and the detail offer a **Reply by email** button, whatever the form holds.
+- **The definition is in D1, so people who do not write code can change it.** A small company often runs its website without an engineer on staff. Adding a "Budget" field should not need a code change, a build, and a deploy.
+- **The server trusts only its own definition.** The definition from `GET /api/contact/form` is for drawing the form. On submit, the server reads the definition from D1 again and validates against that. A changed page or a crafted request cannot add fields or skip checks.
+- **One JSON column instead of one column per field.** A column per field would need a schema migration for every form edit, and migrations ship only with package releases. A JSON column with values keyed by field ID needs none.
+- **Fixed IDs and versions keep data apart.** Labels change and fields come and go. Values are keyed by an ID that is never reused, and every inquiry records its version. So answers to different questions never share a column, and every inquiry can be shown as the visitor saw the form.
+- **Email is fixed.** Every inquiry needs a way to reply. Keeping it as a real column lets the list search it and the detail page offer a **Reply by email** button, whatever the other fields are.
 - **Slack stays free of personal data.** Notifications contain only "1 new inquiry", the received time, and a link, whatever fields the form has. See [Slack notifications](/docs/how-it-works/notifications/).
 
 ## Details for developers
 
-The rest of this page is for people who read or change the server code. You do not need it to use the admin screen.
-
 ### The form definition [#form-definition]
 
-The shape of a field id, and of the definition stored for each version. Labels, placeholders, and help texts hold a `ja` and an `en` text.
+These types define a field ID and the definition stored for each version. Labels, placeholders, and help text each hold a `ja` and an `en` string.
 
 ```ts title="packages/server/src/features/contact-form/form-definition.ts"
 export const FIELD_ID_PATTERN = /^f_[a-z0-9]{1,32}$/;
@@ -272,7 +270,7 @@ export interface FormDefinition {
 
 ### How the list filters and searches
 
-The choice filter runs `json_extract()` on the stored JSON. The field id is looked up in the stored definition first. Both the JSON path and the value are bound parameters:
+The choice filter runs `json_extract()` on the stored JSON. The field ID is looked up in the stored definition first. Both the JSON path and the value are bound parameters:
 
 ```ts title="packages/server/src/features/submissions/submission-store.ts"
 choiceIs = sql`json_extract(${submissions.fields}, ${`$.${choice.fieldId}`}) = ${choice.value}`;
@@ -315,10 +313,10 @@ The page reads the current form from a public, read-only endpoint:
 GET /api/contact/form
 ```
 
-The answer contains:
+The response contains:
 
 - the version
-- the fields (id, type, labels, placeholder, help text, required, maximum length, choices)
+- the fields (ID, type, labels, placeholder, help text, required, maximum length, choices)
 - the fixed email field
 - whether the form is available (Turnstile site key, action, and honeypot name)
 
@@ -326,7 +324,7 @@ It contains no secrets. It may be cached for 30 seconds (`Cache-Control: public,
 
 The starter renders the fields in the browser, with a loading state. If the request fails, it shows a short message with the company email address from `site.config.ts`. The browser helper is `getContactForm()` from `@goodnight-web/server/client`.
 
-The page sends the version it rendered as `formVersion`. If the form changed in the meantime, the API answers 409 `form_outdated`. The starter then loads the form again, keeps what the visitor typed in fields that still exist, and asks them to send again.
+The page sends the version it rendered as `formVersion`. If the form changed in the meantime, the API returns 409 `form_outdated`. The starter then loads the form again, keeps what the visitor typed in fields that still exist, and asks them to submit again.
 
 ### How the server checks a submission
 
@@ -334,11 +332,11 @@ The server builds a zod schema from the current version in D1 and checks `fields
 
 The built schema is cached per Worker isolate and version. Each request reads only the current version number.
 
-- Only the ids of the current fields are accepted. Any other key, including `__proto__`, is refused with 400.
+- Only the IDs of the current fields are accepted. Any other key, including `__proto__`, is rejected with 400.
 - Required fields, lengths, formats, and choice values are checked. Text loses control characters and surrounding whitespace (multi-line text keeps line breaks and tabs).
 - Empty optional fields are left out of the stored JSON.
 
-The route reads the current version, refuses an outdated page, and checks the values with the schema of that version:
+The route reads the current version, rejects an outdated page, and checks the values with the schema of that version:
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
 const data = parsed.data;
@@ -388,4 +386,4 @@ return z
   .pipe(z.strictObject(shape))
 ```
 
-Each inquiry stores its values as JSON in `submissions.fields`, keyed by field id, and the version in `submissions.form_version`. See [Database](/docs/database/).
+Each inquiry stores its values as JSON in `submissions.fields`, keyed by field ID, and the version in `submissions.form_version`. See [Database](/docs/database/).

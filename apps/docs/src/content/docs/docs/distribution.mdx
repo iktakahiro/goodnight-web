@@ -1,10 +1,10 @@
 ---
 title: Distribution and updates
 icon: Package
-description: The server comes as an npm package that you do not edit, the site is yours, and updates arrive as Dependabot pull requests.
+description: The server comes as an npm package that you do not edit, your website is yours to edit, and updates arrive as Dependabot pull requests.
 ---
 
-This page shows which files you edit, how updates reach you, and which pull requests are safe to merge. The contact API and the admin screen come from an npm package that you do not edit. The Astro site is yours.
+This page shows which files you edit, how updates reach you, and which pull requests are safe to merge. The contact API and the admin screen come from an npm package that you do not edit. The Astro website is yours to edit.
 
 ## Two parts, split by who edits them
 
@@ -14,7 +14,7 @@ This page shows which files you edit, how updates reach you, and which pull requ
 | What it contains | The Worker factory, the contact API, Better Auth with passkeys, the admin API, the prebuilt admin screen with Japanese and English strings, security headers, and the D1 migrations | Astro pages, Markdown content (ja and en), `site.config.ts`, styles, `wrangler.jsonc`, and a `src/worker.ts` of about three lines |
 | How it changes   | New versions, following semver                                                                                                                                                      | Your own commits                                                                                                                  |
 
-The starter's `src/worker.ts` only calls the factory. The server code stays inside the package.
+The starter's `src/worker.ts` only calls the factory, the function that builds the Worker. The server code stays inside the package.
 
 The starter's `AGENTS.md` and `CLAUDE.md` tell AI tools:
 
@@ -25,8 +25,8 @@ The starter's `AGENTS.md` and `CLAUDE.md` tell AI tools:
 
 The site and the admin screen have separate colors. Changing your site's colors does not change the admin screen, and a package update does not change your site's colors.
 
-- **Your site:** the colors are in the starter. The three main colors are in `theme` in `site.config.ts`, and the shades mixed from them are in `src/styles/global.css`. The sample site is green.
-- **The admin screen (`/admin`):** it has its own fixed theme inside the package, a violet primary on neutral backgrounds, with a light and a dark mode.
+- **Your site:** its colors are in the starter. The three main colors are in `theme` in `site.config.ts`, and the shades mixed from them are in `src/styles/global.css`. The sample site is green.
+- **The admin screen (`/admin`):** a fixed theme inside the package, with a violet primary color on neutral backgrounds and a light and a dark mode.
 
 ## How you get a copy
 
@@ -40,14 +40,14 @@ Keep your copy of the site in a **private** repository. On GitHub, open **Settin
 
 A public repository shows anyone your full site source, your configuration, and the history of every change, including anything committed by mistake. It also lets strangers open pull requests, which is exactly the situation the [update check workflow](#the-update-check-workflow) warns about.
 
-The starter's `.github/workflows/visibility-check.yml` runs on every push, and you can also start it by hand. If the repository is public, the job fails with an error in Japanese and English that tells you to make it private.
+The starter's `.github/workflows/visibility-check.yml` runs on every push, and you can also run it manually. If the repository is public, the job fails with an error in Japanese and English that tells you to make it private.
 
-The workflow needs no token and no permissions. The starter repository that sites are copied from is the only one allowed to be public, so the job is skipped there only.
+The workflow needs no token and no permissions. Only the public starter repository that sites are copied from may be public, so the job is skipped in that repository only.
 
 ## How updates reach you
 
 1. goodnight-web publishes a new version of `@goodnight-web/server`. If it fixes a vulnerability, a GitHub security advisory comes with it.
-2. Dependabot proposes the version once it has been public for 5 days. The settings are in the starter's `.github/dependabot.yml`:
+2. Dependabot, GitHub's tool that opens update pull requests, proposes the version once it has been public for 5 days. The settings are in the starter's `.github/dependabot.yml`:
    - `@goodnight-web/*` updates are grouped into one pull request.
    - Security updates skip this 5-day wait (the cooldown).
    - Minor and patch updates of the site's other packages (such as Astro) come in a second group.
@@ -68,7 +68,7 @@ The workflow needs no token and no permissions. The starter repository that site
 4. Workers Builds builds the pull request and shows a preview.
 5. You check the preview and merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
 
-There is no one-click update in the admin screen. It would need a token that can write to your GitHub repository, stored in the Worker. goodnight-web does not give the Worker that power.
+There is no one-click update in the admin screen. It would need a token that can write to your GitHub repository, stored in the Worker. goodnight-web does not give the Worker that access.
 
 ### The update check workflow [#the-update-check-workflow]
 
@@ -94,7 +94,7 @@ The lockfile may change in other ways. A new `@goodnight-web/server` version can
 
 The packages your site depends on directly are listed in `package.json`. That diff is checked line by line.
 
-If the check cannot see every change, the pull request is not counted as official. For example, GitHub may leave out or cut short the `package.json` diff, or the list of changed files may be incomplete.
+If the check cannot see every change, the pull request is not counted as official. For example, GitHub may omit or truncate the `package.json` diff, or the list of changed files may be incomplete.
 
 #### Inside the script
 

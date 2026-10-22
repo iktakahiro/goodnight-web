@@ -1,9 +1,9 @@
 ---
 title: Privacy notes
-description: What an inquiry stores, where it is stored, when it is gone, and what the privacy policy template says.
+description: What an inquiry stores, where it is stored, when it is deleted, and what the privacy policy template says.
 ---
 
-This page lists what goodnight-web stores for each inquiry, where it is stored, and when it is gone. Use it when you adapt the privacy policy template to your company.
+This page lists what goodnight-web stores for each inquiry, where it is stored, and when it is deleted. Use it when you adapt the privacy policy template to your company.
 
 <Callout type='warn'>
   This page is not legal advice. Have a professional review your privacy policy
@@ -21,7 +21,7 @@ It uses the sample company's details, including the representative's name and th
 
 1. Replace the company details and the contact desk with your own.
 2. If you add a field that collects another kind of personal data, update the "Information we collect" section ([The fields visitors fill in](#fields)).
-3. If you change the retention period, update the days in "Retention and deletion". On the Workers paid plan, change the 7 days until deletion takes full effect to 30 ([Deleted data](#deleted-data)).
+3. If you change the retention period, update the days in "Retention and deletion". On the Workers paid plan, change the time until deletion takes full effect from 7 days to 30 ([Deleted data](#deleted-data)).
 4. Have a professional review the policy.
 5. Remove the note at the top of the page.
 
@@ -34,13 +34,13 @@ Each contact submission stores:
 - the page they sent it from
 - the user agent (browser and OS information)
 - the country that Cloudflare reports
-- a hash of the IP address (`ip_hash`)
+- a hash of the IP address (`ip_hash`), which cannot be turned back into the address
 
 The raw IP address is not stored. See [No raw IP addresses](/docs/how-it-works/ip-hashing/).
 
 ### The fields visitors fill in [#fields]
 
-The email address is always collected. Your admins choose the other fields in the admin screen. The first version asks for name, company, phone number, category, and message ([Customizing the contact form](/docs/contact-form/)).
+The email address is always collected. Your admins choose the other fields in the admin screen. The initial form (version 1) asks for name, company, phone number, category, and message ([Customizing the contact form](/docs/contact-form/)).
 
 When you add a field that collects another kind of personal data, also update the "Information we collect" section of your privacy policy.
 
@@ -50,9 +50,9 @@ Inquiries are deleted after the retention period, 180 days by default. See [Dele
 
 ## Data is stored outside Japan
 
-D1 lets you restrict where data is stored only to the EU, FedRAMP, or the US. You cannot pin a database to Japan ([Cloudflare: D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/)).
+D1 (Cloudflare's database) lets you restrict where data is stored only to the EU, FedRAMP, or the US. You cannot pin a database to Japan ([Cloudflare: D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/)).
 
-Japan's Act on the Protection of Personal Information asks a business that handles personal data abroad to understand the personal information rules of that country. So the template says:
+Japan's Act on the Protection of Personal Information requires a business that handles personal data abroad to understand the personal information rules of that country. So the template says:
 
 - that data may be stored on servers in other countries, such as the United States
 - who the storage provider is
@@ -62,7 +62,7 @@ A comment in the template points to the country surveys published by the Persona
 
 ## Deleted data can be restored for a while [#deleted-data]
 
-You delete inquiries one at a time with **Delete** in the detail. A dialog asks you to confirm first.
+You delete inquiries one at a time with **Delete** on the inquiry's detail page in the admin screen. A dialog asks you to confirm first.
 
 <AdminScreen
   name='inquiry-delete'

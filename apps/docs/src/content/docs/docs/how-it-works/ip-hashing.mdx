@@ -3,7 +3,7 @@ title: No raw IP addresses
 description: How and why goodnight-web keeps only an HMAC of a visitor's IP address, never the address itself.
 ---
 
-goodnight-web never stores or logs a visitor's IP address. It keeps only `HMAC-SHA256(ip, IP_HASH_SECRET)`, which is enough for rate limiting and for spotting repeat senders.
+goodnight-web never stores or logs a visitor's IP address. It keeps only a keyed hash, `HMAC-SHA256(ip, IP_HASH_SECRET)`, which is enough for rate limiting and for spotting repeat senders.
 
 ## What it does
 
@@ -13,7 +13,7 @@ goodnight-web never stores or logs a visitor's IP address. It keeps only `HMAC-S
 
 ## In the code
 
-The contact API reads the IP address from the `cf-connecting-ip` header and keeps only its hash. The raw value goes nowhere except Turnstile siteverify, as `remoteip`:
+The contact API reads the IP address from the `cf-connecting-ip` header and keeps only its hash. The raw IP address is sent only to Turnstile's `siteverify` API, as `remoteip`:
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
 const ip = c.req.header('cf-connecting-ip');
@@ -58,4 +58,4 @@ if (!success) return apiError(c, 429, 'rate_limited');
 - **An IP address is personal data.** It can identify a person, so storing it adds to the personal data you hold and must protect.
 - **A hash is enough.** The same IP always gives the same `ip_hash`, so you can still limit requests and see that several inquiries came from one sender.
 - **A plain hash is not enough.** A plain SHA-256 of an IP address is easy to reverse, because there are only about four billion IPv4 addresses to try. An HMAC with a secret key cannot be reversed without that key, and the key stays in the Worker.
-- **Keep `IP_HASH_SECRET` stable.** If you change it, new hashes no longer match old ones.
+- **Keep `IP_HASH_SECRET` stable.** If you change it, new hashes no longer match old ones, so you can no longer see that a new inquiry came from the same sender as an older one.

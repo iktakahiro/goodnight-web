@@ -4,9 +4,9 @@ icon: ShieldCheck
 description: How goodnight-web protects the admin screen, the contact form, and your secrets, and what it does not protect against.
 ---
 
-This page explains what goodnight-web protects and how, and what you need to do when you run a site. What it cannot protect against is in [What this does not protect against](#limits).
+This page explains what goodnight-web protects and how, and what you need to do when you run a site. The limits are listed at the end, in [What this does not protect against](#limits).
 
-## What you do [#checklist]
+## What you need to do [#checklist]
 
 - Use random values of at least 32 characters for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` ([Secrets](#secrets)).
 - Delete `SETUP_TOKEN` after setup. It is not needed again.
@@ -19,7 +19,7 @@ This page explains what goodnight-web protects and how, and what you need to do 
 
 - **Fail closed.** When a required setting or secret is missing, the feature that needs it is turned off. For example, without `TURNSTILE_SECRET` the contact API returns 503.
 - **Never open the admin screen without sign-in.** There is no development bypass, default account, or shared key.
-- **Do not lose inquiries.** An inquiry is saved before the reply. Suspected spam (a filled honeypot or a high spam score) is saved and listed apart, not dropped.
+- **Do not lose inquiries.** An inquiry is saved before the response. Suspected spam (a filled honeypot or a high spam score) is saved and listed separately, not dropped.
 - **Keep personal data inside Cloudflare.** Notifications carry no personal data. Raw IP addresses are not stored.
 
 ## Admin screen
@@ -31,12 +31,12 @@ This page explains what goodnight-web protects and how, and what you need to do 
 | `ADMIN_EMAILS`                 | Read again on every request. Removing an address locks its sessions out at the next request. See [Removing an admin](#removing-an-admin).                                                                                                                                               |
 | HTTPS                          | The admin screen, the admin API, setup, and sign-in work only over `https://`. See [HTTPS](#https).                                                                                                                                                                                     |
 | Cloudflare Access              | Optional, but strongly recommended. Free for up to 50 users. See [Cloudflare Access](#cloudflare-access).                                                                                                                                                                               |
-| First admin                    | Requires `SETUP_TOKEN` and an address in `ADMIN_EMAILS`. Setup closes for good once the first passkey is registered. See [First admin setup](/docs/how-it-works/first-admin/).                                                                                                          |
+| First admin                    | Requires `SETUP_TOKEN` and an address in `ADMIN_EMAILS`. Setup closes permanently once the first passkey is registered. See [First admin setup](/docs/how-it-works/first-admin/).                                                                                                       |
 | `workers.dev` and preview URLs | These addresses are easy to leave out of an Access policy. Turn them off once your own domain works. Even without Access, the admin screen still requires a passkey sign-in.                                                                                                            |
 | CSRF                           | `Origin` checks and `SameSite` cookies.                                                                                                                                                                                                                                                 |
 | Headers                        | A Content Security Policy and other security headers on Worker responses. The Worker picks the headers after it normalizes the path, so `/%61dmin`, `//admin`, and `/admin/..%2f` get the same headers as `/admin`.                                                                     |
 
-The admin screen's page itself can load without a session, but every data request needs one.
+The admin screen itself can load without a session, but every request for data needs one.
 
 ### Sessions and setup [#sessions-and-setup]
 
@@ -45,7 +45,7 @@ Only a session from a passkey sign-in or from registering the first passkey can 
 - When setup runs again for an address that already has a user, that user's earlier sessions are deleted first.
 - Registering the first passkey closes setup and deletes every session in the database. The browser gets a new session from the passkey registration itself.
 - Once setup is closed, a user without a passkey cannot register one. A session left over from setup cannot create another admin.
-- The admin API answers 401 for a session created before the user's first passkey, even if that session was not deleted.
+- The admin API returns 401 for a session created before the user's first passkey, even if that session was not deleted.
 
 ### HTTPS [#https]
 
@@ -55,7 +55,7 @@ Over plain HTTP, the setup token, session cookies, and passkey requests would cr
 - Other methods over `http://` get 403 with the code `https_required`. They are not redirected, because the body was already sent.
 - `localhost`, `127.0.0.1`, and `[::1]` are exempt, so that `wrangler dev` works.
 
-The site and the contact form are not covered. To require HTTPS for them too, turn on **Always Use HTTPS** for your zone (Cloudflare dashboard > SSL/TLS > Edge Certificates).
+This rule does not cover the site or the contact form. To require HTTPS for them too, turn on **Always Use HTTPS** for your zone (Cloudflare dashboard > SSL/TLS > Edge Certificates).
 
 ### Cloudflare Access [#cloudflare-access]
 
@@ -68,7 +68,7 @@ Put the Access application on these paths:
 - `/api/setup`
 - `/api/auth/*`
 
-Keep `/api/contact` public. Visitors send the contact form there.
+Keep `/api/contact` public. Visitors submit the contact form there.
 
 To have the Worker check the Access token as well, set both of these:
 
@@ -80,7 +80,7 @@ To have the Worker check the Access token as well, set both of these:
 With both set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the paths above, so setup of the first admin also needs a valid token. It checks the RS256 signature, the issuer, the audience, `exp`, and `nbf` ([Cloudflare: validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)). The signing keys come from `https://<team domain>/cdn-cgi/access/certs`, and the Worker caches them for an hour.
 
 - A missing or invalid token gets 403 (`access_denied`).
-- Those paths answer 503 (`access_unavailable`) when only one of the two settings is set, when `ACCESS_TEAM_DOMAIN` is not a plain host name, or when the keys cannot be fetched.
+- Those paths return 503 (`access_unavailable`) when only one of the two settings is set, when `ACCESS_TEAM_DOMAIN` is not a plain hostname, or when the keys cannot be fetched.
 - Without either setting, the Worker does not check Access tokens. Access in front of the site still works; the Worker just does not double-check it.
 - Passkey sign-in is still required with Access.
 
@@ -88,7 +88,7 @@ With both set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the pat
 
 To remove an admin, delete their address from `ADMIN_EMAILS`. The Worker reads `ADMIN_EMAILS` on every request, so that admin's sessions get 403 on their next request. A new passkey sign-in does not help.
 
-The user, its sessions, and its passkeys stay in D1, so adding the address again later makes them work again. To delete them for good, run this yourself (replace the address):
+The user record, its sessions, and its passkeys stay in D1, so adding the address again later makes them work again. To delete them permanently, run this yourself (replace the address):
 
 ```sh
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
@@ -103,8 +103,8 @@ The contact API checks a submission like this before it saves it. [Contact form 
 - `Origin`, `Content-Type`, and the body size are checked before the body is parsed.
 - Turnstile is verified on the server, including `hostname` and `action`.
 - The Rate Limiting binding limits submissions per `ip_hash`.
-- A filled honeypot field does not change the reply. The submission is stored as suspected spam only if it passes Turnstile, the rate limit, and validation. The honeypot value itself is not stored.
-- A high spam score also flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed apart in the admin screen.
+- A filled honeypot field does not change the response. The submission is stored as suspected spam only if it passes Turnstile, the rate limit, and validation. The honeypot value itself is not stored.
+- A high spam score also flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed separately in the admin screen.
 - There is no API key in the page. A key that the browser can read is not a secret, so it would only give a false sense of protection.
 
 ## SQL injection [#sql-injection]
@@ -162,20 +162,20 @@ The SQL text is the same for every search term, page, and page size. Only the pa
 
 - All secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`, `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL`) are Worker secrets.
 - Secrets are never sent to the browser and never written to D1. The admin screen does not show the Slack webhook URL.
-- `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. A shorter value counts as missing, so setup, sign-in, or the contact form answers 503.
+- `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. A shorter value counts as missing, so setup, sign-in, or the contact form returns 503.
 - While setup is open, `GET /api/setup` lists the names of the settings that are missing or too short (never the values). The admin screen also says when `IP_HASH_SECRET` is too short.
 - There is no update button in the admin screen, because it would need a token that can write to your GitHub repository.
 
 ## CSV export
 
 - The export reads 200 rows per query and streams them, so a large table never sits in the Worker's memory as one file.
-- A cell whose first non-whitespace character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return, gets a leading `'`. Spreadsheet apps then show it as text instead of running it as a formula.
+- To keep spreadsheet apps from running a cell as a formula, a cell whose first non-whitespace character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return, gets a leading `'`. The app then shows it as text.
 
 ## Updates and your repository [#updates]
 
 - Fixes arrive as Dependabot pull requests. Merge only pull requests that have the official update comment. See [Distribution and updates](/docs/distribution/).
 - Keep your repository private. The starter's visibility check fails while it is public.
-- goodnight-web keeps its own dependencies few and pinned to exact versions.
+- goodnight-web has few dependencies of its own and pins them to exact versions.
 
 ## What this does not protect against [#limits]
 
