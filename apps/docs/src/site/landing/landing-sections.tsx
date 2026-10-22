@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { ArrowRight } from 'lucide-react';
-import appIcon from '../../assets/app-icon.svg';
+import { BookOpen } from 'lucide-react';
+import logoOnDark from '../../assets/logo-lockup-dark.svg';
 import { sitePath } from '../paths';
 import { DeployButton } from './deploy-button';
 import { FeatureVignette, type FeatureVignetteName } from './feature-vignettes';
@@ -161,9 +161,9 @@ export function AdminShowcase({ children }: { children: ReactNode }) {
 }
 
 /**
- * The closing call to action, drawn as a calm night band: the app icon, the
- * heading and paragraph from the children, then the documentation link and
- * the Deploy to Cloudflare button.
+ * The closing call to action, drawn as a calm night band: the full logo, the
+ * heading and paragraph from the children, then the same two buttons as
+ * the hero: Deploy to Cloudflare and the documentation link.
  */
 export function ClosingCta({ children }: { children: ReactNode }) {
   const japanese = useJapanese();
@@ -171,24 +171,26 @@ export function ClosingCta({ children }: { children: ReactNode }) {
     <section className='closing-cta landing-night'>
       <NightSky variant='closing' />
       <div className='landing-wrap'>
+        {/* The band is dark in both themes, so it always uses the lockup
+            made for dark backgrounds. */}
         <img
-          className='closing-mark'
-          src={appIcon}
-          alt=''
-          width={64}
-          height={64}
+          className='closing-logo'
+          src={logoOnDark}
+          alt='goodnight-web'
+          width={320}
+          height={83}
           loading='lazy'
         />
         {children}
         <div className='landing-actions closing-actions'>
+          <DeployButton />
           <a
-            className='landing-button primary'
+            className='landing-button secondary'
             href={sitePath(japanese ? 'ja/docs/' : 'docs/')}
           >
+            <BookOpen aria-hidden='true' />
             {japanese ? 'ドキュメントを読む' : 'Read the docs'}
-            <ArrowRight aria-hidden='true' />
           </a>
-          <DeployButton />
         </div>
       </div>
     </section>

@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
-import { motion } from 'motion/react';
-import { ArrowRight, BookOpen, Globe, Inbox } from 'lucide-react';
-import appIcon from '../../assets/app-icon.svg';
+import { BookOpen, Globe, Inbox } from 'lucide-react';
 import { BlurFade } from '../../components/magicui/blur-fade';
 import { Highlighter } from '../../components/magicui/highlighter';
 import type { PageMetadata } from '../source';
 import { sitePath } from '../paths';
+import { DeployButton } from './deploy-button';
 import { ThemedImage } from './themed-image';
 import { WindowBar } from './window-bar';
 import '../../styles/landing.css';
@@ -15,7 +14,6 @@ const copy = {
     gloss: 'Everything runs in your own Cloudflare® account.',
     whatIsCloudflare: 'What is Cloudflare?',
     docs: 'Read the docs',
-    gettingStarted: 'Getting started',
     stage: 'Example screens: the website and the admin panel',
     adminAlt: 'Inquiry list in the admin panel',
     siteAlt: 'Example website built with the starter kit',
@@ -26,7 +24,6 @@ const copy = {
     gloss: 'すべて自分の Cloudflare® アカウントで動きます。',
     whatIsCloudflare: 'Cloudflare とは',
     docs: 'ドキュメントを読む',
-    gettingStarted: 'はじめかた',
     stage: 'Webサイトと管理画面の画面例',
     adminAlt: '管理画面の問い合わせ一覧',
     siteAlt: 'スターターキットで作るWebサイトの例',
@@ -62,6 +59,21 @@ function TitleLine({ line, highlight }: { line: string; highlight: string }) {
   );
 }
 
+/**
+ * The tagline. A tagline written on several lines keeps each line together
+ * on wide screens, so a word such as 問い合わせ is never split; a one-line
+ * tagline wraps normally.
+ */
+function TaglinePhrases({ tagline }: { tagline: string }) {
+  const phrases = tagline.split('\n');
+  if (phrases.length === 1) return tagline;
+  return phrases.map((phrase) => (
+    <span key={phrase} className='hero-phrase'>
+      {phrase}
+    </span>
+  ));
+}
+
 /** A browser-like frame with a decorative address bar. */
 function Window({
   className,
@@ -82,8 +94,7 @@ function Window({
 
 /**
  * The top page hero: the eyebrow, the title with its underlined phrase, the
- * tagline, the two entry points, and the website and admin screenshots with
- * the app icon. Text is never animated, so the prerendered HTML shows it.
+ * tagline, the two entry points (Deploy to Cloudflare and the docs), and the website and admin screenshots. Text is never animated, so the prerendered HTML shows it.
  */
 export function LandingHero({ page }: { page: PageMetadata }) {
   const japanese = page.slug === 'ja';
@@ -100,46 +111,23 @@ export function LandingHero({ page }: { page: PageMetadata }) {
             <TitleLine key={line} line={line} highlight={hero.highlight} />
           ))}
         </h1>
-        <p className='hero-tagline'>{hero.tagline}</p>
+        <p className='hero-tagline'>
+          <TaglinePhrases tagline={hero.tagline} />
+        </p>
         <p className='hero-gloss'>
           {text.gloss} <a href='#cloudflare'>{text.whatIsCloudflare}</a>
         </p>
         <div className='landing-actions'>
-          <a
-            className='landing-button primary'
-            href={sitePath(`${prefix}docs/`)}
-          >
-            {text.docs}
-            <ArrowRight aria-hidden='true' />
-          </a>
+          <DeployButton />
           <a
             className='landing-button secondary'
-            href={sitePath(`${prefix}docs/getting-started/`)}
+            href={sitePath(`${prefix}docs/`)}
           >
             <BookOpen aria-hidden='true' />
-            {text.gettingStarted}
+            {text.docs}
           </a>
         </div>
         <div className='hero-stage' role='group' aria-label={text.stage}>
-          <motion.span
-            className='hero-mark motion-reveal'
-            aria-hidden='true'
-            initial={{ opacity: 0, y: 8, scale: 0.92, filter: 'blur(6px)' }}
-            animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-            transition={{
-              delay: 0.55,
-              duration: 0.6,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          >
-            <img src={appIcon} alt='' width={84} height={84} />
-            <motion.span
-              className='hero-mark-shine'
-              initial={{ x: '-130%', skewX: -18 }}
-              animate={{ x: '260%', skewX: -18 }}
-              transition={{ delay: 1.5, duration: 0.9, ease: 'easeInOut' }}
-            />
-          </motion.span>
           <BlurFade
             className='hero-shots'
             delay={0.15}
