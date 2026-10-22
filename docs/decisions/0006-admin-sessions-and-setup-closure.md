@@ -21,11 +21,31 @@ another admin.
   creates the new one (`internalAdapter.deleteUserSessions`).
 - The passkey plugin's `registration.afterVerification` hook calls
   `beforePasskeySaved()` (`src/features/setup/first-passkey.ts`):
-  - a user who already has a passkey may add another;
+  - a user who already has a passkey may add another, but only from a
+    session created at or after that user's first passkey (the same rule as
+    `requireAdmin`; 401 otherwise);
   - a user without a passkey gets 403 when setup is closed;
-  - otherwise this is the first passkey, which closes setup, so every
-    session in the database is deleted. Before the first passkey, the only
-    sessions are the ones setup created.
+  - otherwise this is the first passkey. The hook claims setup with one
+    conditional statement, `INSERT INTO settings (key, value) VALUES
+    ('setup_closed_at', now) ON CONFLICT DO NOTHING RETURNING value`
+    (`claimSetup()`, through Drizzle). D1 runs statements one at a time, so
+    of any number of overlapping registrations exactly one inserts the row;
+    the others get 403. Only the claimant continues, and it then deletes
+    every session in the database. Before the claim no passkey existed, so
+    the only sessions are the ones setup created.
+- If the claimant's passkey is not saved (the insert fails after the claim),
+  an after hook on `/passkey/verify-registration` releases the claim, so the
+  owner is not locked out. The release is one guarded statement:
+  `DELETE FROM settings WHERE key = 'setup_closed_at' AND value = <this
+  claim> AND NOT EXISTS (SELECT 1 FROM passkey)`. It cannot reopen setup
+  after any passkey was saved, and it cannot remove another request's claim.
+  The claim is kept per request, keyed by Better Auth's request context
+  object, which the passkey hook and the after hook share.
+- `createFirstAdmin` checks that setup is open, creates the session, and then
+  checks again. If setup closed in between, it deletes the new session and
+  answers 403 without a cookie. Either the setup session is inserted before
+  the claimant deletes every session (and is deleted with them), or it is
+  inserted after the claim, and the second check sees the claim.
 - The setup UI registers the first passkey with `createSession: true`. The
   passkey plugin then creates a new session after it saves the passkey, so
   the owner stays signed in.
@@ -39,7 +59,11 @@ another admin.
 
 Tests run Better Auth's real registration and sign-in endpoints with a
 software WebAuthn authenticator (`src/testing/soft-authenticator.ts`), and the
-end-to-end test runs the same flow in Chromium.
+end-to-end test runs the same flow in Chromium. The race tests
+(`src/features/setup/setup-race.http.test.ts`) pause chosen statements in the
+test D1 stand-in (`pauseAt` in `src/testing/sqlite-d1.ts`) to interleave two
+first-passkey registrations, and a setup request with a registration, at the
+points that matter.
 
 ## Alternatives considered
 
@@ -50,11 +74,18 @@ end-to-end test runs the same flow in Chromium.
   to carry the extra field, and it needs a migration. The time comparison
   needs no schema change.
 - **Only delete sessions, without the time check in `requireAdmin`.** The
-  delete runs in the registration hook, before the plugin inserts the
-  passkey. A setup request that lands between the two would create a session
-  that survives. The time check rejects such a session when it is older than
-  the passkey, and it also covers sessions that a future code path forgets to
-  delete. It does not close the window completely (see Consequences).
+  time check also covers sessions that a future code path forgets to delete,
+  so it stays as defense in depth.
+- **Check that setup is open, then delete sessions (the first version of
+  this decision).** The check and the passkey insert were separate steps.
+  Two overlapping first-passkey registrations could both pass the check, and
+  a setup request between the delete and the passkey insert could keep a
+  session that passed `requireAdmin`. The post-fix verification of
+  2026-10-22 reproduced this with a delayed insert. The atomic claim
+  replaces it.
+- **Expire a stale claim after a timeout instead of releasing it.** A claim
+  row looks the same as the row the trigger writes, so a timeout would also
+  reopen setup on a site whose passkeys were all deleted. Rejected.
 
 ## Consequences
 
@@ -63,14 +94,11 @@ end-to-end test runs the same flow in Chromium.
 - A second admin cannot be added after setup has closed. The docs say so.
 - Passkey rows without `created_at` do not count for `requireAdmin`; the
   passkey plugin always sets it.
-- Known gap (found by the post-fix verification of 2026-10-22). Closing setup
-  is not atomic: the hook deletes sessions and checks that setup is open
-  before the passkey row is written. A `POST /api/setup` that lands inside
-  that window can still create a session that passes `requireAdmin`, and two
-  first-passkey registrations for different allowed addresses that overlap
-  can both succeed. It needs `SETUP_TOKEN` before setup closes and timing
-  within the owner's registration request; the verifier reproduced it only
-  with an artificially delayed insert. A follow-up should claim
-  `setup_closed_at` atomically before deleting sessions, re-check it after
-  setup creates its session, and apply the session-time rule when a user who
-  already has a passkey registers another.
+- The known gap recorded by the first version of this decision (closing
+  setup was not atomic) is closed by the claim, the second check in
+  `createFirstAdmin`, and the session-time rule for added passkeys.
+- If the Worker stops between the claim and the passkey insert (for example
+  it hits the CPU limit), the after hook does not run and setup stays closed
+  with no passkey. Recovery is manual: when the `passkey` table is empty,
+  delete the `setup_closed_at` row from `settings` with
+  `wrangler d1 execute`, then run setup again.
