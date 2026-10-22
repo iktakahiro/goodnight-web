@@ -16,4 +16,4 @@ export type {
 } from './features/admin-api/admin-routes.ts';
 export { ADMIN_PAGE_SIZE } from './features/admin-api/admin-routes.ts';
 export type { SetupState } from './features/setup/setup-routes.ts';
-export { AUTH_BASE_PATH } from './features/auth/auth.ts';
+export { AUTH_BASE_PATH } from './features/auth/auth-paths.ts';
