@@ -19,52 +19,14 @@ const COMMENT_AUTHOR = 'github-actions[bot]';
 /** Package scope of official goodnight-web packages. */
 const OFFICIAL_SCOPE = '@goodnight-web/';
 
-/** Lockfiles an official update may change. */
+/**
+ * Lockfiles an official update may change. Their contents are not checked:
+ * see {@link classifyUpdate}.
+ */
 const LOCKFILES = ['package-lock.json', 'bun.lock', 'pnpm-lock.yaml'];
 
 /** Every file an official update may change. Paths are from the repository root. */
 const ALLOWED_FILES = ['package.json', ...LOCKFILES];
-
-// Keys in package-lock.json and pnpm-lock.yaml that describe a package
-// instead of naming one. A changed line with such a key belongs to the
-// package entry above it.
-const LOCKFILE_METADATA_KEYS = new Set([
-  'version',
-  'resolved',
-  'integrity',
-  'license',
-  'dev',
-  'optional',
-  'devOptional',
-  'peer',
-  'engines',
-  'node',
-  'npm',
-  'bin',
-  'funding',
-  'url',
-  'type',
-  'cpu',
-  'os',
-  'libc',
-  'hasBin',
-  'hasInstallScript',
-  'hasShrinkwrap',
-  'inBundle',
-  'deprecated',
-  'requiresBuild',
-  'specifier',
-  'resolution',
-  'tarball',
-  'dependencies',
-  'devDependencies',
-  'optionalDependencies',
-  'peerDependencies',
-  'peerDependenciesMeta',
-  'bundleDependencies',
-  'bundledDependencies',
-  'transitivePeerDependencies',
-]);
 
 // An exact or caret/tilde semver version, as Dependabot writes it.
 const VERSION_SPEC =
@@ -101,11 +63,16 @@ const VERSION_SPEC =
  * - the branch is in this repository, not in a fork;
  * - the only changed files are `package.json` and lockfiles at the root, and
  *   they were modified (not added, removed, or renamed);
- * - every changed line in those files belongs to an `@goodnight-web/*`
- *   package.
+ * - `package.json` is one of them, and every changed line in it is an
+ *   `@goodnight-web/*` dependency set to a version number.
  *
- * When something cannot be checked (for example, GitHub did not include the
- * diff of a large file), the update is not official.
+ * Lockfile contents are not checked. A new `@goodnight-web/server` version
+ * can bring new versions of its own dependencies (for example `hono`), and
+ * those show up only in the lockfile. Which top-level packages the site uses
+ * is decided by `package.json`, and that diff is checked line by line.
+ *
+ * When `package.json` cannot be checked (for example, GitHub did not include
+ * its diff), the update is not official.
  *
  * @param {PullRequestInfo} pullRequest
  * @param {ChangedFile[]} files
@@ -131,8 +98,7 @@ function classifyUpdate(pullRequest, files) {
     );
   }
 
-  if (files.length === 0) reasons.push('no changed files');
-
+  let officialChanges = 0;
   for (const file of files) {
     if (!ALLOWED_FILES.includes(file.filename)) {
       reasons.push(
@@ -144,31 +110,32 @@ function classifyUpdate(pullRequest, files) {
       reasons.push(`${file.filename} was ${file.status}, not modified`);
       continue;
     }
+    if (file.filename !== 'package.json') continue;
     if (typeof file.patch !== 'string' || file.patch === '') {
-      reasons.push(`the diff of ${file.filename} is not available`);
+      reasons.push('the diff of package.json is not available');
       continue;
     }
-    const changed =
-      file.filename === 'package.json'
-        ? packageJsonChanges(file.patch)
-        : lockfileChanges(file.filename, file.patch);
-    for (const change of changed) {
+    for (const change of packageJsonChanges(file.patch)) {
       if (change.name === null) {
         reasons.push(
-          `${file.filename}: change outside a package entry: ${change.line}`,
+          `package.json: change outside a dependency entry: ${change.line}`,
         );
       } else if (!change.name.startsWith(OFFICIAL_SCOPE)) {
         reasons.push(
-          file.filename === 'package.json'
-            ? `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${change.name}`
-            : `${file.filename}: package other than ${OFFICIAL_SCOPE}* changed: ${change.name}`,
+          `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${change.name}`,
         );
       } else if (change.invalidSpec) {
         reasons.push(
-          `${file.filename}: ${change.name} is not set to a version number: ${change.line}`,
+          `package.json: ${change.name} is not set to a version number: ${change.line}`,
         );
+      } else {
+        officialChanges += 1;
       }
     }
+  }
+
+  if (officialChanges === 0) {
+    reasons.push(`package.json does not change an ${OFFICIAL_SCOPE}* version`);
   }
 
   return { official: reasons.length === 0, reasons: [...new Set(reasons)] };
@@ -176,7 +143,7 @@ function classifyUpdate(pullRequest, files) {
 
 /**
  * @typedef {object} LineChange
- * @property {string | null} name The package the line belongs to, or null when unknown.
+ * @property {string | null} name The key of the changed entry, or null for a line that is not an entry.
  * @property {string} line The changed line without the leading `+` or `-`.
  * @property {boolean} [invalidSpec] True when a dependency is not set to a version number.
  */
@@ -248,127 +215,6 @@ function packageJsonChanges(patch) {
           !value || !VERSION_SPEC.test(/** @type {string} */ (value[1])),
       });
     }
-  }
-  return changes;
-}
-
-/**
- * The package name at the end of a dependency path, such as
- * `node_modules/a/node_modules/@scope/b` or `@scope/a/b` (bun.lock).
- *
- * @param {string} path
- * @returns {string}
- */
-function lastPackageName(path) {
-  const segments = path
-    .split('/')
-    .filter((s) => s !== '' && s !== 'node_modules');
-  const last = segments[segments.length - 1] ?? '';
-  const parent = segments[segments.length - 2];
-  return parent && parent.startsWith('@') ? `${parent}/${last}` : last;
-}
-
-/**
- * Removes the version (and pnpm peer suffix) from `name@1.2.3(peer@4)`.
- *
- * @param {string} key
- * @returns {string}
- */
-function stripVersion(key) {
-  const withoutPeers = key.split('(')[0] ?? key;
-  const at = withoutPeers.indexOf('@', 1);
-  return at === -1 ? withoutPeers : withoutPeers.slice(0, at);
-}
-
-/**
- * The package a lockfile line names by itself, `null` for a line that only
- * describes the entry above it (such as `"version": ...`), or `undefined` for
- * a line that is neither.
- *
- * @param {string} filename
- * @param {string} text
- * @returns {string | null | undefined}
- */
-function nameInLockfileLine(filename, text) {
-  const line = text.trim();
-  if (filename === 'pnpm-lock.yaml') {
-    const entry = /^(?:'([^']+)'|"([^"]+)"|([^\s'":][^:]*?)):(?:\s|$)/.exec(
-      line,
-    );
-    if (!entry) return undefined;
-    const key = entry[1] ?? entry[2] ?? entry[3] ?? '';
-    if (LOCKFILE_METADATA_KEYS.has(key)) return null;
-    return stripVersion(key);
-  }
-
-  const entry = /^"([^"]*)"\s*:\s*(.*)$/.exec(line);
-  if (!entry) return undefined;
-  const key = /** @type {string} */ (entry[1]);
-  const value = /** @type {string} */ (entry[2]);
-  if (filename === 'bun.lock') {
-    // Package entries look like "key": ["name@version", ...]. The key can be
-    // a path such as "parent/child", so the name comes from the value.
-    const resolved = /^\[\s*"([^"]+)"/.exec(value);
-    if (resolved) return stripVersion(/** @type {string} */ (resolved[1]));
-    return lastPackageName(key);
-  }
-  // package-lock.json
-  if (key.startsWith('node_modules/')) return lastPackageName(key);
-  if (LOCKFILE_METADATA_KEYS.has(key)) return null;
-  return key;
-}
-
-/**
- * Whether a lockfile line starts a package entry, and the package name.
- * Used to find which package a `"version"` or `integrity` line belongs to.
- *
- * @param {string} filename
- * @param {string} text
- * @param {number} maxIndent Only lines indented less than this count.
- * @returns {string | null}
- */
-function entryOwner(filename, text, maxIndent) {
-  const indent = text.length - text.trimStart().length;
-  if (indent >= maxIndent) return null;
-  if (filename === 'pnpm-lock.yaml') {
-    if (!/:\s*$/.test(text)) return null;
-    const name = nameInLockfileLine(filename, text);
-    return typeof name === 'string' ? name : null;
-  }
-  const key = /^\s*"(node_modules\/[^"]+)"\s*:\s*\{/.exec(text);
-  return key ? lastPackageName(/** @type {string} */ (key[1])) : null;
-}
-
-/**
- * Changed lines of a lockfile diff, each with the package it belongs to.
- *
- * @param {string} filename
- * @param {string} patch
- * @returns {LineChange[]}
- */
-function lockfileChanges(filename, patch) {
-  /** @type {LineChange[]} */
-  const changes = [];
-  for (const hunk of parseHunks(patch)) {
-    hunk.forEach(({ kind, text }, index) => {
-      if (kind === ' ' || isPunctuationOnly(text)) return;
-      const line = text.trim();
-      const name = nameInLockfileLine(filename, text);
-      if (typeof name === 'string') {
-        changes.push({ name, line });
-        return;
-      }
-      // Find the entry this line is part of, looking up through unchanged
-      // lines and lines on the same side of the diff.
-      const indent = text.length - text.trimStart().length;
-      let owner = null;
-      for (let i = index - 1; i >= 0 && owner === null; i -= 1) {
-        const previous = /** @type {PatchLine} */ (hunk[i]);
-        if (previous.kind !== ' ' && previous.kind !== kind) continue;
-        owner = entryOwner(filename, previous.text, indent);
-      }
-      changes.push({ name: owner, line });
-    });
   }
   return changes;
 }

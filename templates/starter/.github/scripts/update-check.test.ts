@@ -74,25 +74,15 @@ describe('classifyUpdate', () => {
 +    "astro": "7.5.0"
    },`,
       ),
-      modified(
-        'package-lock.json',
-        `@@ -300,7 +300,7 @@
-     "node_modules/astro": {
--      "version": "7.4.1",
-+      "version": "7.5.0",
-       "license": "MIT",`,
-      ),
+      modified('package-lock.json', packageLockPatch),
     ]);
     expect(result.official).toBe(false);
-    expect(result.reasons).toContain(
+    expect(result.reasons).toEqual([
       'package.json: entry other than an @goodnight-web/* dependency changed: astro',
-    );
-    expect(result.reasons).toContain(
-      'package-lock.json: package other than @goodnight-web/* changed: astro',
-    );
+    ]);
   });
 
-  test('lockfile change of a dependency of @goodnight-web/server is not official', () => {
+  test('lockfile changes to dependencies of @goodnight-web/server are allowed', () => {
     const result = classifyUpdate(pullRequest(), [
       modified('package.json', packageJsonPatch),
       modified(
@@ -105,10 +95,15 @@ describe('classifyUpdate', () => {
        "license": "MIT",`,
       ),
     ]);
-    expect(result.official).toBe(false);
-    expect(result.reasons).toEqual([
-      'package-lock.json: package other than @goodnight-web/* changed: hono',
+    expect(result).toEqual({ official: true, reasons: [] });
+  });
+
+  test('a lockfile diff that GitHub did not include is allowed', () => {
+    const result = classifyUpdate(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      { filename: 'bun.lock', status: 'modified' },
     ]);
+    expect(result).toEqual({ official: true, reasons: [] });
   });
 
   test('author other than dependabot[bot]', () => {
@@ -169,93 +164,36 @@ describe('classifyUpdate', () => {
     expect(result.official).toBe(false);
   });
 
-  test('lockfile-only change of @goodnight-web packages (bun.lock)', () => {
-    const result = classifyUpdate(pullRequest(), [
-      modified(
-        'bun.lock',
-        `@@ -40,7 +40,7 @@
-     "@astrojs/check": ["@astrojs/check@0.9.11", "", {}, "sha512-CCCC"],
-
--    "@goodnight-web/server": ["@goodnight-web/server@0.1.0", "", { "dependencies": { "hono": "4.13.13" } }, "sha512-AAAA"],
-+    "@goodnight-web/server": ["@goodnight-web/server@0.1.1", "", { "dependencies": { "hono": "4.13.13" } }, "sha512-BBBB"],
-
-     "astro": ["astro@7.4.1", "", {}, "sha512-DDDD"],`,
-      ),
-    ]);
-    expect(result).toEqual({ official: true, reasons: [] });
-  });
-
-  test('lockfile-only change of @goodnight-web packages (pnpm-lock.yaml)', () => {
-    const result = classifyUpdate(pullRequest(), [
-      modified(
-        'pnpm-lock.yaml',
-        `@@ -9,8 +9,8 @@ importers:
-     dependencies:
-       '@goodnight-web/server':
--        specifier: 0.1.0
--        version: 0.1.0
-+        specifier: 0.1.1
-+        version: 0.1.1
-       astro:
-         specifier: 7.4.1
-@@ -30,8 +30,8 @@ packages:
-
--  '@goodnight-web/server@0.1.0':
--    resolution: {integrity: sha512-AAAA}
-+  '@goodnight-web/server@0.1.1':
-+    resolution: {integrity: sha512-BBBB}
-
-   astro@7.4.1:`,
-      ),
-    ]);
-    expect(result).toEqual({ official: true, reasons: [] });
-  });
-
-  test('bun.lock entry nested under @goodnight-web/server is checked by its own name', () => {
+  test('lockfile-only change is not official', () => {
     const result = classifyUpdate(pullRequest(), [
       modified(
         'bun.lock',
         `@@ -50,3 +50,3 @@
--    "@goodnight-web/server/hono": ["hono@4.13.13", "", {}, "sha512-AAAA"],
-+    "@goodnight-web/server/hono": ["hono@4.13.14", "", {}, "sha512-BBBB"],`,
+-    "hono": ["hono@4.13.13", "", {}, "sha512-AAAA"],
++    "hono": ["hono@4.13.14", "", {}, "sha512-BBBB"],`,
       ),
     ]);
     expect(result.official).toBe(false);
     expect(result.reasons).toEqual([
-      'bun.lock: package other than @goodnight-web/* changed: hono',
+      'package.json does not change an @goodnight-web/* version',
     ]);
   });
 
-  test('pnpm dependency line inside an @goodnight-web snapshot is checked by its own name', () => {
+  test('package.json change outside a dependency entry', () => {
     const result = classifyUpdate(pullRequest(), [
       modified(
-        'pnpm-lock.yaml',
-        `@@ -80,4 +80,4 @@ snapshots:
-   '@goodnight-web/server@0.1.1':
-     dependencies:
--      hono: 4.13.13
-+      hono: 4.13.14`,
+        'package.json',
+        `@@ -11,3 +11,4 @@
+   "dependencies": {
+     "@goodnight-web/server": "0.1.1",
++    oops
+     "astro": "7.4.1"`,
       ),
     ]);
     expect(result.official).toBe(false);
-    expect(result.reasons).toEqual([
-      'pnpm-lock.yaml: package other than @goodnight-web/* changed: hono',
-    ]);
-  });
-
-  test('lockfile change outside a package entry', () => {
-    const result = classifyUpdate(pullRequest(), [
-      modified(
-        'package-lock.json',
-        `@@ -1,6 +1,6 @@
- {
-   "name": "website",
--  "lockfileVersion": 3,
-+  "lockfileVersion": 4,
-   "requires": true,`,
-      ),
-    ]);
-    expect(result.official).toBe(false);
+    expect(result.reasons).toContain(
+      'package.json: change outside a dependency entry: oops',
+    );
   });
 
   test('package.json change other than a dependency version', () => {
@@ -272,6 +210,7 @@ describe('classifyUpdate', () => {
     expect(result.official).toBe(false);
     expect(result.reasons).toEqual([
       'package.json: entry other than an @goodnight-web/* dependency changed: build',
+      'package.json does not change an @goodnight-web/* version',
     ]);
   });
 
@@ -288,19 +227,20 @@ describe('classifyUpdate', () => {
     expect(result.reasons[0]).toContain('is not set to a version number');
   });
 
-  test('a diff that GitHub did not include is not official', () => {
+  test('a package.json diff that GitHub did not include is not official', () => {
     const result = classifyUpdate(pullRequest(), [
-      modified('package.json', packageJsonPatch),
-      { filename: 'package-lock.json', status: 'modified' },
+      { filename: 'package.json', status: 'modified' },
+      modified('package-lock.json', packageLockPatch),
     ]);
     expect(result.official).toBe(false);
-    expect(result.reasons).toEqual([
-      'the diff of package-lock.json is not available',
-    ]);
+    expect(result.reasons).toContain(
+      'the diff of package.json is not available',
+    );
   });
 
   test('an added lockfile is not official', () => {
     const result = classifyUpdate(pullRequest(), [
+      modified('package.json', packageJsonPatch),
       {
         filename: 'pnpm-lock.yaml',
         status: 'added',
@@ -308,6 +248,7 @@ describe('classifyUpdate', () => {
       },
     ]);
     expect(result.official).toBe(false);
+    expect(result.reasons).toEqual(['pnpm-lock.yaml was added, not modified']);
   });
 
   test('no changed files', () => {
