@@ -2,6 +2,10 @@
 exact = true
 # Only resolve package versions published at least 48 hours ago.
 minimumReleaseAge = 172800
+# Keep workspace links in each workspace's own node_modules. The starter's
+# wrangler.jsonc reads migrations from
+# node_modules/@goodnight-web/server/migrations (docs/decisions/0002).
+linker = "isolated"
 
 [run]
 bun = true

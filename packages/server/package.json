@@ -1,0 +1,41 @@
+{
+  "name": "@goodnight-web/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Worker factory, contact API, passkey admin auth, admin API, and D1 migrations for goodnight-web sites.",
+  "license": "MIT",
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "!src/testing",
+    "migrations"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contact": "./src/contact.ts",
+    "./client": "./src/client.ts",
+    "./messages": "./src/messages.ts"
+  },
+  "scripts": {
+    "build": "bun scripts/build-admin-module.ts",
+    "type-check": "tsc -p tsconfig.json",
+    "test": "bun test src",
+    "test:e2e": "bun e2e/run.ts",
+    "deploy:check": "wrangler deploy --dry-run -c e2e/wrangler.jsonc --outdir dist/dry-run"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "1.7.11",
+    "better-auth": "1.7.11",
+    "hono": "4.13.13",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261019.1",
+    "@goodnight-web/typescript-config": "workspace:*",
+    "@types/bun": "1.4.3",
+    "playwright": "1.64.1",
+    "typescript": "6.0.3",
+    "wrangler": "4.151.2"
+  }
+}

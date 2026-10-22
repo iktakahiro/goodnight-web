@@ -30,10 +30,10 @@ Cloudflare then shows two values ([Cloudflare: create a widget in the dashboard]
 
 ## Put the keys in place
 
-| Key        | Where it goes                        | Public?                                  |
-| ---------- | ------------------------------------ | ---------------------------------------- |
-| Secret key | The Worker secret `TURNSTILE_SECRET` | No. Never commit it or put it in a page. |
-| Site key   | The starter's site configuration     | Yes. It is part of the page.             |
+| Key        | Where it goes                            | Public?                                                    |
+| ---------- | ---------------------------------------- | ---------------------------------------------------------- |
+| Secret key | The Worker secret `TURNSTILE_SECRET`     | No. Never commit it or put it in a page.                   |
+| Site key   | The Worker variable `TURNSTILE_SITE_KEY` | Yes. The contact page reads it from `/api/contact/config`. |
 
 To set the secret, open the Worker in the Cloudflare dashboard and add `TURNSTILE_SECRET` under variables and secrets. From a terminal in your project, this does the same:
 
@@ -42,8 +42,9 @@ npx wrangler secret put TURNSTILE_SECRET
 ```
 
 <Callout type='warn' title='Draft / not verified yet'>
-  The starter is not written yet, so the exact setting name for the site key is
-  not decided. This page will name it when the starter lands.
+  The server reads the site key from `TURNSTILE_SITE_KEY`. The starter is not
+  written yet, so where you set it in the starter (for example `vars` in
+  `wrangler.jsonc`) will be confirmed when the starter lands.
 </Callout>
 
 ## What the Worker checks

@@ -1,6 +1,6 @@
 ---
 title: First admin setup
-description: The first admin can be created only with the SETUP_TOKEN secret and an address in ADMIN_EMAILS. Setup closes once an admin exists.
+description: The first admin can be created only with the SETUP_TOKEN secret and an address in ADMIN_EMAILS. Setup closes once the first passkey is registered.
 ---
 
 <Callout type='info'>
@@ -11,10 +11,13 @@ description: The first admin can be created only with the SETUP_TOKEN secret and
 
 Right after a deploy, the site has no admin. The setup endpoint `/api/setup` creates the first one, and it accepts a request only if:
 
-- the request includes the correct `SETUP_TOKEN`, and
-- the email address is in `ADMIN_EMAILS`.
+- the request comes from the site itself (the `Origin` header is checked),
+- the request includes the correct `SETUP_TOKEN` (compared in constant time), and
+- the email address is in `ADMIN_EMAILS` (upper and lower case do not matter).
 
-The new admin then registers a passkey. Once an admin exists, the setup endpoint closes and stays closed.
+Setup attempts are also rate-limited, and setup is turned off when the rate limit cannot run (the Rate Limiting binding or `IP_HASH_SECRET` is missing). The new admin is signed in and then registers a passkey. Once the first passkey is registered, the setup endpoint closes and stays closed, even if every passkey is deleted later. Until then, setup can run again, so a person who left before registering a passkey is not locked out.
+
+The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session from setup alone is only good for registering the first passkey.
 
 ## Why it is built this way
 
