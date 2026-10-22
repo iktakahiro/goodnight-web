@@ -1,7 +1,11 @@
 // Package entry point for `@goodnight-web/server`.
 export { createGoodnightWorker } from './app.ts';
 export type { GoodnightEnv } from './env.ts';
-export type { GoodnightWorkerOptions } from './options.ts';
+export type {
+  ContactCategory,
+  GoodnightWorkerOptions,
+  LocalizedLabel,
+} from './options.ts';
 export type { Locale } from './shared/messages.ts';
 export type { ApiErrorBody, ApiErrorCode } from './shared/api-error.ts';
 export {
@@ -9,6 +13,7 @@ export {
   type SubmissionStatus,
 } from './features/submissions/submission-status.ts';
 export type {
+  AdminCategory,
   AdminStatus,
   AdminSubmission,
   AdminSubmissionList,

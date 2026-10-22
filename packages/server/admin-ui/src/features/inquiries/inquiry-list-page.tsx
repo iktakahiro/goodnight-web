@@ -24,6 +24,7 @@ import {
 } from '../auth/admin-session.tsx';
 import { PageError } from '../layout/page-states.tsx';
 import { SetupNotices } from '../layout/setup-notices.tsx';
+import { categoryLabel } from './category-label.ts';
 import { csvExportUrl, fetchInquiries } from './inquiries-api.ts';
 import {
   STATUS_FILTERS,
@@ -35,6 +36,7 @@ import { StatusBadge } from './status-badge.tsx';
 
 const InquiryRow = ({ item }: { item: AdminSubmissionSummary }) => {
   const { locale, t } = useI18n();
+  const { status } = useAdminSession();
   const unread = item.status === 'new';
   return (
     <li>
@@ -67,7 +69,7 @@ const InquiryRow = ({ item }: { item: AdminSubmissionSummary }) => {
             ) : null}
             {item.category ? (
               <Badge tone='outline' className='self-center'>
-                {item.category}
+                {categoryLabel(item.category, status?.categories, locale)}
               </Badge>
             ) : null}
           </div>

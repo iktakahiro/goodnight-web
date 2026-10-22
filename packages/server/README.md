@@ -11,9 +11,20 @@ import { createGoodnightWorker } from '@goodnight-web/server';
 
 export default createGoodnightWorker({
   locale: 'ja',
-  contact: { categories: ['sales', 'press', 'other'] },
+  contact: {
+    categories: [
+      { value: 'sales', label: { ja: '製品・料金について', en: 'Sales' } },
+      { value: 'press', label: { ja: '取材・メディア', en: 'Press' } },
+      'other',
+    ],
+  },
 });
 ```
+
+Each category is a plain value (`'other'`) or `{ value, label: { ja, en } }`.
+The contact API accepts, stores, and sends to Slack only the `value`; the
+admin UI shows the label in the admin's language, or the value when there is
+no label.
 
 `wrangler.jsonc` needs:
 

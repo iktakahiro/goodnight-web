@@ -25,5 +25,11 @@ globalThis.fetch = (async (
 
 export default createGoodnightWorker({
   locale: 'en',
-  contact: { categories: ['sales', 'press', 'other'] },
+  contact: {
+    categories: [
+      { value: 'sales', label: { ja: '製品・料金について', en: 'Sales' } },
+      { value: 'press', label: { ja: '取材・メディア', en: 'Press' } },
+      { value: 'other', label: { ja: 'その他', en: 'Other' } },
+    ],
+  },
 });

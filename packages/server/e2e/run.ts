@@ -273,6 +273,7 @@ const main = async () => {
         hasText: 'E2E Visitor',
       });
       await row.getByText('New').waitFor();
+      await row.getByText('Sales', { exact: true }).waitFor();
       await row.getByText('Hello from the end-to-end test.').waitFor();
     });
 
@@ -374,6 +375,7 @@ const main = async () => {
       await page
         .getByRole('button', { name: 'お問い合わせ一覧に戻る' })
         .waitFor();
+      await page.getByText('製品・料金について').first().waitFor();
     });
 
     await step('delete asks for confirmation, then removes it', async () => {

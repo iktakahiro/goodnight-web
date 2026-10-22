@@ -52,6 +52,7 @@ import {
 } from '../auth/admin-session.tsx';
 import { MessageCard, PageError } from '../layout/page-states.tsx';
 import { SetupNotices } from '../layout/setup-notices.tsx';
+import { categoryLabel } from './category-label.ts';
 import {
   deleteInquiry,
   fetchInquiry,
@@ -232,7 +233,7 @@ const DetailSkeleton = () => {
  */
 export const InquiryDetailPage = ({ id }: { id: string }) => {
   const { locale, t } = useI18n();
-  const { refreshStatus } = useAdminSession();
+  const { status, refreshStatus } = useAdminSession();
   const inquiry = useAsync(async () => {
     const result = await fetchInquiry(id);
     // Opening a new inquiry marks it read: update the header count.
@@ -291,6 +292,9 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
 
   const item = inquiry.data;
   const received = formatDateTime(item.createdAt, locale);
+  const category = item.category
+    ? categoryLabel(item.category, status?.categories, locale)
+    : null;
   return (
     <div className='flex flex-col gap-5'>
       <SetupNotices />
@@ -300,9 +304,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
           <div className='flex flex-col gap-3 border-b border-border/70 bg-gradient-to-b from-accent/50 to-card px-6 pt-6 pb-5 sm:px-8 sm:pt-8'>
             <div className='flex flex-wrap items-center gap-2'>
               <StatusBadge status={item.status} />
-              {item.category ? (
-                <Badge tone='outline'>{item.category}</Badge>
-              ) : null}
+              {category ? <Badge tone='outline'>{category}</Badge> : null}
             </div>
             <h1 className='text-2xl leading-snug font-bold tracking-tight break-words'>
               {item.name}
@@ -375,12 +377,12 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                   </a>
                 </InfoRow>
               ) : null}
-              {item.category ? (
+              {category ? (
                 <InfoRow
                   icon={<Tag aria-hidden='true' />}
                   label={t('field.category')}
                 >
-                  {item.category}
+                  {category}
                 </InfoRow>
               ) : null}
               {item.pagePath ? (

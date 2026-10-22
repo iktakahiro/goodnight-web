@@ -295,6 +295,38 @@ describe('POST /api/contact', () => {
     });
   });
 
+  test('validates labeled categories by their values', async () => {
+    const worker = createTestWorker({
+      options: {
+        contact: {
+          categories: [
+            { value: 'sales', label: { ja: '営業', en: 'Sales' } },
+            'other',
+          ],
+        },
+      },
+    });
+    expect((await post(worker, validBody({ category: 'sales' }))).status).toBe(
+      200,
+    );
+    expect((await post(worker, validBody({ category: 'other' }))).status).toBe(
+      200,
+    );
+    for (const category of ['営業', 'Sales']) {
+      const response = await post(worker, validBody({ category }));
+      expect(response.status).toBe(400);
+      expect((await response.json()).error.fields).toEqual({
+        category: 'invalid',
+      });
+    }
+    expect(rows(worker).map((row) => row.category)).toEqual(
+      expect.arrayContaining(['sales', 'other']),
+    );
+    expect(rows(worker)).toHaveLength(2);
+    const config = await (await worker.fetch('/api/contact/config')).json();
+    expect(config.categories).toEqual(['sales', 'other']);
+  });
+
   test('error messages follow Accept-Language', async () => {
     const worker = createTestWorker({ env: { TURNSTILE_SECRET: undefined } });
     const ja = await post(worker, validBody(), {
@@ -366,6 +398,22 @@ describe('Slack notification', () => {
     const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
     await post(worker, validBody({ category: 'Call me at 090-1111-2222' }));
     expect(external.slackCalls()[0]?.body).not.toContain('090-1111-2222');
+  });
+
+  test('shows the value of a labeled category, not its label', async () => {
+    const worker = createTestWorker({
+      env: { SLACK_WEBHOOK_URL: SLACK_URL },
+      options: {
+        locale: 'ja',
+        contact: {
+          categories: [{ value: 'press', label: { ja: '取材', en: 'Press' } }],
+        },
+      },
+    });
+    await post(worker, validBody({ category: 'press' }));
+    const payload = JSON.parse(external.slackCalls()[0]?.body ?? '{}');
+    expect(payload.text).toContain('種類: press');
+    expect(payload.text).not.toContain('取材');
   });
 
   test('uses the configured locale', async () => {

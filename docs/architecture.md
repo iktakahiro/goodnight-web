@@ -108,8 +108,9 @@ When `available` is `false`, the form shows that it is not available yet.
    returns 429.
 5. Validate the input with the zod schema exported from
    `@goodnight-web/server/contact` (control characters removed, lengths
-   checked, `consent` must be `true`). A category outside
-   `options.contact.categories` is rejected. Then compute the spam score; a
+   checked, `consent` must be `true`). A category outside the values of
+   `options.contact.categories` is rejected; labels are only for the admin
+   UI. Then compute the spam score; a
    score of 3 or more sets the status to `held`.
 6. Insert the row into D1, then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
@@ -185,15 +186,15 @@ in `ADMIN_EMAILS` and has at least one passkey. The session from setup alone
 only allows registering the first passkey. State-changing requests also need
 the Worker's own `Origin` (CSRF). There is no development bypass.
 
-| Route                                      | Result                                                                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/admin/me`                        | the signed-in admin                                                                                                       |
-| `GET /api/admin/status`                    | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount` |
-| `GET /api/admin/submissions?status=&page=` | 50 per page, newest first, `total` and `unreadCount`; runs pruning                                                        |
-| `GET /api/admin/submissions/:id`           | one submission; a `new` one becomes `read`                                                                                |
-| `PATCH /api/admin/submissions/:id`         | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                    |
-| `DELETE /api/admin/submissions/:id`        | deletes the row                                                                                                           |
-| `GET /api/admin/submissions.csv?status=`   | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                         |
+| Route                                      | Result                                                                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/admin/me`                        | the signed-in admin                                                                                                                                          |
+| `GET /api/admin/status`                    | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `slackConfigured`, `version`, `retentionDays`, `unreadCount`, `categories` (`{ value, label }`) |
+| `GET /api/admin/submissions?status=&page=` | 50 per page, newest first, `total` and `unreadCount`; runs pruning                                                                                           |
+| `GET /api/admin/submissions/:id`           | one submission; a `new` one becomes `read`                                                                                                                   |
+| `PATCH /api/admin/submissions/:id`         | `{ status }`: `new`, `read`, `done`, `held`, or `spam`                                                                                                       |
+| `DELETE /api/admin/submissions/:id`        | deletes the row                                                                                                                                              |
+| `GET /api/admin/submissions.csv?status=`   | CSV with a UTF-8 BOM; cells starting with `= + - @`, tab, or CR get a leading `'`                                                                            |
 
 `ip_hash` is never returned by the admin API.
 
