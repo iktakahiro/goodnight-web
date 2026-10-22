@@ -1,3 +1,4 @@
+import { useLocation, useRouter } from '@tanstack/react-router';
 import {
   createContext,
   useCallback,
@@ -7,9 +8,9 @@ import {
   type ReactNode,
 } from 'react';
 import type { AdminStatus } from '../../../../src/features/admin-api/admin-routes.ts';
+import type { SetupState } from '../../../../src/features/setup/setup-routes.ts';
 import { ApiError } from '../../shared/api/api-client.ts';
-import { navigate } from '../../shared/router/router.tsx';
-import { loginPath } from '../../shared/router/routes.ts';
+import { toAdminPath } from '../../shared/router/admin-paths.ts';
 import {
   fetchMe,
   fetchSetupState,
@@ -17,6 +18,86 @@ import {
   type AdminUser,
 } from './admin-api.ts';
 import { authClient } from './auth-client.ts';
+
+/** Result of the session check that guards the signed-in screens. */
+export type SessionCheck =
+  | { state: 'signed-in'; admin: AdminUser }
+  /** No session. `setupOpen`: no admin exists yet, so setup comes first. */
+  | { state: 'signed-out'; setupOpen: boolean }
+  /** Setup step 1 is done, but no passkey is registered yet. */
+  | { state: 'needs-passkey' };
+
+/**
+ * Checks the session for the route guard and remembers the signed-in admin,
+ * so moving between signed-in screens does not call the API again.
+ */
+export interface SessionGuard {
+  /**
+   * Checks the session with `GET /api/admin/me`, or returns the remembered
+   * admin.
+   *
+   * @throws {ApiError} `forbidden` when the address is no longer in
+   *   `ADMIN_EMAILS`, or any other API error.
+   */
+  check: () => SessionCheck | Promise<SessionCheck>;
+  /** Forgets the remembered admin (after sign-out or a 401). */
+  forget: () => void;
+}
+
+/** The API calls a {@link SessionGuard} makes. Tests replace them. */
+export interface SessionApi {
+  fetchMe: () => Promise<AdminUser>;
+  fetchSetupState: () => Promise<SetupState>;
+}
+
+const toApiError = (error: unknown): ApiError =>
+  error instanceof ApiError
+    ? error
+    : new ApiError(0, 'server_error', 'unexpected error');
+
+/** Creates the {@link SessionGuard} that the router passes to its routes. */
+export const createSessionGuard = (
+  api: SessionApi = { fetchMe, fetchSetupState },
+): SessionGuard => {
+  let admin: AdminUser | null = null;
+
+  const load = async (): Promise<SessionCheck> => {
+    try {
+      admin = await api.fetchMe();
+      return { state: 'signed-in', admin };
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (apiError.code === 'unauthorized') {
+        const setup = await api.fetchSetupState().catch(() => null);
+        return { state: 'signed-out', setupOpen: setup?.open === true };
+      }
+      if (apiError.code === 'passkey_required')
+        return { state: 'needs-passkey' };
+      throw apiError;
+    }
+  };
+
+  return {
+    check: () => (admin ? { state: 'signed-in', admin } : load()),
+    forget: () => {
+      admin = null;
+    },
+  };
+};
+
+/** Returns the router's {@link SessionGuard}. */
+const useSessionGuard = (): SessionGuard => useRouter().options.context.session;
+
+/** Returns a function that signs out and goes to the sign-in screen. */
+export const useSignOut = (): (() => Promise<void>) => {
+  const router = useRouter();
+  const session = useSessionGuard();
+  return useCallback(async () => {
+    await authClient.signOut().catch(() => undefined);
+    session.forget();
+    await router.navigate({ to: '/login', replace: true });
+  }, [router, session]);
+};
 
 interface AdminSessionValue {
   admin: AdminUser;
@@ -32,80 +113,6 @@ interface AdminSessionValue {
 
 const AdminSessionContext = createContext<AdminSessionValue | null>(null);
 
-/** Session check result before the admin screens render. */
-export type SessionCheck =
-  | { state: 'checking' }
-  | { state: 'forbidden' }
-  | { state: 'error'; error: ApiError }
-  | { state: 'signed-in'; admin: AdminUser };
-
-const currentPath = () => window.location.pathname + window.location.search;
-
-/**
- * Where to send a visitor without a session: the setup screen while setup is
- * open (no admin can sign in yet), otherwise the sign-in screen, which
- * returns to the current path afterwards.
- */
-const redirectSignedOut = async (): Promise<void> => {
-  const setup = await fetchSetupState().catch(() => null);
-  if (setup?.open) navigate('/admin/setup', { replace: true });
-  else navigate(loginPath(currentPath()), { replace: true });
-};
-
-/** Signs out and goes to the sign-in screen. */
-export const signOutAndLeave = async (): Promise<void> => {
-  await authClient.signOut().catch(() => undefined);
-  navigate('/admin/login', { replace: true });
-};
-
-/**
- * Checks the session with `GET /api/admin/me`:
- *
- * - 401: goes to setup (while open) or sign-in;
- * - 403 `passkey_required`: goes to setup to register the passkey;
- * - 403 `forbidden`: the address is no longer in `ADMIN_EMAILS`.
- */
-export const useSessionCheck = (): [SessionCheck, () => void] => {
-  const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{
-    attempt: number;
-    check: SessionCheck;
-  } | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    fetchMe().then(
-      (admin) => {
-        if (active)
-          setResult({ attempt, check: { state: 'signed-in', admin } });
-      },
-      (error: unknown) => {
-        if (!active) return;
-        const apiError =
-          error instanceof ApiError
-            ? error
-            : new ApiError(0, 'server_error', 'unexpected error');
-        if (apiError.code === 'unauthorized') {
-          void redirectSignedOut();
-        } else if (apiError.code === 'passkey_required') {
-          navigate('/admin/setup', { replace: true });
-        } else if (apiError.code === 'forbidden') {
-          setResult({ attempt, check: { state: 'forbidden' } });
-        } else {
-          setResult({ attempt, check: { state: 'error', error: apiError } });
-        }
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [attempt]);
-
-  const check: SessionCheck =
-    result?.attempt === attempt ? result.check : { state: 'checking' };
-  return [check, () => setAttempt((n) => n + 1)];
-};
-
 /**
  * Holds the signed-in admin, the site status (for the setup notices), and the
  * unread count shown in the header.
@@ -117,6 +124,7 @@ export const AdminSessionProvider = ({
   admin: AdminUser;
   children: ReactNode;
 }) => {
+  const signOut = useSignOut();
   const [status, setStatus] = useState<AdminStatus | null>(null);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [statusAttempt, setStatusAttempt] = useState(0);
@@ -148,7 +156,7 @@ export const AdminSessionProvider = ({
         unreadCount,
         setUnreadCount,
         refreshStatus,
-        signOut: signOutAndLeave,
+        signOut,
       }}
     >
       {children}
@@ -167,12 +175,19 @@ export const useAdminSession = (): AdminSessionValue => {
 
 /**
  * Sends the user to sign-in when an API call reports that the session ended
- * (401) while a screen was open.
+ * (401) while a screen was open. Sign-in returns to the current screen.
  */
 export const useSignInOnUnauthorized = (error: ApiError | null): void => {
+  const router = useRouter();
+  const session = useSessionGuard();
+  const href = useLocation({ select: (location) => location.href });
   useEffect(() => {
-    if (error?.code === 'unauthorized') {
-      navigate(loginPath(currentPath()), { replace: true });
-    }
-  }, [error]);
+    if (error?.code !== 'unauthorized') return;
+    session.forget();
+    void router.navigate({
+      to: '/login',
+      search: { next: toAdminPath(href) },
+      replace: true,
+    });
+  }, [error, href, router, session]);
 };

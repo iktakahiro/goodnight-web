@@ -1,8 +1,8 @@
+import { Link } from '@tanstack/react-router';
 import { LogOut, Mail } from 'lucide-react';
 import { useAdminSession } from '../auth/admin-session.tsx';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { formatNumber } from '../../shared/i18n/format.ts';
-import { Link } from '../../shared/router/router.tsx';
 import { Button } from '../../shared/ui/button.tsx';
 import { cn } from '../../shared/ui/cn.ts';
 import { LanguageSwitch } from './language-switch.tsx';
@@ -21,7 +21,7 @@ export const AppHeader = () => {
     <header className='sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur-md'>
       <div className='mx-auto flex h-16 max-w-5xl items-center gap-2 px-4 sm:gap-3 sm:px-6'>
         <Link
-          href='/admin'
+          to='/'
           className='-ml-1 flex items-center gap-2.5 rounded-xl px-1 py-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/60'
         >
           <LogoMark className='size-9' />
@@ -37,7 +37,8 @@ export const AppHeader = () => {
 
         <div className='ml-auto flex items-center gap-1 sm:gap-2'>
           <Link
-            href='/admin?status=new'
+            to='/'
+            search={{ status: 'new' }}
             aria-label={`${t('header.unread')}: ${t('admin.unreadCount', {
               count: formatNumber(unreadCount ?? 0, locale),
             })}`}

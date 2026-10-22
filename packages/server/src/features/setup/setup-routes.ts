@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import * as z from 'zod';
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
 import { timingSafeEqual } from '../../shared/crypto.ts';
@@ -7,6 +6,7 @@ import { limitByIpHash } from '../../shared/ip-rate-limit.ts';
 import { isAllowedOrigin, readBodyWithLimit } from '../../shared/request.ts';
 import { isAdminEmail } from '../auth/admin-emails.ts';
 import { getAuth, isAuthConfigured } from '../auth/auth.ts';
+import { setupInputSchema } from './setup-schema.ts';
 import { isSetupClosed, isSetupConfigured } from './setup-state.ts';
 
 /** Body of `GET /api/setup`. */
@@ -21,12 +21,6 @@ export interface SetupState {
 }
 
 const MAX_SETUP_BODY_BYTES = 4 * 1024;
-
-const setupBodySchema = z.object({
-  token: z.string().min(1).max(512),
-  email: z.string().trim().pipe(z.email().max(254)),
-  name: z.string().trim().max(100).optional(),
-});
 
 /**
  * Routes under `/api/setup`, which create the first admin:
@@ -75,7 +69,7 @@ export const setupRoutes = new Hono<HonoEnv>()
 
     if (await isSetupClosed(env.DB)) return apiError(c, 403, 'setup_closed');
 
-    const parsed = setupBodySchema.safeParse(raw);
+    const parsed = setupInputSchema.safeParse(raw);
     if (!parsed.success) return apiError(c, 400, 'invalid_input');
     const { token, email, name } = parsed.data;
     if (!timingSafeEqual(token, env.SETUP_TOKEN ?? '')) {

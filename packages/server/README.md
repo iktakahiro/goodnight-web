@@ -49,7 +49,12 @@ security rules.
 
 ## Development
 
-The admin UI source is in `admin-ui/` (Vite, React, Base UI, Tailwind v4).
+The admin UI source is in `admin-ui/`: a Vite-built React SPA with Base UI,
+Tailwind v4, TanStack Router (typed code-based routes under `/admin`, search
+parameters validated with zod), TanStack Form (setup and sign-in; the setup
+form uses the exported `setupInputSchema`), and TanStack Table (the inquiry
+list, with server-side pagination; the order is fixed to newest first because
+the admin API has no other sort). It does not use TanStack Start.
 `bun run build` builds it and embeds it in
 `src/features/admin-ui/admin-files.gen.ts`, which is not committed. Run the
 build before `type-check` or `test` when you call them directly in this

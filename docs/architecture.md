@@ -206,16 +206,39 @@ Base UI, shadcn-style components (the component source is copied into
 v4, and lucide icons. It ships prebuilt inside `@goodnight-web/server` and is
 served by the Worker ([0004](decisions/0004-admin-ui-delivery.md)).
 
-| Path                    | Screen                                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                              |
-| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                            |
-| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), 50 per page, CSV export; `?status=&page=` keep the state |
-| `/admin/inquiries/<id>` | Detail: message, contact details, status change, reply by email, delete with a confirmation dialog                        |
+The UI uses three TanStack libraries, all in the browser only:
 
-- **Session.** The list and detail screens first call `GET /api/admin/me`.
-  Without a session (401) they go to `/admin/setup` while setup is open, and
-  otherwise to `/admin/login?next=<path>`. After sign-in the user returns to
+- **TanStack Router** for typed, code-based routes under the basepath
+  `/admin` (`admin-ui/src/app-router.tsx`). The basepath is a URL rewrite
+  rather than the router's `basepath` option, which would write the list as
+  `/admin/`. There is no route generator, so the build is plain
+  `vite build`. Search parameters are validated with zod
+  schemas; a value that is not valid falls back to the default instead of
+  showing an error. Unknown paths show the not-found screen.
+- **TanStack Form** for the setup and sign-in forms. The setup form validates
+  with `setupInputSchema`, the same zod schema `POST /api/setup` uses (it is
+  exported from `@goodnight-web/server`). zod's English messages are not
+  shown; the UI maps each error to `field.required`, `field.invalid`, or
+  `field.too_long` in the UI's language.
+- **TanStack Table** (headless) for the inquiry list. Pagination and sorting
+  are manual: the API returns one page of 50, sorted by received date, newest
+  first. The API has no other order, so the sort is fixed. The rows keep
+  their list design (one link per inquiry) instead of a `<table>`.
+
+The UI does not use TanStack Start; the Worker serves the static build.
+
+| Path                    | Screen                                                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                                            |
+| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                                          |
+| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), 50 per page, newest first, CSV export; `?status=&page=` keep the state |
+| `/admin/inquiries/<id>` | Detail: message, contact details, status change, reply by email, delete with a confirmation dialog                                      |
+
+- **Session.** Before the list or detail screen loads, a route guard (the
+  router's `beforeLoad`) calls `GET /api/admin/me` and remembers the admin
+  until sign-out or a 401. Without a session (401) it redirects to
+  `/admin/setup` while setup is open, and otherwise to
+  `/admin/login?next=<path>`. After sign-in the user returns to
   `next`, so the link in a Slack notification (`/admin/inquiries/<id>`) works
   when signed out. `next` must be an `/admin` path. A session without a
   passkey (403 `passkey_required`) goes to the passkey step of setup. There
@@ -248,9 +271,9 @@ served by the Worker ([0004](decisions/0004-admin-ui-delivery.md)).
   `src/features/admin-ui/admin-files.gen.ts` (path, content type, ETag,
   body). The generated file is not committed. Turborepo builds it before
   `type-check`, `test`, and `deploy:check` of the server package. The bundle
-  is one JS file of about 190 kB gzip and one CSS file of about 8 kB gzip.
+  is one JS file of about 260 kB gzip and one CSS file of about 8 kB gzip.
   With it, `deploy:check` reports the server's test Worker at about
-  3,250 KiB (670 KiB gzip).
+  3,490 KiB (750 KiB gzip).
 - **Serving.** `/admin` and paths without a file extension return
   `index.html` (`no-cache`); `/admin/assets/*` are immutable; ETags give
   304s. The SPA shell loads without a session, but every data request needs

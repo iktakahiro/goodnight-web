@@ -1,4 +1,10 @@
 import {
+  Link,
+  useCanGoBack,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router';
+import {
   ArrowLeft,
   Building2,
   CalendarClock,
@@ -22,7 +28,6 @@ import { errorMessage } from '../../shared/api/error-message.ts';
 import { useAsync } from '../../shared/api/use-async.ts';
 import { formatDateTime } from '../../shared/i18n/format.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
-import { Link, cameFromApp, navigate } from '../../shared/router/router.tsx';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -64,12 +69,6 @@ const toApiError = (error: unknown) =>
   error instanceof ApiError
     ? error
     : new ApiError(0, 'server_error', 'unexpected error');
-
-/** Goes back to the list, keeping its filter when we came from it. */
-const backToList = () => {
-  if (cameFromApp()) window.history.back();
-  else navigate('/admin');
-};
 
 const InfoRow = ({
   icon,
@@ -154,6 +153,7 @@ const StatusControl = ({
 const DeleteControl = ({ inquiry }: { inquiry: AdminSubmission }) => {
   const { t } = useI18n();
   const { refreshStatus } = useAdminSession();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -164,7 +164,7 @@ const DeleteControl = ({ inquiry }: { inquiry: AdminSubmission }) => {
       setOpen(false);
       refreshStatus();
       showToast(t('detail.deleted'));
-      navigate('/admin', { replace: true });
+      void navigate({ to: '/', replace: true });
     } catch (error) {
       showToast(
         `${t('detail.deleteFailed')} ${errorMessage(t, toApiError(error))}`,
@@ -241,6 +241,15 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
     return result;
   }, id);
   useSignInOnUnauthorized(inquiry.status === 'error' ? inquiry.error : null);
+  const router = useRouter();
+  const navigate = useNavigate();
+  // Back to the list, keeping its filter and page when we came from it. A
+  // deep link (for example from Slack) has no history to go back to.
+  const canGoBack = useCanGoBack();
+  const backToList = () => {
+    if (canGoBack) router.history.back();
+    else void navigate({ to: '/' });
+  };
 
   const back = (
     <button
@@ -270,10 +279,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
             icon={<FileText aria-hidden='true' />}
             title={t('error.not_found')}
             action={
-              <Link
-                href='/admin'
-                className={buttonVariants({ variant: 'outline' })}
-              >
+              <Link to='/' className={buttonVariants({ variant: 'outline' })}>
                 {t('app.backToList')}
               </Link>
             }

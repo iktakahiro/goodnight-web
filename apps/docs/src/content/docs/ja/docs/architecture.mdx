@@ -21,6 +21,7 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 | Turnstile                 | 問い合わせフォームのボット対策（Cloudflare 製）。Worker がトークンをサーバー側で検証します。                                                             |
 | Rate Limiting binding     | `ip_hash` ごとに問い合わせの送信回数を制限する Workers の binding。無料プランで使えます。                                                                |
 | Better Auth とパスキー    | 管理者のログイン。パスキーだけを使い、メールとパスワードでのログインは無効にします。                                                                     |
+| 管理画面                  | React と TanStack Router、Form、Table で作り、Vite でビルドしたアプリ。ビルド済みで `@goodnight-web/server` に入っていて、Worker が配信します。          |
 | Slack Webhook（任意）     | 「新しい問い合わせ」の短い通知。個人情報は含めません。                                                                                                   |
 | Cloudflare Access（任意） | `/admin/*` と `/api/admin/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。                                                             |
 

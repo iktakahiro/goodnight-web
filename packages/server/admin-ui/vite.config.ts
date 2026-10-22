@@ -14,8 +14,9 @@ export default defineConfig({
     // The admin CSP allows only 'self' scripts; keep everything in files.
     modulePreload: { polyfill: false },
     assetsInlineLimit: 0,
-    // One chunk of about 190 kB gzip (React, Base UI, the auth client). It is
-    // embedded in the Worker, so splitting it would not save any requests.
-    chunkSizeWarningLimit: 800,
+    // One chunk of about 260 kB gzip (React, Base UI, TanStack Router, Form,
+    // and Table, zod, the auth client). It is embedded in the Worker, so
+    // splitting it would not save any requests.
+    chunkSizeWarningLimit: 1000,
   },
 });
