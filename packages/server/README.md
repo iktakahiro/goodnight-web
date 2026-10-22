@@ -38,9 +38,16 @@ security rules.
 
 ## Development
 
+The admin UI source is in `admin-ui/` (Vite, React, Base UI, Tailwind v4).
+`bun run build` builds it and embeds it in
+`src/features/admin-ui/admin-files.gen.ts`, which is not committed. Run the
+build before `type-check` or `test` when you call them directly in this
+directory (Turborepo does it for you from the repository root).
+
 ```sh
-bun run test       # unit and HTTP tests (in-memory D1 stand-in)
-bun run test:e2e   # wrangler dev + Chromium passkeys; needs `bunx playwright install chromium`
-bun run build      # embeds the admin UI into src/features/admin-ui/admin-files.gen.ts
+bun run build        # builds admin-ui/ and writes admin-files.gen.ts
+bun run test         # unit and HTTP tests (in-memory D1 stand-in) and admin UI unit tests
+bun run test:e2e     # wrangler dev + the admin UI in Chromium with passkeys; needs `bunx playwright install chromium`
+bun run screenshots <dir>  # admin UI screenshots with fictional sample data
 bun run deploy:check
 ```
