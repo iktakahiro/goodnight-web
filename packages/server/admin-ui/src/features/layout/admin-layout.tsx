@@ -23,7 +23,7 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
       >
         {children}
       </main>
-      <footer className='mx-auto w-full max-w-5xl px-4 pb-8 text-xs text-muted-foreground/80 sm:px-6'>
+      <footer className='mx-auto w-full max-w-5xl px-4 pb-8 text-xs text-muted-foreground sm:px-6'>
         {t('app.name')}
         {status ? ` ${status.version}` : ''}
       </footer>

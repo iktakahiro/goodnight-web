@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { LanguageSwitch } from './language-switch.tsx';
 import { LogoMark } from './logo-mark.tsx';
+import { ThemeSwitch } from './theme-switch.tsx';
 
 /** Layout for the sign-in and setup screens: a centered card. */
 export const AuthLayout = ({ children }: { children: ReactNode }) => {
@@ -20,7 +21,10 @@ export const AuthLayout = ({ children }: { children: ReactNode }) => {
             </span>
           </span>
         </div>
-        <LanguageSwitch />
+        <div className='flex items-center gap-1 sm:gap-2'>
+          <LanguageSwitch />
+          <ThemeSwitch />
+        </div>
       </header>
       <main
         id='main'

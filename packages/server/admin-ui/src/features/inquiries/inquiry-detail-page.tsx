@@ -255,7 +255,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
     <button
       type='button'
       onClick={backToList}
-      className='inline-flex items-center gap-1.5 self-start rounded-full py-1 pr-3 text-sm font-medium text-muted-foreground transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/60'
+      className='inline-flex items-center gap-1.5 self-start rounded-full py-1 pr-3 text-sm font-medium text-muted-foreground transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring'
     >
       <ArrowLeft aria-hidden='true' className='size-4' />
       {t('app.backToList')}
@@ -357,7 +357,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
               >
                 <a
                   href={`mailto:${item.email}`}
-                  className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+                  className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
                 >
                   {item.email}
                 </a>
@@ -377,7 +377,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                 >
                   <a
                     href={`tel:${item.phone}`}
-                    className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+                    className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
                   >
                     {item.phone}
                   </a>

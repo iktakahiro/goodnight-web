@@ -46,7 +46,7 @@ export const SetupNotices = ({
               href={docsUrl(locale, '/docs/setup/turnstile/')}
               target='_blank'
               rel='noreferrer'
-              className='inline-flex items-center gap-1 rounded-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/60'
+              className='inline-flex items-center gap-1 rounded-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring'
             >
               {t('admin.turnstileNoticeLink')}
               <ExternalLink aria-hidden='true' className='size-3.5' />
@@ -76,14 +76,14 @@ export const SetupNotices = ({
               href={docsUrl(locale, '/docs/how-it-works/notifications/')}
               target='_blank'
               rel='noreferrer'
-              className='rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+              className='rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
             >
               {t('notice.slackLink')}
             </a>
             <button
               type='button'
               onClick={() => setSlackDismissed(true)}
-              className='rounded-sm text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+              className='rounded-sm text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
             >
               {t('notice.close')}
             </button>

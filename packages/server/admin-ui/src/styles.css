@@ -1,37 +1,60 @@
 @import 'tailwindcss';
 
-/* A soft lavender theme. The hue (258) matches the documentation site. */
-@theme {
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * The admin theme: deep navy-violet on light, soft surfaces. The light values
+ * live in @theme; `.dark` on <html> swaps them for the dark values below
+ * (public/theme-init.js sets the class before the first paint). Keep every
+ * color a 6-digit hex value: theme-contrast.test.ts reads this file and
+ * checks the WCAG AA contrast of the main pairs in both modes.
+ */
+@theme static {
   --font-sans:
     system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans',
     'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Zen Kaku Gothic New',
     'Yu Gothic UI', Meiryo, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --color-background: hsl(260, 60%, 98.5%);
-  --color-foreground: hsl(258, 30%, 20%);
-  --color-card: hsl(0, 0%, 100%);
-  --color-card-foreground: hsl(258, 30%, 20%);
-  --color-popover: hsl(0, 0%, 100%);
-  --color-popover-foreground: hsl(258, 30%, 20%);
-  --color-muted: hsl(258, 55%, 96.5%);
-  --color-muted-foreground: hsl(256, 14%, 42%);
-  --color-primary: hsl(258, 48%, 54%);
-  --color-primary-hover: hsl(258, 48%, 48%);
-  --color-primary-foreground: hsl(0, 0%, 100%);
-  --color-secondary: hsl(258, 70%, 95%);
-  --color-secondary-foreground: hsl(258, 40%, 30%);
-  --color-accent: hsl(258, 70%, 94%);
-  --color-accent-foreground: hsl(258, 45%, 30%);
-  --color-border: hsl(258, 40%, 90%);
-  --color-input: hsl(258, 30%, 84%);
-  --color-ring: hsl(258, 60%, 66%);
-  --color-destructive: hsl(350, 62%, 50%);
-  --color-destructive-hover: hsl(350, 62%, 44%);
-  --color-destructive-soft: hsl(350, 80%, 97%);
-  --color-warning-soft: hsl(40, 90%, 95%);
-  --color-warning-border: hsl(38, 70%, 80%);
-  --color-warning-foreground: hsl(30, 60%, 26%);
+  --color-background: #f5f6fb;
+  --color-foreground: #1b1f3f;
+  --color-card: #ffffff;
+  --color-card-foreground: #1b1f3f;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1b1f3f;
+  --color-muted: #eef0f7;
+  --color-muted-foreground: #525979;
+  --color-primary: #2f3482;
+  --color-primary-hover: #24286a;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #e8eaf7;
+  --color-secondary-foreground: #262b6b;
+  --color-accent: #e8eaf8;
+  --color-accent-foreground: #23286a;
+  --color-border: #dde0ee;
+  --color-input: #858bb0;
+  --color-ring: #5a60c8;
+  --color-overlay: #0d1030;
+  --color-destructive: #b42343;
+  --color-destructive-hover: #981c37;
+  --color-destructive-foreground: #ffffff;
+  --color-destructive-soft: #fdf0f3;
+  --color-destructive-border: #f0c3cd;
+  --color-warning-soft: #fdf5e2;
+  --color-warning-border: #ead199;
+  --color-warning-foreground: #693f0c;
+  --color-warning-icon: #a35d07;
+  --color-success-soft: #eaf6ef;
+  --color-success-border: #b6dfc6;
+  --color-success-foreground: #1a5f3d;
+  --color-info-soft: #ecebfe;
+  --color-info-border: #c6c3f4;
+  --color-info-foreground: #37309b;
+  --color-logo-tile: #e4e6fa;
+  --color-logo-moon: #2f3482;
+  --color-logo-star: #7f86e3;
+  --color-glow: #dfe2fb;
+  --color-selection: #cfd3f7;
 
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
@@ -40,10 +63,59 @@
   --radius-2xl: 1.5rem;
 
   --shadow-soft:
-    0 1px 2px hsl(258 40% 40% / 0.05), 0 4px 16px hsl(258 40% 40% / 0.06);
+    0 1px 2px rgb(27 31 63 / 0.05), 0 4px 16px rgb(27 31 63 / 0.06);
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  /* Dark mode: a deep navy background, not black. */
+  :root.dark {
+    color-scheme: dark;
+    --color-background: #0f1330;
+    --color-foreground: #e4e6f6;
+    --color-card: #171c3f;
+    --color-card-foreground: #e4e6f6;
+    --color-popover: #1c2248;
+    --color-popover-foreground: #e4e6f6;
+    --color-muted: #1f2549;
+    --color-muted-foreground: #a6acd0;
+    --color-primary: #a9aefc;
+    --color-primary-hover: #c0c4ff;
+    --color-primary-foreground: #12163a;
+    --color-secondary: #242a55;
+    --color-secondary-foreground: #dfe2fb;
+    --color-accent: #272e5e;
+    --color-accent-foreground: #e2e5ff;
+    --color-border: #2b3262;
+    --color-input: #6b72a6;
+    --color-ring: #9ea4f6;
+    --color-overlay: #03050f;
+    --color-destructive: #f28b9e;
+    --color-destructive-hover: #f6a6b5;
+    --color-destructive-foreground: #2b0a14;
+    --color-destructive-soft: #36172d;
+    --color-destructive-border: #6e3049;
+    --color-warning-soft: #312811;
+    --color-warning-border: #6b5222;
+    --color-warning-foreground: #f2d48e;
+    --color-warning-icon: #e6b350;
+    --color-success-soft: #112f2a;
+    --color-success-border: #2a6451;
+    --color-success-foreground: #a0dfc0;
+    --color-info-soft: #252a68;
+    --color-info-border: #4a50a8;
+    --color-info-foreground: #d3d5ff;
+    --color-logo-tile: #272e5e;
+    --color-logo-moon: #c3c7ff;
+    --color-logo-star: #8a90e8;
+    --color-glow: #1f2656;
+    --color-selection: #3b4290;
+    --shadow-soft: 0 1px 2px rgb(3 5 15 / 0.3), 0 4px 16px rgb(3 5 15 / 0.35);
+  }
+
   *,
   ::after,
   ::before {
@@ -59,7 +131,7 @@
     background:
       radial-gradient(
         1200px 420px at 50% -120px,
-        hsl(262 80% 92% / 0.9),
+        var(--color-glow),
         transparent 70%
       ),
       var(--color-background);
@@ -75,7 +147,7 @@
   }
 
   ::selection {
-    background: hsl(258 80% 86%);
+    background: var(--color-selection);
   }
 }
 

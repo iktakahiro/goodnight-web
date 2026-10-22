@@ -13,7 +13,7 @@
 // virtual authenticator) -> sign-out -> passkey sign-in -> list (URL search
 // parameters, not-found) -> detail -> status
 // change -> Slack-style deep link while signed out -> language switch ->
-// delete with confirmation. Also checks the API rules the UI relies on, and
+// light/dark switch -> delete with confirmation. Also checks the API rules the UI relies on, and
 // that the UI runs under the admin CSP without violations.
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -450,6 +450,75 @@ const main = async () => {
         .getByRole('button', { name: ui('ja', 'app.backToList') })
         .waitFor();
       await page.getByText(sales.label.ja).first().waitFor();
+    });
+
+    // The class on <html> when #root is parsed: theme-init.js has run, the
+    // app has not. Shows that the first paint already has the right colors.
+    await context.addInitScript(() => {
+      new MutationObserver((_, observer) => {
+        if (!document.getElementById('root')) return;
+        document.documentElement.dataset.e2eDarkAtParse = String(
+          document.documentElement.classList.contains('dark'),
+        );
+        observer.disconnect();
+      }).observe(document, { childList: true, subtree: true });
+    });
+    const darkClass = () =>
+      page.evaluate(() => ({
+        now: document.documentElement.classList.contains('dark'),
+        atParse: document.documentElement.dataset.e2eDarkAtParse,
+      }));
+
+    await step('the theme follows the system setting by default', async () => {
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.reload();
+      await page.getByTestId('theme-switch').waitFor();
+      const dark = await darkClass();
+      if (!dark.now || dark.atParse !== 'true') {
+        throw new Error(`expected dark: ${JSON.stringify(dark)}`);
+      }
+      await page.emulateMedia({ colorScheme: 'light' });
+      await page.waitForFunction(
+        () => !document.documentElement.classList.contains('dark'),
+      );
+    });
+
+    await step(
+      'the dark choice is kept after reload, before render',
+      async () => {
+        await page.getByTestId('theme-switch').click();
+        await page
+          .getByRole('menuitemradio', { name: ui('ja', 'theme.dark') })
+          .click();
+        await page.waitForFunction(() =>
+          document.documentElement.classList.contains('dark'),
+        );
+        await page
+          .getByRole('button', {
+            name: `${ui('ja', 'theme.label')}: ${ui('ja', 'theme.dark')}`,
+          })
+          .waitFor();
+        await page.reload();
+        await page.getByTestId('theme-switch').waitFor();
+        const dark = await darkClass();
+        if (!dark.now || dark.atParse !== 'true') {
+          throw new Error(`expected dark: ${JSON.stringify(dark)}`);
+        }
+      },
+    );
+
+    await step('back to the system setting', async () => {
+      await page.getByTestId('theme-switch').click();
+      await page
+        .getByRole('menuitemradio', { name: ui('ja', 'theme.system') })
+        .click();
+      await page.waitForFunction(
+        () => !document.documentElement.classList.contains('dark'),
+      );
+      const stored = await page.evaluate(() =>
+        localStorage.getItem('goodnight-web.admin.theme'),
+      );
+      if (stored !== 'system') throw new Error(`stored ${stored}`);
     });
 
     await step('delete asks for confirmation, then removes it', async () => {

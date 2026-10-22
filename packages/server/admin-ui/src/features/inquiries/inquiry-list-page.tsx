@@ -73,7 +73,7 @@ const InquiryRow = ({ item }: { item: AdminSubmissionSummary }) => {
         to='/inquiries/$id'
         params={{ id: item.id }}
         data-testid='inquiry-row'
-        className='group flex gap-3 px-4 py-4 transition-colors outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset sm:gap-4 sm:px-6'
+        className='group flex gap-3 px-4 py-4 transition-colors outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset sm:gap-4 sm:px-6'
       >
         <span className='flex w-2 shrink-0 justify-center pt-2.5'>
           {unread ? (

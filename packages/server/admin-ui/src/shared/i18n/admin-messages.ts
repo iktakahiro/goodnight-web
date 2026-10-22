@@ -21,6 +21,11 @@ const en = {
   'language.ja': '日本語',
   'language.en': 'English',
 
+  'theme.label': 'Appearance',
+  'theme.system': 'Match the system',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
+
   'header.unread': 'Unread inquiries',
   'header.signedInAs': 'Signed in as {email}',
 
@@ -136,6 +141,11 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
 
   'language.ja': '日本語',
   'language.en': 'English',
+
+  'theme.label': '表示モード',
+  'theme.system': 'システムに合わせる',
+  'theme.light': 'ライト',
+  'theme.dark': 'ダーク',
 
   'header.unread': '未読のお問い合わせ',
   'header.signedInAs': '{email} でログイン中',

@@ -207,6 +207,14 @@ const setLocale = async (page: Page, locale: 'ja' | 'en') => {
   await page.reload();
 };
 
+const setTheme = async (page: Page, theme: 'light' | 'dark') => {
+  await page.evaluate(
+    (value) => localStorage.setItem('goodnight-web.admin.theme', value),
+    theme,
+  );
+  await page.reload();
+};
+
 const main = async () => {
   await mkdir(outDir, { recursive: true });
   await buildPackage();
@@ -258,6 +266,12 @@ const main = async () => {
       .waitFor();
     await shoot(page, 'admin-login-en.png');
     await setLocale(page, 'ja');
+    await setTheme(page, 'dark');
+    await page
+      .getByRole('button', { name: ui('ja', 'admin.signIn') })
+      .waitFor();
+    await shoot(page, 'admin-login-ja-dark.png');
+    await setTheme(page, 'light');
     await page.getByRole('button', { name: ui('ja', 'admin.signIn') }).click();
     await page.waitForURL(`${base}/admin`);
 
@@ -266,7 +280,13 @@ const main = async () => {
     await setLocale(page, 'en');
     await page.getByTestId('inquiry-row').first().waitFor();
     await shoot(page, 'admin-list-en.png');
+    await setTheme(page, 'dark');
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-en-dark.png');
     await setLocale(page, 'ja');
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-ja-dark.png');
+    await setTheme(page, 'light');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByTestId('inquiry-row').first().waitFor();
     await shoot(page, 'admin-list-mobile-ja.png');
@@ -280,6 +300,10 @@ const main = async () => {
     await page.goto(`${base}/admin/inquiries/${samples[0]?.id}`);
     await page.getByTestId('inquiry-body').waitFor();
     await shoot(page, 'admin-detail-ja.png');
+    await setTheme(page, 'dark');
+    await page.getByTestId('inquiry-body').waitFor();
+    await shoot(page, 'admin-detail-ja-dark.png');
+    await setTheme(page, 'light');
 
     // Restart without TURNSTILE_SECRET: the contact form closes and the
     // admin UI shows the setup notice.

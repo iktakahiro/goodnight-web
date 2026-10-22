@@ -17,7 +17,7 @@ export const AlertDialogContent = ({
   ...props
 }: ComponentProps<typeof BaseAlertDialog.Popup>) => (
   <BaseAlertDialog.Portal>
-    <BaseAlertDialog.Backdrop className='fixed inset-0 z-40 min-h-dvh bg-[hsl(258_30%_20%/0.28)] backdrop-blur-[2px] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute' />
+    <BaseAlertDialog.Backdrop className='fixed inset-0 z-40 min-h-dvh bg-overlay/35 dark:bg-overlay/65 backdrop-blur-[2px] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute' />
     <BaseAlertDialog.Popup
       className={cn(
         'fixed top-1/2 left-1/2 z-50 flex w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-2xl shadow-primary/15 outline-none transition-[scale,opacity] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 sm:p-7',

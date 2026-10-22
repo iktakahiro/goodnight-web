@@ -8,7 +8,7 @@ const noticeVariants = cva(
     variants: {
       tone: {
         warning:
-          'border-warning-border bg-warning-soft text-warning-foreground [&>svg]:text-amber-600',
+          'border-warning-border bg-warning-soft text-warning-foreground [&>svg]:text-warning-icon',
         info: 'border-border bg-card/70 text-muted-foreground [&>svg]:text-primary',
         error:
           'border-destructive/25 bg-destructive-soft text-destructive [&>svg]:text-destructive',
