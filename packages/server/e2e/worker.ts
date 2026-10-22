@@ -4,6 +4,7 @@
 // "contact" action, and any other token fails.
 import { createGoodnightWorker } from '../src/index.ts';
 import { TURNSTILE_SITEVERIFY_URL } from '../src/features/contact/turnstile.ts';
+import { e2eCategories } from './categories.ts';
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (
@@ -26,10 +27,6 @@ globalThis.fetch = (async (
 export default createGoodnightWorker({
   locale: 'en',
   contact: {
-    categories: [
-      { value: 'sales', label: { ja: '製品・料金について', en: 'Sales' } },
-      { value: 'press', label: { ja: '取材・メディア', en: 'Press' } },
-      { value: 'other', label: { ja: 'その他', en: 'Other' } },
-    ],
+    categories: e2eCategories,
   },
 });

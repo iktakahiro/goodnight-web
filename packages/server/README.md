@@ -42,7 +42,9 @@ API answers 503 until Turnstile is set up.
 The contact form uses `@goodnight-web/server/client` (`getContactConfig()`,
 `submitContact()`) and, for client-side checks, the schema in
 `@goodnight-web/server/contact`. Japanese and English strings are in
-`@goodnight-web/server/messages`.
+`@goodnight-web/server/messages`. The admin UI strings, as JSON, are in
+`@goodnight-web/server/admin-messages.json`; a site's end-to-end test reads
+button names and headings from it.
 
 See `docs/architecture.md` in the repository for the request flows and the
 security rules.
@@ -56,12 +58,14 @@ form uses the exported `setupInputSchema`), and TanStack Table (the inquiry
 list, with server-side pagination; the order is fixed to newest first because
 the admin API has no other sort). It does not use TanStack Start.
 `bun run build` builds it and embeds it in
-`src/features/admin-ui/admin-files.gen.ts`, which is not committed. Run the
+`src/features/admin-ui/admin-files.gen.ts`, and writes the admin UI strings
+to `src/features/admin-ui/admin-messages.gen.json`. Neither file is
+committed. Run the
 build before `type-check` or `test` when you call them directly in this
 directory (Turborepo does it for you from the repository root).
 
 ```sh
-bun run build        # builds admin-ui/ and writes admin-files.gen.ts
+bun run build        # builds admin-ui/ and writes the two .gen files
 bun run test         # unit and HTTP tests (in-memory D1 stand-in) and admin UI unit tests
 bun run test:e2e     # wrangler dev + the admin UI in Chromium with passkeys; needs `bunx playwright install chromium`
 bun run screenshots <dir>  # admin UI screenshots with fictional sample data

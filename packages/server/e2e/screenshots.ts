@@ -17,6 +17,7 @@ import {
   queryDatabase,
   startDevServer,
   testVars,
+  ui,
 } from './support.ts';
 
 const outDir = resolve(process.argv[2] ?? join(packageDir, '.screenshots'));
@@ -228,28 +229,36 @@ const main = async () => {
     const { base } = server;
 
     await page.goto(`${base}/admin/setup`);
-    await page.getByLabel('メールアドレス').waitFor();
-    await page.getByLabel('メールアドレス').fill(ADMIN_EMAIL);
-    await page.getByLabel('セットアップトークン').fill(SETUP_TOKEN);
-    await page.getByLabel('メールアドレス').focus();
+    await page.getByLabel(ui('ja', 'admin.setup.email')).waitFor();
+    await page.getByLabel(ui('ja', 'admin.setup.email')).fill(ADMIN_EMAIL);
+    await page.getByLabel(ui('ja', 'admin.setup.token')).fill(SETUP_TOKEN);
+    await page.getByLabel(ui('ja', 'admin.setup.email')).focus();
     await shoot(page, 'admin-setup-ja.png');
-    await page.getByLabel('お名前').fill('管理者');
-    await page.getByRole('button', { name: '次へ' }).click();
-    await page.getByRole('button', { name: 'パスキーを登録' }).click();
-    await page.getByRole('button', { name: 'お問い合わせ一覧を開く' }).click();
+    await page.getByLabel(ui('ja', 'admin.setup.name')).fill('管理者');
+    await page
+      .getByRole('button', { name: ui('ja', 'setup.continue') })
+      .click();
+    await page
+      .getByRole('button', { name: ui('ja', 'admin.setup.registerPasskey') })
+      .click();
+    await page
+      .getByRole('button', { name: ui('ja', 'setup.goToList') })
+      .click();
 
     await insertSamples();
 
-    await page.getByRole('button', { name: 'ログアウト' }).click();
-    await page.getByRole('button', { name: 'パスキーでログイン' }).waitFor();
+    await page.getByRole('button', { name: ui('ja', 'admin.signOut') }).click();
+    await page
+      .getByRole('button', { name: ui('ja', 'admin.signIn') })
+      .waitFor();
     await shoot(page, 'admin-login-ja.png');
     await setLocale(page, 'en');
     await page
-      .getByRole('button', { name: 'Sign in with a passkey' })
+      .getByRole('button', { name: ui('en', 'admin.signIn') })
       .waitFor();
     await shoot(page, 'admin-login-en.png');
     await setLocale(page, 'ja');
-    await page.getByRole('button', { name: 'パスキーでログイン' }).click();
+    await page.getByRole('button', { name: ui('ja', 'admin.signIn') }).click();
     await page.waitForURL(`${base}/admin`);
 
     await page.getByTestId('inquiry-row').first().waitFor();
