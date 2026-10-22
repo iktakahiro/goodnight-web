@@ -162,10 +162,7 @@ const ListSkeleton = () => (
 const stickyClass = (id: string, scrolled: boolean): string | undefined => {
   if (id === 'received_at') return 'md:sticky md:left-0 md:z-10';
   if (id === 'email') {
-    return cn(
-      'md:sticky md:z-10',
-      scrolled && 'md:shadow-[8px_0_8px_-6px_hsl(258_40%_40%/0.16)]',
-    );
+    return cn('md:sticky md:z-10', scrolled && 'md:shadow-(--shadow-sticky)');
   }
   return undefined;
 };
@@ -191,7 +188,7 @@ const SortHeader = ({ label, query }: { label: string; query: ListQuery }) => {
         next: asc ? t('list.sortNewest') : t('list.sortOldest'),
       })}
       data-testid='sort-received'
-      className='-mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 whitespace-nowrap outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/60'
+      className='-mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 whitespace-nowrap outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring'
     >
       {label}
       <Icon aria-hidden='true' className='size-3.5 text-foreground' />
@@ -482,7 +479,7 @@ export const InquiryListPage = () => {
             onClick={(event) => event.stopPropagation()}
             title={item.email}
             className={cn(
-              'block max-w-56 truncate rounded-sm outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/60',
+              'block max-w-56 truncate rounded-sm outline-none hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring',
               unread ? 'font-bold' : 'font-medium',
             )}
           >
@@ -502,7 +499,7 @@ export const InquiryListPage = () => {
       default: {
         const value = item.fields[id];
         if (!value) {
-          return <span className='text-muted-foreground/60'>—</span>;
+          return <span className='text-muted-foreground'>—</span>;
         }
         const column = fieldColumns.find((entry) => entry.id === id);
         const long = column?.type === 'textarea';
@@ -588,7 +585,7 @@ export const InquiryListPage = () => {
                           'min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-semibold tabular-nums',
                           view === 'spam'
                             ? 'bg-warning-soft text-warning-foreground'
-                            : 'bg-primary text-primary-foreground',
+                            : 'bg-primary text-primary-foreground in-data-active:bg-primary-foreground in-data-active:text-primary',
                         )}
                       >
                         {formatNumber(count, locale)}
@@ -627,7 +624,7 @@ export const InquiryListPage = () => {
               <Link
                 to='/'
                 search={listSearch({ view: 'spam' })}
-                className='rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+                className='rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
               >
                 {t('list.spamHintLink', {
                   count: formatNumber(counts?.spam ?? 0, locale),
@@ -867,7 +864,7 @@ export const InquiryListPage = () => {
                   <div
                     aria-hidden='true'
                     className={cn(
-                      'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-foreground/10 to-transparent transition-opacity md:hidden',
+                      'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-card to-transparent transition-opacity md:hidden',
                       edges.before ? 'opacity-100' : 'opacity-0',
                     )}
                   />
@@ -876,7 +873,7 @@ export const InquiryListPage = () => {
                     data-testid='inquiry-table-more'
                     data-visible={edges.after}
                     className={cn(
-                      'pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-foreground/10 to-transparent transition-opacity',
+                      'pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-card to-transparent transition-opacity',
                       edges.after ? 'opacity-100' : 'opacity-0',
                     )}
                   />

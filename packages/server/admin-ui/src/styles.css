@@ -70,6 +70,8 @@
 
   --shadow-soft:
     0 1px 2px rgb(17 17 19 / 0.05), 0 4px 16px rgb(17 17 19 / 0.06);
+  /* The edge of the sticky table columns while the table is scrolled. */
+  --shadow-sticky: 8px 0 8px -6px rgb(17 17 19 / 0.16);
 }
 
 @layer base {
@@ -123,6 +125,7 @@
     --color-table-row-hover: #232327;
     --color-table-row-unread: #221e30;
     --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.35);
+    --shadow-sticky: 8px 0 10px -6px rgb(0 0 0 / 0.6);
   }
 
   *,

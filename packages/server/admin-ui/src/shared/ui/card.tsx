@@ -5,7 +5,7 @@ import { cn } from './cn.ts';
 export const Card = ({ className, ...props }: ComponentProps<'div'>) => (
   <div
     className={cn(
-      'rounded-2xl border border-border/80 bg-card text-card-foreground shadow-soft',
+      'rounded-2xl border border-border/80 bg-card text-card-foreground shadow-(--shadow-soft)',
       className,
     )}
     {...props}

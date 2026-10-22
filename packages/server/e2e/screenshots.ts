@@ -356,6 +356,13 @@ const main = async () => {
     await page.goto(`${base}/admin/inquiries/${spamSample?.id}`);
     await page.getByTestId('spam-notice').waitFor();
     await shoot(page, 'admin-detail-spam-ja.png');
+    await setTheme(page, 'dark');
+    await page.getByTestId('spam-notice').waitFor();
+    await shoot(page, 'admin-detail-spam-ja-dark.png');
+    await page.goto(`${base}/admin?view=spam`);
+    await page.getByTestId('inquiry-row').first().waitFor();
+    await shoot(page, 'admin-list-spam-ja-dark.png');
+    await setTheme(page, 'light');
     await page.goto(`${base}/admin`);
     await page.getByTestId('inquiry-row').first().waitFor();
     await setLocale(page, 'en');
@@ -421,6 +428,16 @@ const main = async () => {
       await page.goto(`${base}/admin/inquiries/${customId}`);
       await page.getByText('80 万円前後').waitFor();
       await shootFull(page, join(formDir, 'detail-custom-field-ja-dark.png'));
+      // A narrow window, scrolled sideways: the sticky columns, their
+      // shadow, and the edge fade on the dark surfaces.
+      await page.setViewportSize({ width: 820, height: 800 });
+      await page.goto(`${base}/admin`);
+      await page.getByTestId('inquiry-row').first().waitFor();
+      await page
+        .getByTestId('inquiry-table-scroll')
+        .evaluate((element) => element.scrollBy({ left: 160 }));
+      await shoot(page, 'admin-list-scrolled-ja-dark.png');
+      await page.setViewportSize({ width: 1280, height: 800 });
     }
 
     // Restart without TURNSTILE_SECRET: the contact form closes and the

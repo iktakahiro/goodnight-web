@@ -17,7 +17,7 @@ export const DialogContent = ({
   ...props
 }: ComponentProps<typeof BaseDialog.Popup>) => (
   <BaseDialog.Portal>
-    <BaseDialog.Backdrop className='fixed inset-0 z-40 min-h-dvh bg-foreground/30 backdrop-blur-[2px] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute' />
+    <BaseDialog.Backdrop className='fixed inset-0 z-40 min-h-dvh bg-overlay/35 dark:bg-overlay/65 backdrop-blur-[2px] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute' />
     <BaseDialog.Popup
       className={cn(
         'fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[36rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-2xl shadow-primary/15 outline-none transition-[scale,opacity] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 sm:p-7',

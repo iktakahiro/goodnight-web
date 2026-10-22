@@ -246,14 +246,14 @@ const AnswerRow = ({
             href={text}
             target='_blank'
             rel='noopener noreferrer nofollow'
-            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
           >
             {text}
           </a>
         ) : entry.type === 'tel' ? (
           <a
             href={`tel:${text}`}
-            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+            className='rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
           >
             {text}
           </a>
@@ -487,7 +487,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                 <a
                   href={`mailto:${item.email}`}
                   data-testid='inquiry-email'
-                  className='rounded-sm break-all text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60'
+                  className='rounded-sm break-all text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
                 >
                   {item.email}
                 </a>

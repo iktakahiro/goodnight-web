@@ -25,7 +25,7 @@ const NavLink = ({
     aria-current={active ? 'page' : undefined}
     data-testid={`nav-${to === '/' ? 'inquiries' : 'form'}`}
     className={cn(
-      'inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/60 sm:px-3',
+      'inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring sm:px-3',
       active
         ? 'bg-accent text-accent-foreground'
         : 'text-muted-foreground hover:bg-muted hover:text-foreground',

@@ -73,6 +73,19 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['ring', 'background', UI],
   ['primary', 'accent', TEXT],
   ['logo-moon', 'logo-tile', UI],
+  // The unread count in the selected list tab swaps the primary colors.
+  ['primary', 'primary-foreground', TEXT],
+  // The inquiry table: text and the unread dot on the opaque header and row
+  // backgrounds that the sticky columns use.
+  ['muted-foreground', 'table-header', TEXT],
+  ['foreground', 'table-header', TEXT],
+  ['foreground', 'table-row-hover', TEXT],
+  ['muted-foreground', 'table-row-hover', TEXT],
+  ['primary', 'table-row-hover', TEXT],
+  ['foreground', 'table-row-unread', TEXT],
+  ['muted-foreground', 'table-row-unread', TEXT],
+  ['primary', 'table-row-unread', TEXT],
+  ['ring', 'table-row-unread', UI],
 ];
 
 describe('admin theme contrast (WCAG AA)', () => {
