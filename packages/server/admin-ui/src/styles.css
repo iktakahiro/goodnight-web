@@ -53,10 +53,9 @@
   --color-info-border: #d7c3f4;
   --color-info-foreground: #5d309c;
   /* The logo (features/layout/logo-mark.tsx), as in brand/: moon and cat,
-     pillow, the eyes and toes, and the two wordmark words. */
+     pillow, and the two wordmark words. The eyes are cut-outs. */
   --color-logo-mark: #743bc4;
   --color-logo-pillow: #e4d8fb;
-  --color-logo-eyes: #e4d8fb;
   --color-logo-wordmark: #341065;
   --color-logo-accent: #743bc4;
   --color-glow: #ffffff;
@@ -122,7 +121,6 @@
     --color-info-foreground: #ddd1ff;
     --color-logo-mark: #ffffff;
     --color-logo-pillow: #bfabfc;
-    --color-logo-eyes: #111113;
     --color-logo-wordmark: #ffffff;
     --color-logo-accent: #bfabfc;
     --color-glow: #19191c;

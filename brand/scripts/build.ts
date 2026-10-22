@@ -1,5 +1,6 @@
 /**
- * Builds the brand files from the geometry in `logo.ts`: writes the SVGs to
+ * Builds the brand files from the masters in `brand/masters/` (read by
+ * `logo.ts`): writes the SVGs to
  * `brand/`, renders the PNG and ICO files to `brand/png/`, copies the favicon
  * and lockup files into the admin UI and the docs site, and writes the admin
  * UI's inline logo shapes (`logo-shapes.gen.ts`).
@@ -112,13 +113,12 @@ await write(
     '/** viewBox of the lockup: the symbol and the wordmark. */\n' +
     `export const LOCKUP_VIEW_BOX = '${lockupViewBox()}';\n\n` +
     '/**\n' +
-    ' * The lockup paths, back to front. The symbol is every shape before the\n' +
-    ' * `goodnight` and `web` wordmark shapes. `line` is a round-capped stroke\n' +
-    ' * width; `outline` is a pillow-coloured outline drawn under the fill.\n' +
+    ' * The lockup paths, back to front. The symbol is the `pillow` and `mark`\n' +
+    ' * shapes; the eyes and the line around the pillow are holes in `mark`.\n' +
     ' */\n' +
     `export const LOGO_SHAPES: readonly {\n` +
-    `  role: 'moon' | 'cat' | 'pillow' | 'eyes' | 'goodnight' | 'web';\n` +
-    `  d: string;\n  line?: number;\n  outline?: number;\n}[] = ${JSON.stringify(lockupShapes(), null, 2)};\n`,
+    `  role: 'mark' | 'pillow' | 'goodnight' | 'web';\n` +
+    `  d: string;\n}[] = ${JSON.stringify(lockupShapes(), null, 2)};\n`,
 );
 
 console.log(written.join('\n'));

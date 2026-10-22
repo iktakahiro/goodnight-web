@@ -410,8 +410,9 @@ The UI does not use TanStack Start; the Worker serves the static build.
   `#root` is parsed.
 - **Logo.** The header and the sign-in screen draw the goodnight web logo
   as inline SVG from `features/layout/logo-shapes.gen.ts`, which
-  `brand/scripts/build.ts` generates from the same geometry as the files in
-  `brand/`. The `logo-*` tokens color it in each mode. The favicons and the
+  `brand/scripts/build.ts` generates from the masters in `brand/masters/`,
+  the same source as the files in `brand/`. The `logo-*` tokens color it in
+  each mode; the eyes are holes in the path and show the background. The favicons and the
   touch icon in `admin-ui/public` are copies of the files in `brand/`.
 - **CSP.** Every admin response gets the admin CSP
   (`default-src 'self'; script-src 'self'; style-src 'self'; ...`). The

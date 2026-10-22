@@ -73,9 +73,8 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['ring', 'background', UI],
   ['primary', 'accent', TEXT],
   // The logo on the page background: the mark as a graphic, the wordmark as
-  // text. The eyes are cut-outs in the pillow or background color.
+  // text. The eyes are cut-outs that show the background.
   ['logo-mark', 'background', UI],
-  ['logo-mark', 'logo-eyes', UI],
   ['logo-wordmark', 'background', TEXT],
   ['logo-accent', 'background', TEXT],
   // The unread count in the selected list tab swaps the primary colors.
