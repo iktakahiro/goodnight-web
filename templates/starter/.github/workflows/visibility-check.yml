@@ -1,0 +1,42 @@
+# Fails when this repository is public. A company site repository should be
+# private: it holds your settings and drafts, and a public copy invites pull
+# requests from strangers.
+name: Visibility check
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  private-repository:
+    # The public goodnight-web starter that sites are copied from is the only
+    # repository allowed to be public.
+    if: github.repository != 'iktakahiro/goodnight-web-starter'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check that the repository is private
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$REPOSITORY_PRIVATE" = "true" ]; then
+            echo "The repository is private. / リポジトリは非公開（private）です。"
+            exit 0
+          fi
+
+          en="This repository is public. Anyone can read it. Make it private: Settings > General > Danger Zone > Change visibility > Private."
+          ja="このリポジトリは公開（public）になっています。誰でも中身を見られます。非公開にしてください: Settings > General > Danger Zone > Change visibility > Private"
+
+          echo "::error title=Public repository / 公開リポジトリ::${ja} / ${en}"
+          {
+            echo "## ⚠️ このリポジトリは公開されています"
+            echo
+            echo "$ja"
+            echo
+            echo "## ⚠️ This repository is public"
+            echo
+            echo "$en"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

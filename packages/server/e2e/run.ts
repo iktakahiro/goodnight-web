@@ -7,8 +7,9 @@
 // .wrangler/e2e-state, so it does not touch other local databases.
 //
 // Covers: contact POST -> row in D1; then the real admin UI: first-admin
-// setup with wrong and right input -> passkey registration (CDP virtual
-// authenticator) -> sign-out -> passkey sign-in -> list -> detail -> status
+// setup with empty, wrong, and right input -> passkey registration (CDP
+// virtual authenticator) -> sign-out -> passkey sign-in -> list (URL search
+// parameters, not-found) -> detail -> status
 // change -> Slack-style deep link while signed out -> language switch ->
 // delete with confirmation. Also checks the API rules the UI relies on, and
 // that the UI runs under the admin CSP without violations.
@@ -204,6 +205,13 @@ const main = async () => {
       await page.getByLabel('Email address').fill(email);
       await page.getByRole('button', { name: 'Continue' }).click();
     };
+    await step('setup checks the fields before sending', async () => {
+      await page.getByRole('button', { name: 'Continue' }).click();
+      await page.getByText('Required.').nth(1).waitFor();
+      await page.getByLabel('Email address').fill('not-an-address');
+      await page.getByText('Check this field.').waitFor();
+      await page.getByLabel('Email address').fill('');
+    });
     await step('setup shows the wrong-token error', async () => {
       await submitSetup('wrong-token', ADMIN_EMAIL);
       await page.getByText('The setup token is not correct.').waitFor();
@@ -275,6 +283,23 @@ const main = async () => {
       await row.getByText('New').waitFor();
       await row.getByText('Sales', { exact: true }).waitFor();
       await row.getByText('Hello from the end-to-end test.').waitFor();
+    });
+
+    await step('an invalid list URL falls back to the defaults', async () => {
+      await page.goto(`${base}/admin?status=deleted&page=abc`);
+      await page.getByRole('tab', { name: 'All', selected: true }).waitFor();
+      await page.getByTestId('inquiry-row').first().waitFor();
+    });
+    await step('the status tab is kept in the URL', async () => {
+      await page.getByRole('tab', { name: 'New' }).click();
+      await page.waitForURL(`${base}/admin?status=new`);
+      await page.getByTestId('inquiry-row').first().waitFor();
+    });
+    await step('an unknown admin path shows not found', async () => {
+      await page.goto(`${base}/admin/nope`);
+      await page.getByRole('heading', { name: 'Page not found' }).waitFor();
+      await page.getByRole('link', { name: 'Back to inquiries' }).click();
+      await page.waitForURL(`${base}/admin`);
     });
 
     await step('a row opens the detail, which marks it read', async () => {

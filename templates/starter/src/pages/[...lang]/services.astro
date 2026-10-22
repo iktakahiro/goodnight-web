@@ -1,0 +1,128 @@
+---
+import PageHeader from '../../components/site/page-header.astro';
+import Button from '../../components/ui/button.astro';
+import Card from '../../components/ui/card.astro';
+import SectionHeading from '../../components/ui/section-heading.astro';
+import BaseLayout from '../../layouts/base-layout.astro';
+import {
+  localeFromParam,
+  localeStaticPaths,
+  localizePath,
+} from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+
+export const getStaticPaths = localeStaticPaths;
+
+const locale = localeFromParam(Astro.params.lang);
+
+const text = {
+  ja: {
+    title: 'サービス',
+    lead: '家具の製作、修理、店舗内装の設計を行っています。どれも1点からご相談いただけます。',
+    services: [
+      {
+        title: '家具の製作',
+        body: 'カウンター、陳列棚、テーブル、ベンチなどを、お店やオフィスに合わせてつくります。材料は国産の広葉樹を中心に、ご予算に合わせてご提案します。',
+        points: ['採寸とご提案は無料', '製作期間の目安は1〜2か月', '納品後1年間の無償点検'],
+      },
+      {
+        title: '修理と張り替え',
+        body: 'ぐらつき、きしみ、割れの修理と、椅子の座面の張り替え、テーブルの塗り直しを行います。他社でつくられた家具もお受けします。',
+        points: ['写真でのお見積もりが可能', '店舗の定休日に合わせた引き取り', '同じ椅子のまとめての張り替え'],
+      },
+      {
+        title: '店舗内装の設計',
+        body: '家具の配置、照明、床材、サインまで、開店や改装の準備をまとめてお手伝いします。施工は地元の協力会社と行います。',
+        points: ['平面図とイメージ図の作成', '工事の日程調整', '開店後の家具の追加や修理'],
+      },
+    ],
+    flowTitle: 'ご依頼の流れ',
+    flow: [
+      { title: 'お問い合わせ', body: 'フォームからご相談内容をお送りください。' },
+      { title: 'ご相談・採寸', body: 'お店に伺い、使い方とご予算をお聞きします。' },
+      { title: 'お見積もり', body: '図面とお見積もりをお出しします。' },
+      { title: '製作・納品', body: '工房で製作し、設置まで行います。' },
+    ],
+  },
+  en: {
+    title: 'Services',
+    lead: 'We make furniture, repair it, and design shop interiors. You can ask us about a single piece.',
+    services: [
+      {
+        title: 'Custom furniture',
+        body: 'Counters, display shelves, tables, and benches made for your shop or office. We mainly use Japanese hardwood and suggest materials that fit your budget.',
+        points: ['Free measurement and proposal', 'Usually one to two months to make', 'Free inspection for one year after delivery'],
+      },
+      {
+        title: 'Repair and reupholstery',
+        body: 'We fix wobbling, creaking, and cracks, replace seat fabric, and refinish tables. We also repair furniture made by other companies.',
+        points: ['Estimates from photos', 'Pickup on your closing day', 'Reupholstery for sets of the same chair'],
+      },
+      {
+        title: 'Shop interior design',
+        body: 'We help you prepare for opening or renovation, from furniture layout to lighting, flooring, and signs. Construction is done with local partner companies.',
+        points: ['Floor plans and visual drafts', 'Scheduling the construction work', 'Additional furniture and repairs after opening'],
+      },
+    ],
+    flowTitle: 'How it works',
+    flow: [
+      { title: 'Contact us', body: 'Send us your request through the form.' },
+      { title: 'Meeting and measuring', body: 'We visit your shop and ask how you will use the furniture and what your budget is.' },
+      { title: 'Estimate', body: 'We send you drawings and an estimate.' },
+      { title: 'Making and delivery', body: 'We make the furniture in our workshop and install it.' },
+    ],
+  },
+}[locale];
+---
+
+<BaseLayout locale={locale} title={text.title} description={text.lead} path='/services/'>
+  <PageHeader eyebrow='Services' title={text.title} lead={text.lead} />
+
+  <div class='mx-auto max-w-5xl space-y-16 px-5 pt-14 sm:px-8'>
+    <ul class='space-y-6'>
+      {
+        text.services.map((service, index) => (
+          <Card as='li' class='grid gap-6 md:grid-cols-[auto_1fr]'>
+            <span
+              aria-hidden='true'
+              class='grid size-14 place-items-center rounded-2xl bg-primary-soft text-lg font-bold text-primary-strong'
+            >
+              {String(index + 1).padStart(2, '0')}
+            </span>
+            <div class='space-y-4'>
+              <h2 class='text-xl font-bold sm:text-2xl'>{service.title}</h2>
+              <p class='text-muted'>{service.body}</p>
+              <ul class='flex flex-wrap gap-2'>
+                {service.points.map((point) => (
+                  <li class='rounded-full bg-primary-softer px-4 py-1.5 text-sm font-bold text-primary-strong ring-1 ring-border'>
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Card>
+        ))
+      }
+    </ul>
+
+    <section aria-labelledby='flow-title' class='space-y-8'>
+      <SectionHeading id='flow-title' title={text.flowTitle} />
+      <ol class='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+        {
+          text.flow.map((step, index) => (
+            <li class='rounded-card border border-border bg-card p-6'>
+              <p class='text-sm font-bold text-primary-strong'>
+                STEP {index + 1}
+              </p>
+              <h3 class='mt-1 text-lg font-bold'>{step.title}</h3>
+              <p class='mt-2 text-sm text-muted'>{step.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+      <Button href={localizePath(locale, '/contact/')} size='lg'>
+        {ui.contactUs[locale]}
+      </Button>
+    </section>
+  </div>
+</BaseLayout>

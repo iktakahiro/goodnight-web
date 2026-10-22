@@ -211,16 +211,39 @@ Base UI, shadcn-style components (the component source is copied into
 v4, and lucide icons. It ships prebuilt inside `@goodnight-web/server` and is
 served by the Worker ([0004](decisions/0004-admin-ui-delivery.md)).
 
-| Path                    | Screen                                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                              |
-| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                            |
-| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), 50 per page, CSV export; `?status=&page=` keep the state |
-| `/admin/inquiries/<id>` | Detail: message, contact details, status change, reply by email, delete with a confirmation dialog                        |
+The UI uses three TanStack libraries, all in the browser only:
 
-- **Session.** The list and detail screens first call `GET /api/admin/me`.
-  Without a session (401) they go to `/admin/setup` while setup is open, and
-  otherwise to `/admin/login?next=<path>`. After sign-in the user returns to
+- **TanStack Router** for typed, code-based routes under the basepath
+  `/admin` (`admin-ui/src/app-router.tsx`). The basepath is a URL rewrite
+  rather than the router's `basepath` option, which would write the list as
+  `/admin/`. There is no route generator, so the build is plain
+  `vite build`. Search parameters are validated with zod
+  schemas; a value that is not valid falls back to the default instead of
+  showing an error. Unknown paths show the not-found screen.
+- **TanStack Form** for the setup and sign-in forms. The setup form validates
+  with `setupInputSchema`, the same zod schema `POST /api/setup` uses (it is
+  exported from `@goodnight-web/server`). zod's English messages are not
+  shown; the UI maps each error to `field.required`, `field.invalid`, or
+  `field.too_long` in the UI's language.
+- **TanStack Table** (headless) for the inquiry list. Pagination and sorting
+  are manual: the API returns one page of 50, sorted by received date, newest
+  first. The API has no other order, so the sort is fixed. The rows keep
+  their list design (one link per inquiry) instead of a `<table>`.
+
+The UI does not use TanStack Start; the Worker serves the static build.
+
+| Path                    | Screen                                                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/admin/setup`          | First admin: setup token and email (`POST /api/setup`), then passkey registration, then done                                            |
+| `/admin/login`          | Passkey sign-in: a button, and passkey autofill (conditional UI) where the browser supports it                                          |
+| `/admin`                | Inquiry list: status tabs (all, new, read, done, on hold, spam), 50 per page, newest first, CSV export; `?status=&page=` keep the state |
+| `/admin/inquiries/<id>` | Detail: message, contact details, status change, reply by email, delete with a confirmation dialog                                      |
+
+- **Session.** Before the list or detail screen loads, a route guard (the
+  router's `beforeLoad`) calls `GET /api/admin/me` and remembers the admin
+  until sign-out or a 401. Without a session (401) it redirects to
+  `/admin/setup` while setup is open, and otherwise to
+  `/admin/login?next=<path>`. After sign-in the user returns to
   `next`, so the link in a Slack notification (`/admin/inquiries/<id>`) works
   when signed out. `next` must be an `/admin` path. A session without a
   passkey (403 `passkey_required`) goes to the passkey step of setup. There
@@ -253,9 +276,9 @@ served by the Worker ([0004](decisions/0004-admin-ui-delivery.md)).
   `src/features/admin-ui/admin-files.gen.ts` (path, content type, ETag,
   body). The generated file is not committed. Turborepo builds it before
   `type-check`, `test`, and `deploy:check` of the server package. The bundle
-  is one JS file of about 190 kB gzip and one CSS file of about 8 kB gzip.
+  is one JS file of about 260 kB gzip and one CSS file of about 8 kB gzip.
   With it, `deploy:check` reports the server's test Worker at about
-  2,750 KiB (610 KiB gzip).
+  2,990 KiB (680 KiB gzip).
 - **Serving.** `/admin` and paths without a file extension return
   `index.html` (`no-cache`); `/admin/assets/*` are immutable; ETags give
   304s. The SPA shell loads without a session, but every data request needs
@@ -325,10 +348,15 @@ Entry points (`exports` in `packages/server/package.json`):
 **`templates/starter`** is the part users own: Astro pages, Markdown content in
 Content Collections (ja and en), `site.config.ts`, styles, a `src/worker.ts`
 of about three lines that calls `createGoodnightWorker()`, `wrangler.jsonc`,
-and `AGENTS.md` / `CLAUDE.md` that tell AI tools which files to edit.
+and `AGENTS.md` / `CLAUDE.md` that tell AI tools which files to edit. It also
+ships GitHub files: a Dependabot config, an Update check workflow that marks
+official `@goodnight-web/*` update pull requests, and a Visibility check
+workflow that fails while the repository is public. See
+[starter.md](starter.md).
 
 In this repository the starter depends on `@goodnight-web/server` through
-`workspace:*`. When the starter is copied out for users (planned for M2), that
+`workspace:*`. Its contact form uses `getContactConfig()` and
+`submitContact()` and gets the Turnstile site key from the config API. When the starter is copied out for users (planned for M2), that
 dependency is replaced with the published exact version.
 
 ## How updates reach users
@@ -337,7 +365,9 @@ dependency is replaced with the published exact version.
    it fixes a vulnerability).
 2. The starter ships a `.github/dependabot.yml` that groups `@goodnight-web/*`
    updates with a cooldown. Dependabot opens one pull request in the user's
-   repository. Security updates are not delayed by the cooldown.
+   repository. Security updates are not delayed by the cooldown. The
+   starter's Update check workflow comments whether the pull request is an
+   official update, and the starter's README tells users to merge only those.
 3. The user's CI or Workers Builds builds the pull request and shows a preview.
 4. The user merges the pull request. The deploy script runs
    `wrangler d1 migrations apply DB --remote && wrangler deploy`, so migrations
@@ -402,6 +432,12 @@ the Worker a token that can write to GitHub.
 - `bun test` also runs the admin UI's unit tests (`admin-ui/src/**/*.test.ts`):
   language detection, date and number formatting, routes and the `next`
   parameter, list query parsing, and the message catalogs.
+- `bun run test:e2e` in `templates/starter` runs the starter against
+  `wrangler dev` with Cloudflare's Turnstile test keys: pages, the
+  not-available state and 503, a form submission saved to D1, then the admin
+  UI in a real browser: setup, passkey registration, sign-out, passkey
+  sign-in, the inquiry in the list with its category label, the detail, and a
+  status change. See [starter.md](starter.md#end-to-end-test).
 - `deploy:check` for the server package runs `wrangler deploy --dry-run` on
   the e2e Worker to check that the package bundles for Workers.
 

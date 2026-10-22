@@ -1,0 +1,140 @@
+---
+/** The header with the company name, the navigation, and the language links. */
+import LanguageSwitcher from './language-switcher.astro';
+import { localizePath } from '../../i18n/locales';
+import { ui } from '../../i18n/ui';
+import { siteConfig, type Locale } from '../../../site.config';
+
+interface Props {
+  locale: Locale;
+  alternates: Partial<Record<Locale, string>>;
+  path: string;
+}
+
+const { locale, alternates, path } = Astro.props;
+
+function isCurrent(itemPath: string): boolean {
+  return path === itemPath || path.startsWith(itemPath);
+}
+---
+
+<header
+  class='sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md'
+>
+  <div
+    class='mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:gap-4 sm:px-8'
+  >
+    <a
+      href={localizePath(locale, '/')}
+      class='flex min-w-0 items-center gap-2.5 rounded-full font-bold text-foreground no-underline'
+    >
+      <span
+        aria-hidden='true'
+        class='grid size-9 shrink-0 place-items-center rounded-full bg-primary-soft text-primary-strong'
+      >
+        <svg viewBox='0 0 24 24' class='size-5' fill='currentColor'>
+          <path
+            d='M14.5 3.2a8.8 8.8 0 1 0 6.3 12.9 7 7 0 0 1-6.3-12.9Z'
+          ></path>
+        </svg>
+      </span>
+      <span class='text-[0.95rem] leading-snug sm:text-base'>
+        {siteConfig.company.name[locale]}
+      </span>
+    </a>
+
+    <nav aria-label={ui.mainNav[locale]} class='hidden lg:block'>
+      <ul class='flex items-center gap-1'>
+        {
+          siteConfig.nav.map((item) => (
+            <li>
+              <a
+                href={localizePath(locale, item.path)}
+                aria-current={isCurrent(item.path) ? 'page' : undefined}
+                class='block rounded-full px-4 py-2 text-[0.95rem] font-bold text-foreground/80 no-underline transition-colors hover:bg-primary-soft hover:text-primary-strong aria-[current=page]:bg-primary-soft aria-[current=page]:text-primary-strong'
+              >
+                {item.label[locale]}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div class='flex shrink-0 items-center gap-2'>
+      <LanguageSwitcher locale={locale} alternates={alternates} />
+      <button
+        type='button'
+        class='inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-card px-3.5 text-sm font-bold whitespace-nowrap lg:hidden'
+        aria-expanded='false'
+        aria-controls='mobile-nav'
+        data-menu-button
+        data-label-open={ui.menu[locale]}
+        data-label-close={ui.closeMenu[locale]}
+      >
+        <svg
+          aria-hidden='true'
+          viewBox='0 0 24 24'
+          class='size-4'
+          fill='none'
+          stroke='currentColor'
+          stroke-width='2'
+          stroke-linecap='round'
+        >
+          <path d='M4 7h16M4 12h16M4 17h16'></path>
+        </svg>
+        <span data-menu-label>{ui.menu[locale]}</span>
+      </button>
+    </div>
+  </div>
+
+  <nav
+    id='mobile-nav'
+    aria-label={ui.mainNav[locale]}
+    class='border-t border-border/70 px-5 pt-2 pb-5 sm:px-8 lg:hidden'
+    hidden
+  >
+    <ul class='mx-auto grid max-w-6xl gap-1'>
+      {
+        siteConfig.nav.map((item) => (
+          <li>
+            <a
+              href={localizePath(locale, item.path)}
+              aria-current={isCurrent(item.path) ? 'page' : undefined}
+              class='block rounded-xl px-4 py-3 font-bold no-underline hover:bg-primary-soft aria-[current=page]:bg-primary-soft aria-[current=page]:text-primary-strong'
+            >
+              {item.label[locale]}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</header>
+
+<script>
+  const button = document.querySelector<HTMLButtonElement>('[data-menu-button]');
+  const menu = document.getElementById('mobile-nav');
+  const label = button?.querySelector('[data-menu-label]');
+
+  function setOpen(open: boolean): void {
+    if (!button || !menu) return;
+    button.setAttribute('aria-expanded', String(open));
+    menu.hidden = !open;
+    if (label) {
+      label.textContent =
+        (open ? button.dataset.labelClose : button.dataset.labelOpen) ?? '';
+    }
+  }
+
+  button?.addEventListener('click', () => {
+    setOpen(button.getAttribute('aria-expanded') !== 'true');
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && button?.getAttribute('aria-expanded') === 'true') {
+      setOpen(false);
+      button.focus();
+    }
+  });
+</script>

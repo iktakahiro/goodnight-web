@@ -1,0 +1,22 @@
+# Dependabot opens pull requests that update the packages of this site.
+#
+# - goodnight-web updates (@goodnight-web/*) come in one pull request.
+# - The cooldown waits until a version has been public for 5 days. Security
+#   updates are not delayed.
+# - Merge only pull requests that have the "official goodnight-web update"
+#   comment from the Update check workflow. See README.md.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 5
+    groups:
+      goodnight-web:
+        patterns: ['@goodnight-web/*']
+      site-dependencies:
+        patterns: ['*']
+        exclude-patterns: ['@goodnight-web/*']
+        update-types: [minor, patch]

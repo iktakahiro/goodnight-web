@@ -68,7 +68,7 @@ openssl rand -base64 32
 
 ### Turnstile を設定する
 
-Turnstile のウィジェットを作り、サイトキーとシークレットキーを入れます。それまで、問い合わせフォームは「まだ利用できません」と表示し、送信を受け付けません。[Turnstile を設定する](/ja/docs/setup/turnstile/)の手順に従ってください。
+Turnstile のウィジェットを作り、サイトキーを `wrangler.jsonc`（`TURNSTILE_SITE_KEY`）に、シークレットキーをシークレット `TURNSTILE_SECRET` に入れます。それまで、問い合わせフォームは「まだ利用できません」と表示し、送信を受け付けません。[Turnstile を設定する](/ja/docs/setup/turnstile/)の手順に従ってください。
 
 </Step>
 

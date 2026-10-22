@@ -236,7 +236,7 @@ const main = async () => {
     await page.getByLabel('お名前').fill('管理者');
     await page.getByRole('button', { name: '次へ' }).click();
     await page.getByRole('button', { name: 'パスキーを登録' }).click();
-    await page.getByRole('button', { name: 'お問い合わせを開く' }).click();
+    await page.getByRole('button', { name: 'お問い合わせ一覧を開く' }).click();
 
     await insertSamples();
 

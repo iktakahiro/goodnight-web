@@ -1,5 +1,13 @@
 {
   "extends": "@goodnight-web/typescript-config/base.json",
-  "compilerOptions": { "types": ["bun"] },
-  "include": ["*.config.ts", "scripts/**/*.ts"]
+  "compilerOptions": {
+    "types": ["bun"],
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": [
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "templates/starter/.github/scripts/*"
+  ]
 }

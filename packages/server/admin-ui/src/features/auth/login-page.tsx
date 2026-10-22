@@ -1,8 +1,9 @@
+import { useForm } from '@tanstack/react-form';
+import { Link, getRouteApi, useRouter } from '@tanstack/react-router';
 import { KeyRound, Sparkles } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
-import { Link, navigate, useLocation } from '../../shared/router/router.tsx';
-import { safeNextPath } from '../../shared/router/routes.ts';
+import { safeNextPath, toRouterHref } from '../../shared/router/admin-paths.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import {
   Card,
@@ -23,8 +24,7 @@ import { AuthLayout } from '../layout/auth-layout.tsx';
 import { fetchMe, fetchSetupState } from './admin-api.ts';
 import { authClient } from './auth-client.ts';
 
-const currentNext = () =>
-  safeNextPath(new URLSearchParams(window.location.search).get('next'));
+const loginRoute = getRouteApi('/login');
 
 const supportsConditionalUi = async (): Promise<boolean> => {
   try {
@@ -46,18 +46,23 @@ const supportsConditionalUi = async (): Promise<boolean> => {
  */
 export const LoginPage = () => {
   const { t } = useI18n();
-  const { search } = useLocation();
-  const next = safeNextPath(search.get('next'));
-  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+  const next = safeNextPath(loginRoute.useSearch().next);
   const [failed, setFailed] = useState<'failed' | 'rate_limited' | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
+
+  const leave = () => {
+    router.options.context.session.forget();
+    void router.navigate({ href: toRouterHref(next), replace: true });
+  };
+  const leaveFromEffect = useEffectEvent(leave);
 
   useEffect(() => {
     let active = true;
     // Already signed in: skip this screen.
     fetchMe().then(
       () => {
-        if (active) navigate(currentNext(), { replace: true });
+        if (active) leaveFromEffect();
       },
       () => undefined,
     );
@@ -72,25 +77,28 @@ export const LoginPage = () => {
     void supportsConditionalUi().then(async (supported) => {
       if (!supported || !active) return;
       const result = await authClient.signIn.passkey({ autoFill: true });
-      if (active && !result.error) navigate(currentNext(), { replace: true });
+      if (active && !result.error) leaveFromEffect();
     });
     return () => {
       active = false;
     };
   }, []);
 
-  const signIn = async () => {
-    setBusy(true);
-    setFailed(null);
-    const result = await authClient.signIn.passkey();
-    setBusy(false);
-    if (result.error) {
-      // Sign-in requests are rate-limited per ip_hash (429).
-      setFailed(result.error.status === 429 ? 'rate_limited' : 'failed');
-      return;
-    }
-    navigate(next, { replace: true });
-  };
+  // The form has no fields to send: submitting it (the button or Enter in the
+  // account field) opens the browser's passkey prompt.
+  const form = useForm({
+    defaultValues: { username: '' },
+    onSubmit: async () => {
+      setFailed(null);
+      const result = await authClient.signIn.passkey();
+      if (result.error) {
+        // Sign-in requests are rate-limited per ip_hash (429).
+        setFailed(result.error.status === 429 ? 'rate_limited' : 'failed');
+        return;
+      }
+      leave();
+    },
+  });
 
   return (
     <AuthLayout>
@@ -105,56 +113,75 @@ export const LoginPage = () => {
           </CardTitle>
           <CardDescription>{t('login.lead')}</CardDescription>
         </CardHeader>
-        <CardContent className='flex flex-col gap-5'>
-          <Field>
-            <FieldLabel>{t('login.autofillLabel')}</FieldLabel>
-            <Input
-              name='username'
-              type='text'
-              autoComplete='username webauthn'
-              autoCapitalize='none'
-              spellCheck={false}
-            />
-            <FieldDescription>{t('login.autofillHint')}</FieldDescription>
-          </Field>
-          {failed ? (
-            <Notice
-              tone='error'
-              role='alert'
-              icon={<KeyRound aria-hidden='true' />}
-            >
-              <p>
-                {failed === 'rate_limited'
-                  ? t('error.rate_limited')
-                  : t('login.failed')}
+        <CardContent>
+          <form
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              void form.handleSubmit();
+            }}
+            className='flex flex-col gap-5'
+          >
+            <form.Field name='username'>
+              {(field) => (
+                <Field name={field.name}>
+                  <FieldLabel>{t('login.autofillLabel')}</FieldLabel>
+                  <Input
+                    type='text'
+                    autoComplete='username webauthn'
+                    autoCapitalize='none'
+                    spellCheck={false}
+                    value={field.state.value}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                  <FieldDescription>{t('login.autofillHint')}</FieldDescription>
+                </Field>
+              )}
+            </form.Field>
+            {failed ? (
+              <Notice
+                tone='error'
+                role='alert'
+                icon={<KeyRound aria-hidden='true' />}
+              >
+                <p>
+                  {failed === 'rate_limited'
+                    ? t('error.rate_limited')
+                    : t('login.failed')}
+                </p>
+              </Notice>
+            ) : null}
+            <form.Subscribe selector={(state) => state.isSubmitting}>
+              {(busy) => (
+                <Button type='submit' size='lg' disabled={busy}>
+                  {busy ? <Spinner /> : <KeyRound aria-hidden='true' />}
+                  {busy ? t('login.signingIn') : t('admin.signIn')}
+                </Button>
+              )}
+            </form.Subscribe>
+            {setupOpen ? (
+              <Notice
+                tone='info'
+                data-testid='setup-open'
+                icon={<Sparkles aria-hidden='true' />}
+              >
+                <p>
+                  {t('login.setupOpen')}{' '}
+                  <Link
+                    to='/setup'
+                    className='rounded-sm font-semibold text-primary underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/60'
+                  >
+                    {t('login.setupLink')}
+                  </Link>
+                </p>
+              </Notice>
+            ) : (
+              <p className='text-center text-[0.8125rem] leading-relaxed text-muted-foreground'>
+                {t('login.setupNote')}
               </p>
-            </Notice>
-          ) : null}
-          <Button size='lg' onClick={() => void signIn()} disabled={busy}>
-            {busy ? <Spinner /> : <KeyRound aria-hidden='true' />}
-            {busy ? t('login.signingIn') : t('admin.signIn')}
-          </Button>
-          {setupOpen ? (
-            <Notice
-              tone='info'
-              data-testid='setup-open'
-              icon={<Sparkles aria-hidden='true' />}
-            >
-              <p>
-                {t('login.setupOpen')}{' '}
-                <Link
-                  href='/admin/setup'
-                  className='rounded-sm font-semibold text-primary underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/60'
-                >
-                  {t('login.setupLink')}
-                </Link>
-              </p>
-            </Notice>
-          ) : (
-            <p className='text-center text-[0.8125rem] leading-relaxed text-muted-foreground'>
-              {t('login.setupNote')}
-            </p>
-          )}
+            )}
+          </form>
         </CardContent>
       </Card>
     </AuthLayout>

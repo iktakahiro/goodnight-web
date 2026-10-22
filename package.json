@@ -14,7 +14,7 @@
     "format": "bun --bun oxfmt --check .",
     "format:fix": "bun --bun oxfmt .",
     "type-check": "turbo run type-check && tsc -p tsconfig.json",
-    "test": "turbo run test",
+    "test": "turbo run test && bun test ./templates/starter/.github/scripts",
     "check:sql": "bun test ./scripts && bun scripts/check-sql.ts",
     "db:generate": "bun run --cwd packages/server db:generate",
     "db:check": "bun run --cwd packages/server db:check",

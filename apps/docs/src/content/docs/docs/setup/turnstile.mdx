@@ -41,11 +41,15 @@ To set the secret, open the Worker in the Cloudflare dashboard and add `TURNSTIL
 npx wrangler secret put TURNSTILE_SECRET
 ```
 
-<Callout type='warn' title='Draft / not verified yet'>
-  The server reads the site key from `TURNSTILE_SITE_KEY`. The starter is not
-  written yet, so where you set it in the starter (for example `vars` in
-  `wrangler.jsonc`) will be confirmed when the starter lands.
-</Callout>
+In the starter, the site key goes in `wrangler.jsonc`. Commit the change; the next deploy picks it up:
+
+```jsonc
+"vars": {
+  "TURNSTILE_SITE_KEY": "0x4AAAAAAA...",
+},
+```
+
+Set it only there. The contact page does not contain the key; it reads the key from the Worker. A value that you set only in the dashboard is replaced by the value in `wrangler.jsonc` on the next deploy, because `wrangler deploy` uploads the variables from the file.
 
 ## What the Worker checks
 
@@ -59,7 +63,7 @@ A token is valid for 300 seconds and can be verified only once ([Cloudflare: ser
 
 ## Local development
 
-For `wrangler dev`, use Cloudflare's test keys instead of real ones ([Cloudflare: testing](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)). This pair always passes:
+For `wrangler dev`, use Cloudflare's test keys instead of real ones ([Cloudflare: testing](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)). With this pair, the widget always passes and siteverify accepts every token:
 
 ```txt
 site key:   1x00000000000000000000AA
@@ -67,3 +71,15 @@ secret key: 1x0000000000000000000000000000000AA
 ```
 
 Do not use test keys on the live site; they let every request through.
+
+With the test secret key, siteverify answers with `hostname` set to `example.com` and no `action` (checked on 2026-10-22):
+
+```json
+{
+  "success": true,
+  "hostname": "example.com",
+  "metadata": { "result_with_testing_key": true }
+}
+```
+
+The Worker checks both fields, so it rejects a submission made with the test keys, and the form says that the check failed. This is on purpose: the production check does not change for local development. The starter's end-to-end test (`npm run test:e2e`) checks that this rejection happens. It then runs `e2e/worker.ts`, a test-only Worker that sets `hostname` and `action` to the expected values in answers marked `result_with_testing_key`, and submits the form through to D1. Never deploy that file.

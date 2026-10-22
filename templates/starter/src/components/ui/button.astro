@@ -1,0 +1,60 @@
+---
+/**
+ * A button or a link that looks like a button.
+ * Pass `href` to render a link; otherwise a `<button>` is rendered.
+ */
+import type { HTMLAttributes } from 'astro/types';
+
+type Variant = 'primary' | 'secondary' | 'outline' | 'ghost';
+type Size = 'sm' | 'md' | 'lg';
+
+type Props = (HTMLAttributes<'a'> | HTMLAttributes<'button'>) & {
+  variant?: Variant;
+  size?: Size;
+  href?: string;
+};
+
+const {
+  variant = 'primary',
+  size = 'md',
+  href,
+  class: className,
+  ...rest
+} = Astro.props;
+
+const base =
+  'inline-flex items-center justify-center gap-2 rounded-full font-bold transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50';
+
+const variants: Record<Variant, string> = {
+  primary:
+    'bg-primary text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary-strong',
+  secondary: 'bg-primary-soft text-primary-strong hover:bg-primary-ring/40',
+  outline:
+    'border border-border bg-card text-foreground hover:border-primary-ring hover:bg-primary-softer',
+  ghost: 'text-foreground hover:bg-primary-soft',
+};
+
+const sizes: Record<Size, string> = {
+  sm: 'min-h-9 px-4 text-sm',
+  md: 'min-h-11 px-6 text-[0.95rem]',
+  lg: 'min-h-13 px-8 text-base',
+};
+
+const classes = [base, variants[variant], sizes[size], className];
+---
+
+{
+  href ? (
+    <a href={href} class:list={classes} {...(rest as HTMLAttributes<'a'>)}>
+      <slot />
+    </a>
+  ) : (
+    <button
+      type='button'
+      class:list={classes}
+      {...(rest as HTMLAttributes<'button'>)}
+    >
+      <slot />
+    </button>
+  )
+}

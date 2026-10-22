@@ -22,6 +22,7 @@ description: One Worker with Static Assets and one D1 database serve the site, t
 | Turnstile                    | Cloudflare's bot check on the contact form. The Worker verifies each token on the server.                                                               |
 | Rate Limiting binding        | A Workers binding that limits contact submissions per `ip_hash`. It works on the free plan.                                                             |
 | Better Auth with passkeys    | Admin sign-in. Passkeys only; email and password sign-in is turned off.                                                                                 |
+| Admin UI                     | A React app (TanStack Router, Form, and Table) built with Vite. It ships prebuilt in `@goodnight-web/server`, and the Worker serves it.                 |
 | Slack webhook (optional)     | A short "new inquiry" message, with no personal data.                                                                                                   |
 | Cloudflare Access (optional) | An extra sign-in layer in front of `/admin/*` and `/api/admin/*`. Recommended, not required.                                                            |
 
