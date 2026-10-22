@@ -23,18 +23,26 @@
 //    stored in D1.
 //
 // Every secret is passed with --var, so a local .dev.vars does not change the
-// result. Set E2E_PORT to change the port (default 8841) and
-// E2E_SCREENSHOT_DIR to save screenshots.
+// result. Set E2E_PORT to change the port (default 8841),
+// E2E_SCREENSHOT_DIR to save screenshots, and E2E_DEBUG_DIR to save a
+// screenshot of each failed admin step and a Playwright trace of the admin
+// screen (trace.zip, open it with `npx playwright show-trace`).
+//
+// Button names and headings in the admin screen come from
+// @goodnight-web/server/admin-messages.json, and the contact categories from
+// site.config.ts, so wording changes do not break the test.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import adminMessages from '@goodnight-web/server/admin-messages.json' with { type: 'json' };
 import {
   chromium,
   type Browser,
   type BrowserContext,
   type Page,
 } from 'playwright';
+import { siteConfig } from '../site.config.ts';
 
 const siteDir = resolve(import.meta.dirname, '..');
 const stateDir = join(siteDir, '.wrangler/e2e-state');
@@ -42,6 +50,7 @@ const bin = (name: string) => join(siteDir, 'node_modules/.bin', name);
 const port = Number(process.env.E2E_PORT ?? '8841');
 const base = `http://localhost:${port}`;
 const screenshotDir = process.env.E2E_SCREENSHOT_DIR;
+const debugDir = process.env.E2E_DEBUG_DIR;
 
 // Cloudflare's public Turnstile test keys: the widget always passes, and
 // siteverify accepts every token.
@@ -63,6 +72,28 @@ const testTurnstile = {
   TURNSTILE_SECRET: TEST_SECRET,
 };
 
+/**
+ * An admin screen string from the catalog in @goodnight-web/server, with
+ * `{name}` placeholders filled. The test finds buttons and headings by these
+ * strings, so a package update that changes the wording does not break it.
+ */
+function ui(
+  locale: 'ja' | 'en',
+  key: keyof (typeof adminMessages)['en'],
+  params: Readonly<Record<string, string | number>> = {},
+): string {
+  return adminMessages[locale][key].replace(/\{(\w+)\}/g, (match, name) =>
+    String(params[name] ?? match),
+  );
+}
+
+// The test sends the first contact category in site.config.ts.
+const category = (() => {
+  const first = siteConfig.contactCategories[0];
+  if (!first) throw new Error('site.config.ts has no contact categories');
+  return first;
+})();
+
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown): void {
   if (!ok) failures++;
@@ -70,8 +101,12 @@ function check(name: string, ok: boolean, detail?: unknown): void {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${suffix}`);
 }
 
-/** Runs a browser step; a timeout or a missing element counts as a failure. */
+/**
+ * Runs a browser step on `page`; a timeout or a missing element counts as a
+ * failure.
+ */
 async function step(
+  page: Page,
   name: string,
   action: () => Promise<unknown>,
 ): Promise<void> {
@@ -80,6 +115,11 @@ async function step(
     check(name, true);
   } catch (error) {
     check(name, false, error instanceof Error ? error.message : String(error));
+    if (debugDir) {
+      const file = join(debugDir, `${failures}.png`);
+      await page.screenshot({ path: file, fullPage: true });
+      console.log(`  url: ${page.url()} screenshot: ${file}`);
+    }
   }
 }
 
@@ -189,7 +229,7 @@ async function screenshot(page: Page, name: string): Promise<void> {
 async function fillContactForm(page: Page, name: string): Promise<void> {
   await page.fill('#contact-name', name);
   await page.fill('#contact-email', 'visitor@example.org');
-  await page.selectOption('#contact-category', 'service');
+  await page.selectOption('#contact-category', category.value);
   await page.fill(
     '#contact-message',
     'テーブルの修理について相談したいです。\nHello from the end-to-end test.',
@@ -321,10 +361,17 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
     'empty form shows the validation message',
     await page.locator('[data-result="invalid"]').isVisible(),
   );
+  // The form takes its messages from data attributes (the text is in
+  // contact-form.astro), so compare with the attribute, not a fixed text.
+  const requiredText = await page.getAttribute(
+    '[data-contact]',
+    'data-message-required',
+  );
   check(
-    'empty name shows a Japanese field error',
-    (await page.locator('#contact-name-error').textContent()) ===
-      '入力してください。' &&
+    'empty name shows the field error',
+    Boolean(requiredText) &&
+      (await page.locator('#contact-name-error').textContent()) ===
+        requiredText &&
       (await page.getAttribute('#contact-name', 'aria-invalid')) === 'true',
   );
 
@@ -365,7 +412,7 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
     rows.length === 1 &&
       row?.name === 'E2E 訪問者' &&
       row.email === 'visitor@example.org' &&
-      row.category === 'service' &&
+      row.category === category.value &&
       row.status === 'new' &&
       row.page_path === '/contact/' &&
       String(row.body).startsWith('テーブルの修理'),
@@ -410,6 +457,9 @@ async function adminFlow(browser: Browser): Promise<void> {
     locale: 'ja-JP',
     viewport: { width: 1280, height: 800 },
   });
+  if (debugDir) {
+    await context.tracing.start({ screenshots: true, snapshots: true });
+  }
   // The virtual authenticator would also answer the sign-in screen's passkey
   // autofill. Turn autofill off so the test signs in with the button.
   await context.addInitScript(() => {
@@ -428,23 +478,38 @@ async function adminFlow(browser: Browser): Promise<void> {
   const [submission] = await query('SELECT id FROM submissions');
   const id = String(submission?.id);
   const row = page.getByTestId('inquiry-row').filter({ hasText: 'E2E 訪問者' });
+  const registerButton = page.getByRole('button', {
+    name: ui('ja', 'admin.setup.registerPasskey'),
+  });
 
-  await step('/admin sends a new site to setup (in Japanese)', async () => {
-    await page.goto(`${base}/admin`);
-    await page.waitForURL(`${base}/admin/setup`);
-    await page.getByRole('heading', { name: '最初の管理者を作成' }).waitFor();
-  });
-  await step('setup with SETUP_TOKEN and an ADMIN_EMAILS address', async () => {
-    await page.getByLabel('セットアップトークン').fill(SETUP_TOKEN);
-    await page.getByLabel('メールアドレス').fill(ADMIN_EMAIL);
-    await page.getByLabel('お名前').fill('管理者');
-    await page.getByRole('button', { name: '次へ' }).click();
-    await page.getByRole('button', { name: 'パスキーを登録' }).waitFor();
-  });
-  await step('register a passkey', async () => {
-    await page.getByRole('button', { name: 'パスキーを登録' }).click();
+  await step(
+    page,
+    '/admin sends a new site to setup (in Japanese)',
+    async () => {
+      await page.goto(`${base}/admin`);
+      await page.waitForURL(`${base}/admin/setup`);
+      await page
+        .getByRole('heading', { name: ui('ja', 'admin.setup.title') })
+        .waitFor();
+    },
+  );
+  await step(
+    page,
+    'setup with SETUP_TOKEN and an ADMIN_EMAILS address',
+    async () => {
+      await page.getByLabel(ui('ja', 'admin.setup.token')).fill(SETUP_TOKEN);
+      await page.getByLabel(ui('ja', 'admin.setup.email')).fill(ADMIN_EMAIL);
+      await page.getByLabel(ui('ja', 'admin.setup.name')).fill('管理者');
+      await page
+        .getByRole('button', { name: ui('ja', 'setup.continue') })
+        .click();
+      await registerButton.waitFor();
+    },
+  );
+  await step(page, 'register a passkey', async () => {
+    await registerButton.click();
     await page
-      .getByRole('heading', { name: 'セットアップが完了しました' })
+      .getByRole('heading', { name: ui('ja', 'setup.doneTitle') })
       .waitFor();
   });
   const stored = await credentials();
@@ -460,15 +525,22 @@ async function adminFlow(browser: Browser): Promise<void> {
   );
   check('setup is closed in D1', closed.length === 1, closed);
 
-  await step('setup leads to the list with 1 unread', async () => {
-    await page.getByRole('button', { name: 'お問い合わせを開く' }).click();
+  await step(page, 'setup leads to the list with 1 unread', async () => {
+    await page
+      .getByRole('button', { name: ui('ja', 'setup.goToList') })
+      .click();
     await page.waitForURL(`${base}/admin`);
-    await page.getByTestId('unread-count').getByText('未読 1 件').waitFor();
+    await page
+      .getByTestId('unread-count')
+      .getByText(ui('ja', 'admin.unreadCount', { count: 1 }))
+      .waitFor();
   });
-  await step('sign out', async () => {
-    await page.getByRole('button', { name: 'ログアウト' }).click();
+  await step(page, 'sign out', async () => {
+    await page.getByRole('button', { name: ui('ja', 'admin.signOut') }).click();
     await page.waitForURL(`${base}/admin/login`);
-    await page.getByRole('heading', { name: '管理画面にログイン' }).waitFor();
+    await page
+      .getByRole('heading', { name: ui('ja', 'login.title') })
+      .waitFor();
   });
   const signedOut = await page.evaluate(
     async () => (await fetch('/api/admin/submissions')).status,
@@ -479,17 +551,21 @@ async function adminFlow(browser: Browser): Promise<void> {
     signedOut,
   );
 
-  await step('sign in with the passkey', async () => {
-    await page.getByRole('button', { name: 'パスキーでログイン' }).click();
+  await step(page, 'sign in with the passkey', async () => {
+    await page.getByRole('button', { name: ui('ja', 'admin.signIn') }).click();
     await page.waitForURL(`${base}/admin`);
   });
   await step(
+    page,
     'the inquiry from the form is in the list with the Japanese category label',
     async () => {
       await row.waitFor();
-      await row.getByText('サービスについて', { exact: true }).waitFor();
+      await row.getByText(category.label.ja, { exact: true }).waitFor();
       await row.getByText('テーブルの修理について相談したいです。').waitFor();
-      await page.getByTestId('unread-count').getByText('未読 1 件').waitFor();
+      await page
+        .getByTestId('unread-count')
+        .getByText(ui('ja', 'admin.unreadCount', { count: 1 }))
+        .waitFor();
     },
   );
   if (screenshotDir) {
@@ -498,31 +574,46 @@ async function adminFlow(browser: Browser): Promise<void> {
     await screenshot(page, 'starter-admin-list-ja.png');
   }
 
-  await step('switch the admin screen to English', async () => {
-    await page.getByRole('button', { name: /^言語/ }).click();
-    await page.getByRole('menuitemradio', { name: 'English' }).click();
+  await step(page, 'switch the admin screen to English', async () => {
+    await page.getByTestId('language-switch').click();
+    await page
+      .getByRole('menuitemradio', { name: ui('en', 'language.en') })
+      .click();
     // A radio item keeps the menu open.
     await page.keyboard.press('Escape');
     await page.getByRole('menu').waitFor({ state: 'hidden' });
-    await page.getByRole('heading', { name: 'Inquiries' }).waitFor();
-    await row.getByText('Our services', { exact: true }).waitFor();
+    await page.getByRole('heading', { name: ui('en', 'list.title') }).waitFor();
+    await row.getByText(category.label.en, { exact: true }).waitFor();
   });
-  await step('open the detail, which marks the inquiry read', async () => {
-    await row.click();
-    await page.waitForURL(`${base}/admin/inquiries/${id}`);
-    await page.getByRole('heading', { name: 'E2E 訪問者' }).waitFor();
-    await page
-      .getByTestId('inquiry-body')
-      .getByText('Hello from the end-to-end test.')
-      .waitFor();
-    await page.getByText('Our services', { exact: true }).waitFor();
-    await page.getByTestId('status-select').getByText('Read').waitFor();
-    await page.getByTestId('unread-count').getByText('0 unread').waitFor();
-  });
-  await step('change the status to Done', async () => {
+  await step(
+    page,
+    'open the detail, which marks the inquiry read',
+    async () => {
+      await row.click();
+      await page.waitForURL(`${base}/admin/inquiries/${id}`);
+      await page.getByRole('heading', { name: 'E2E 訪問者' }).waitFor();
+      await page
+        .getByTestId('inquiry-body')
+        .getByText('Hello from the end-to-end test.')
+        .waitFor();
+      await page.getByText(category.label.en, { exact: true }).waitFor();
+      await page
+        .getByTestId('status-select')
+        .getByText(ui('en', 'status.read'))
+        .waitFor();
+      await page
+        .getByTestId('unread-count')
+        .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
+        .waitFor();
+    },
+  );
+  const statusChanged = page.getByText(
+    ui('en', 'detail.statusChanged', { status: ui('en', 'status.done') }),
+  );
+  await step(page, 'change the status to Done', async () => {
     await page.getByTestId('status-select').click();
-    await page.getByRole('option', { name: 'Done' }).click();
-    await page.getByText('Status changed to “Done”.').waitFor();
+    await page.getByRole('option', { name: ui('en', 'status.done') }).click();
+    await statusChanged.waitFor();
   });
   const status = await query(
     `SELECT status FROM submissions WHERE id = '${id}'`,
@@ -535,17 +626,20 @@ async function adminFlow(browser: Browser): Promise<void> {
   );
   if (screenshotDir) {
     // Wait for the toast to close so it does not cover the page.
-    await page
-      .getByText('Status changed to “Done”.')
+    await statusChanged
       .waitFor({ state: 'hidden', timeout: 10_000 })
       .catch(() => {});
     await screenshot(page, 'starter-admin-detail-en.png');
+  }
+  if (debugDir) {
+    await context.tracing.stop({ path: join(debugDir, 'trace.zip') });
   }
   await context.close();
 }
 
 async function main(): Promise<void> {
   if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
+  if (debugDir) await mkdir(debugDir, { recursive: true });
   await run(bin('astro'), ['build']);
   await rm(stateDir, { recursive: true, force: true });
   await run(bin('wrangler'), [

@@ -211,6 +211,14 @@ local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
    label), the detail (marks it read), and a status change to Done that is
    stored in D1. It fails on any CSP violation or page error in the admin UI.
 
-`E2E_SCREENSHOT_DIR` saves screenshots. The test needs
-`npx playwright install chromium` and network access to
-`challenges.cloudflare.com`. It is not run in CI.
+The admin steps find buttons and headings by role, with names from
+`@goodnight-web/server/admin-messages.json` (the admin UI strings, written by
+the package build), and take the contact category from `site.config.ts`. A
+change to the admin copy or to the site's categories does not break the
+test.
+
+`E2E_SCREENSHOT_DIR` saves screenshots. `E2E_DEBUG_DIR` saves a screenshot
+of each failed admin step and a Playwright trace of the admin screen. The
+test needs `npx playwright install chromium` and network access to
+`challenges.cloudflare.com`. CI runs it in the `e2e` job, after the server
+end-to-end test.
