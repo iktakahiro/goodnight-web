@@ -1,12 +1,12 @@
 ---
 title: データベースとマイグレーション
 icon: Database
-description: D1 データベースのテーブル、クエリの書き方、マイグレーションが npm パッケージに入って deploy スクリプトで適用される流れ、スキーマの変更がサイトに届く流れをまとめます。
+description: D1 データベースのテーブル、クエリの書き方、マイグレーションが npm パッケージに入ってデプロイのスクリプトで適用される流れ、スキーマの変更がサイトに届く流れをまとめます。
 ---
 
 <Callout type='warn' title='下書き / 未検証'>
   パッケージはまだ公開していません。ここに書いたマイグレーションとクエリは、手元で確認しています（`wrangler
-  d1 migrations apply --local`、テスト、`wrangler dev` に対する end-to-end
+  d1 migrations apply --local`、テスト、`wrangler dev` に対する E2E
   テスト）。Dependabot と Workers Builds を通じた更新の流れは M2
   で予定しています。
 </Callout>
@@ -18,7 +18,7 @@ description: D1 データベースのテーブル、クエリの書き方、マ�
 | テーブル                                                | 中身                                                                                                                                                                                                                                                            |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `submissions`                                           | 問い合わせフォームの送信内容。メールアドレス、`fields`（フォームの値。項目 ID をキーにした JSON）、`form_version`、`locale`、状態（`unread` か `read`）、`suspected_spam`、スパムスコアと理由、`ip_hash`（IP アドレスの HMAC。IP アドレスそのものは入れません） |
-| `form_definitions`                                      | お問い合わせフォームの定義のバージョン。追記だけで、保存したバージョンごとに 1 行。変更も削除もしません                                                                                                                                                         |
+| `form_definitions`                                      | 問い合わせフォームの定義のバージョン。追記だけで、保存したバージョンごとに 1 行。変更も削除もしません                                                                                                                                                           |
 | `settings`                                              | `retention_days`、`last_cleanup_at`（[データの自動削除](/ja/docs/how-it-works/data-pruning/)用）、`setup_closed_at`                                                                                                                                             |
 | `user`、`session`、`account`、`verification`、`passkey` | Better Auth の管理者、セッション、パスキー                                                                                                                                                                                                                      |
 
@@ -40,7 +40,7 @@ suspectedSpam: integer('suspected_spam', { mode: 'boolean' })
   .default(false),
 ```
 
-CHECK 制約で、データベースをこのリストと合わせておきます。インデックスは、未読件数と、未読・既読の表示に使います。
+CHECK 制約により、データベースもこのリストにある値しか受け付けません。インデックスは、未読件数と、「未読」と「既読」のタブに使います。
 
 ```ts title="packages/server/src/db/schema.ts"
 // Unread count and the unread and read views.
@@ -52,9 +52,9 @@ check(
 ),
 ```
 
-## お問い合わせフォームの項目
+## 問い合わせフォームの項目
 
-お問い合わせフォームの項目は列ではありません。管理者が管理画面で編集し、保存するたびに、次の `version` 番号と JSON の定義を持つ行が `form_definitions` に増えます。いちばん大きいバージョンが現在のフォームです。2 つのトリガーで、このテーブルを追記だけにしています。
+問い合わせフォームの項目は列ではありません。管理者が管理画面で編集し、保存するたびに、次の `version` 番号と JSON の定義を持つ行が `form_definitions` に増えます。いちばん大きいバージョンが現在のフォームです。2 つのトリガーで、このテーブルを追記だけにしています。
 
 ```sql title="migrations/0004_form_definition_seed.sql"
 CREATE TRIGGER `form_definitions_no_update` BEFORE UPDATE ON `form_definitions`
@@ -131,9 +131,9 @@ node_modules/@goodnight-web/server/migrations/
 2. `0004_form_definition_seed.sql`（手で書いたもの）は、それまでのフォームの項目（`f_name`、`f_company`、`f_phone`、`f_category`、`f_message`）でフォームのバージョン 1 を保存し、既存の送信内容の `name`、`company`、`phone`、`category`、`body` をその ID で `fields` に写し、追記だけにするトリガーを作ります。
 3. `0005_drop_fixed_contact_columns.sql` は古い列を削除します。
 
-列の削除は追加だけの変更ではありません。最初のリリースより前に入れたので、この列に書き込む Worker はどこにもデプロイされていません。
+列の削除は、スキーマの変更を追加だけにするという決まりの例外です。最初のリリースより前に入れたので、この列に書き込む Worker はどこにもデプロイされていません。
 
-`0006_unread_read_status.sql` は、状態を `unread` と `read` だけにし、`suspected_spam` の印を足します。SQLite で CHECK 制約を変えるにはテーブルを作り直す必要があるので、drizzle-kit は `submissions` を新しいテーブルに写します。生成された写しの部分は、古い状態を置き換えるよう手で直しました。`new` は `unread` に、それ以外の状態はすべて `read` にし、`held` か `spam` だった行には `suspected_spam = 1` を付けます。`0005` と同じく、最初のリリースより前に入れます。
+`0006_unread_read_status.sql` は、状態を `unread` と `read` だけにし、`suspected_spam` の印を足します。SQLite で CHECK 制約を変えるにはテーブルを作り直す必要があるので、drizzle-kit は `submissions` を新しいテーブルに写します。生成された SQL のうち行を写す部分は手で直し、古い状態を新しい状態に置き換えるようにしました。`new` は `unread` に、それ以外の状態はすべて `read` にし、`held` か `spam` だった行には `suspected_spam = 1` を付けます。`0005` と同じく、最初のリリースより前に入れます。
 
 サイトの `wrangler.jsonc` では、D1 の binding がこのディレクトリを指します。
 
@@ -146,13 +146,13 @@ node_modules/@goodnight-web/server/migrations/
 ]
 ```
 
-deploy スクリプトは、新しいコードを公開する前にマイグレーションを適用します。
+`deploy` スクリプトは、新しいコードを公開する前にマイグレーションを適用します。
 
 ```sh
 wrangler d1 migrations apply DB --remote && wrangler deploy
 ```
 
-wrangler はファイルを名前順に並べ、適用したファイルをデータベースの `d1_migrations` テーブルに記録します。記録済みのファイルは飛ばすので、もう一度実行しても何も起きません。ファイルの途中で失敗すると D1 はそのファイルを取り消し、deploy は `wrangler deploy` の前で止まります。
+wrangler はファイルを名前順に並べ、適用したファイルをデータベースの `d1_migrations` テーブルに記録します。記録済みのファイルは飛ばすので、もう一度実行しても何も起きません。ファイルの途中で失敗すると D1 はそのファイルを取り消し、デプロイは `wrangler deploy` の前で止まります。
 
 サイト側でマイグレーションを書く必要はありません。`wrangler d1 migrations create` は実行しないでください。`node_modules` の中にファイルを作ってしまいます。
 
@@ -160,11 +160,11 @@ wrangler はファイルを名前順に並べ、適用したファイルをデ�
 
 1. goodnight-web がスキーマを変え、`0007_add_note.sql` のような新しいマイグレーションを生成して、`@goodnight-web/server` の新しいバージョンを公開します。公開したマイグレーションのファイルは、編集も名前の変更もしません。
 2. Dependabot が、あなたのリポジトリに `@goodnight-web/server` を更新するプルリクエストを作ります。[配布と更新](/ja/docs/distribution/)を参照してください。
-3. あなたがマージします。deploy スクリプトが `0007_add_note.sql` を適用してから、新しいコードを公開します。
+3. あなたがマージします。`deploy` スクリプトが `0007_add_note.sql` を適用してから、新しいコードを公開します。
 
 2 つのコマンドの間は、古いバージョンの Worker が新しいスキーマに対して動きます。goodnight-web はスキーマの変更を追加だけ（新しいテーブルと列）にとどめ、クエリは列名を指定しているので、その間も古いバージョンは動き続けます。
 
-プルリクエストのプレビュービルドは deploy スクリプトを実行しないので、新しいマイグレーションを適用していないデータベースを使います。新しいスキーマが必要な画面は、プレビューでは失敗することがあります。この点はまだ確認していません。
+プルリクエストのプレビュービルドは `deploy` スクリプトを実行しないので、新しいマイグレーションを適用していないデータベースを使います。新しいスキーマが必要な画面は、プレビューでは失敗することがあります。この点はまだ確認していません。
 
 ## Time Travel でマイグレーションを取り消す
 
@@ -175,4 +175,4 @@ wrangler d1 time-travel info DB --timestamp=2026-10-22T09:00:00Z
 wrangler d1 time-travel restore DB --timestamp=2026-10-22T09:00:00Z
 ```
 
-復元すると、その時点より後の問い合わせとログインもすべて消えます。また、公開中のコードは変わりません。マイグレーションより前の時点に戻したときは、それに合う古いバージョンのサイトも deploy してください。そうしないと、次の deploy でマイグレーションがもう一度適用されます。
+復元すると、その時点より後の問い合わせとログインもすべて消えます。また、公開中のコードは変わりません。マイグレーションより前の時点に戻したときは、それに合う古いバージョンのサイトもデプロイしてください。そうしないと、次のデプロイでマイグレーションがもう一度適用されます。

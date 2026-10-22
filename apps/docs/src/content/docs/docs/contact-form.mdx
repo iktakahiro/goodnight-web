@@ -164,21 +164,59 @@ Within a view, you can also filter:
 - by form version;
 - by the option of a select or radio field of the current version.
 
+### Order
+
+The list is sorted by received time only: newest first by default, oldest first when you select the **Received** column header. It cannot be sorted by email address, status, or a form field, because the received time is what admins look for.
+
+### Search by email address
+
+The search box finds inquiries whose email address contains the text you type, ignoring case. `example.co` finds `taro@example.com` and `info@example.co.jp`. It searches the fixed email column only, never the form fields.
+
+The search text is at most 254 characters (the longest email address). The search applies within the current view and filters, and the CSV export follows it.
+
+To find inquiries by the value of a form field, use the option filter or the CSV export.
+
+## The inquiry detail
+
+The detail shows each inquiry with the labels of the version it was sent with, in that version's order. If a field is no longer on the current form, its value is still shown, marked as being from version N and archived. A label that is renamed later does not change how an old inquiry reads.
+
+## CSV export
+
+The CSV has the fixed columns (`id`, `received_at`, `status` (`unread` or `read`), `suspected_spam` (`1` or `0`), `email`, `locale`, `form_version`, `page_path`, `country`, `spam_score`, `spam_reasons`) and then one column for every field id the form ever had: the current fields in form order, then archived fields.
+
+- Headers are labels in the chosen language (Japanese or English).
+- An archived field's header ends with the last version that had it, for example `Budget (v3)`. A new field with the same label has its own column, `Budget`.
+- If two headers are still the same, the field id is added in brackets.
+- Select, radio, and checkbox values are written as option labels.
+- Every text cell that starts like a spreadsheet formula (`=`, `+`, `-`, `@`, or a tab) gets a leading `'`.
+- The export follows the list's view, email search, and filters. The All view leaves suspected spam out; export the Suspected spam view to get it.
+- The file is read 200 rows at a time and streamed, so a large table is never held in memory.
+- The export holds the rows sent with the form version that was current when it started, and older ones. If someone saves a new version during the export, inquiries sent with that version are left out, because the header has no columns for its new fields. They appear in the next export.
+
+## Why it is built this way
+
+- **The definition is in D1, so people who do not write code can change it.** A small company often runs its site without an engineer at hand. Adding a "Budget" field should not need a code change, a build, and a deploy.
+- **The server trusts only its own definition.** The definition from `GET /api/contact/form` is for drawing the form. On submit, the server reads the definition from D1 again and validates against that. A changed page or a hand-made request cannot add fields or skip checks.
+- **One JSON column instead of one column per field.** A column per field would need a schema migration for every form edit, and migrations ship only with package releases. A JSON column with values keyed by field id needs none.
+- **Immutable ids and versions keep data apart.** Labels change and fields come and go. Because values are keyed by an id that is never reused, and every inquiry records its version, answers to different questions never end up in the same column, and every inquiry can be shown as the visitor saw the form.
+- **Email is fixed.** Every inquiry needs a way to reply. Keeping it as a real column lets the list search it and the detail offer a reply button, whatever the form holds.
+- **Slack stays free of personal data.** Notifications contain only "1 new inquiry", the received time, and a link, whatever fields the form has. See [Slack notifications](/docs/how-it-works/notifications/).
+
+## Details for developers
+
+The rest of this page is for people who read or change the server code. You do not need it to use the admin screen.
+
+### How the list filters and searches
+
 The option filter runs `json_extract()` on the stored JSON. The field id is looked up in the stored definition first, and both the JSON path and the value are bound parameters:
 
 ```ts title="packages/server/src/features/submissions/submission-store.ts"
 choiceIs = sql`json_extract(${submissions.fields}, ${`$.${choice.fieldId}`}) = ${choice.value}`;
 ```
 
-### Order
+The order is limited to received time for one more reason: the values of form fields live in one JSON column, where sorting would mean a different query plan for every field.
 
-The list is sorted by received time only: newest first by default, oldest first when you select the **Received** column header. It cannot be sorted by email address, status, or a form field. The received time is what admins look for, and the values of form fields live in one JSON column, where sorting would mean a different query plan for every field.
-
-### Search by email address
-
-The search box finds inquiries whose email address contains the text you type, ignoring case. `example.co` finds `taro@example.com` and `info@example.co.jp`. It searches the fixed email column only, never the form fields.
-
-The query uses Drizzle's `like` on `lower(email)` with one bound parameter. `%`, `_`, and `\` in the search text are escaped, so they match as plain characters:
+The email search uses Drizzle's `like` on `lower(email)` with one bound parameter. `%`, `_`, and `\` in the search text are escaped, so they match as plain characters:
 
 ```ts title="packages/server/src/features/submissions/submission-store.ts"
 export const escapeLike = (term: string): string =>
@@ -195,30 +233,11 @@ const emailContains = (term: string): SQL =>
   )} escape '\\'`;
 ```
 
-The search text is at most 254 characters (the longest email address). The search applies within the current view and filters, and the CSV export follows it.
+**Why there is no index for the email search.** A `LIKE '%text%'` search cannot use an index, so D1 reads every row of `submissions`. For a contact form this is fine: a busy small company gets a few thousand inquiries a year, and rows older than the retention period (180 days by default) are deleted. Reading a few thousand short rows takes milliseconds and costs few D1 row reads. An extra index would slow every insert and still not help a partial match. The `created_at` index serves the order and the retention cleanup.
 
-**Why there is no index for it.** A `LIKE '%text%'` search cannot use an index, so D1 reads every row of `submissions`. For a contact form this is fine: a busy small company gets a few thousand inquiries a year, and rows older than the retention period (180 days by default) are deleted. Reading a few thousand short rows takes milliseconds and costs few D1 row reads. An extra index would slow every insert and still not help a partial match. The `created_at` index serves the order and the retention cleanup.
+**Why there is no search over the form fields.** A search over free text would need `LIKE` over every stored value or a full-text index that has to follow every form change. Filters and the CSV export cover the common needs.
 
-There is no search over the form fields. A search over free text would need `LIKE` over every stored value or a full-text index that has to follow every form change. Filters and the CSV export cover the common needs.
-
-## The inquiry detail
-
-The detail shows each inquiry with the labels of the version it was sent with, in that version's order. If a field is no longer on the current form, its value is still shown, marked as being from version N and archived. A label that is renamed later does not change how an old inquiry reads.
-
-## CSV export
-
-The CSV has the fixed columns (`id`, `received_at`, `status` (`unread` or `read`), `suspected_spam` (`1` or `0`), `email`, `locale`, `form_version`, `page_path`, `country`, `spam_score`, `spam_reasons`) and then one column for every field id the form ever had: the current fields in form order, then archived fields.
-
-- Headers are labels in the chosen language (Japanese or English).
-- An archived field's header ends with the last version that had it, for example `Budget (v3)`. A new field with the same label has its own column, `Budget`.
-- If two headers are still the same, the field id is added in brackets.
-- Select, radio, and checkbox values are written as option labels.
-- Every text cell that starts like a spreadsheet formula (`=`, `+`, `-`, `@`, or a tab) gets a leading `'`.
-- The export follows the list's view, email search, and filters. The All view leaves suspected spam out; export the Suspected spam view to get it.
-- The file is streamed in batches of rows, so a large table is never held in memory.
-- The export holds the rows sent with the form version that was current when it started, and older ones. If someone saves a new version during the export, inquiries sent with that version are left out, because the header has no columns for its new fields. They appear in the next export.
-
-## How the contact page gets the form
+### How the contact page gets the form
 
 The page reads the current form from a public, read-only endpoint:
 
@@ -232,7 +251,7 @@ The starter renders the fields in the browser, with a loading state. If the requ
 
 The page sends the version it rendered as `formVersion`. If the form changed in the meantime, the API answers 409 `form_outdated`. The starter then loads the form again, keeps what the visitor typed in fields that still exist, and asks them to send again.
 
-## How the server checks a submission
+### How the server checks a submission
 
 The server builds a zod schema from the current version in D1 and checks `fields` against it. It never uses a definition sent by the browser. The built schema is cached per Worker isolate and version; each request reads only the current version number.
 
@@ -291,12 +310,3 @@ return z
 ```
 
 Each inquiry stores its values as JSON in `submissions.fields`, keyed by field id, and the version in `submissions.form_version`. See [Database and migrations](/docs/database/).
-
-## Why it is built this way
-
-- **The definition is in D1, so people who do not write code can change it.** A small company often runs its site without an engineer at hand. Adding a "Budget" field should not need a code change, a build, and a deploy.
-- **The server trusts only its own definition.** The definition from `GET /api/contact/form` is for drawing the form. On submit, the server reads the definition from D1 again and validates against that. A changed page or a hand-made request cannot add fields or skip checks.
-- **One JSON column instead of one column per field.** A column per field would need a schema migration for every form edit, and migrations ship only with package releases. A JSON column with values keyed by field id needs none.
-- **Immutable ids and versions keep data apart.** Labels change and fields come and go. Because values are keyed by an id that is never reused, and every inquiry records its version, answers to different questions never end up in the same column, and every inquiry can be shown as the visitor saw the form.
-- **Email is fixed.** Every inquiry needs a way to reply. Keeping it as a real column lets the list search it and the detail offer a reply button, whatever the form holds.
-- **Slack stays free of personal data.** Notifications contain only "1 new inquiry", the received time, and a link, whatever fields the form has. See [Slack notifications](/docs/how-it-works/notifications/).

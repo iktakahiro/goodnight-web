@@ -128,7 +128,7 @@ if (elapsedMs !== undefined && elapsedMs < SPAM_MIN_ELAPSED_MS) {
 return { score, reasons };
 ```
 
-`url` fields are expected to hold links and are not counted. A score of 3 or more (`SPAM_SUSPECT_THRESHOLD`) flags the submission as suspected spam. One link in a message does not; three links, a link in the name field, or a form sent in under 3 seconds do. The score and the reasons (`spam_reasons`, together with `honeypot` when the trap was hit) are stored and shown in the inquiry detail:
+`url` fields are expected to hold links and are not counted. A score of 3 or more (`SPAM_SUSPECT_THRESHOLD`) flags the submission as suspected spam. One link in a message does not; three or more links, a link in the name field, or a form sent in under 3 seconds do. The score and the reasons (`spam_reasons`, together with `honeypot` when the trap was hit) are stored and shown in the inquiry detail:
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
 const suspectedSpam = honeypot || spam.score >= SPAM_SUSPECT_THRESHOLD;

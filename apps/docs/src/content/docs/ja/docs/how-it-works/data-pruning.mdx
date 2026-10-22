@@ -21,7 +21,7 @@ runInBackground(c, 'prune', () => pruneIfDue(env.DB, now));
 return c.json({ ok: true });
 ```
 
-`pruneIfDue()` は、まず `last_cleanup_at` の条件付きの upsert 1 回で実行を確保します。保存されている時刻が 1 時間以上前のときだけ更新するので、2 つのリクエストが同時に来ても、削除するのは片方だけです。保持期間は `settings.retention_days` から読みます（1〜3,650 日。ないときや不正な値のときは 180 日）。
+`pruneIfDue()` は、まず `last_cleanup_at` を条件付きの upsert で 1 回だけ更新し、削除を実行する権利を取ります。保存されている時刻が 1 時間以上前のときだけ更新するので、2 つのリクエストが同時に来ても、削除するのは片方だけです。保持期間は `settings.retention_days` から読みます（1〜3,650 日。ないときや不正な値のときは 180 日）。
 
 ```ts title="packages/server/src/features/retention/prune.ts"
 const orm = getDatabase(db);

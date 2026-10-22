@@ -31,7 +31,7 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 
 - Worker 1 つと D1 データベース 1 つ。Queues、Cron Triggers、KV は使いません。
 - 必須の外部サービスは Cloudflare と GitHub だけです。
-- 安全側に倒します。設定やシークレットが足りないときは、それを必要とする機能を止めます。
+- フェイルクローズにします。設定やシークレットが足りないときは、それを必要とする機能を止めます。
 
 ## ルート
 
@@ -40,7 +40,7 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 | `/`、`/blog/*`、`/contact/` など | 訪問者             | 静的なページ。Worker のコードは動きません。                                                                                                                                                                                       |
 | `GET /api/contact/form`          | 問い合わせページ   | 現在のフォームの項目と、フォームが使えるかどうか。公開の読み取り専用です。                                                                                                                                                        |
 | `POST /api/contact`              | 問い合わせフォーム | 確認、回数制限をして、送信内容を保存します。                                                                                                                                                                                      |
-| `/api/setup`                     | 最初の管理者       | 最初の管理者を作ります。パスキーが登録されたら閉じます。                                                                                                                                                                          |
+| `/api/setup`                     | 最初の管理者       | 最初の管理者を作ります。最初のパスキーが登録されると使えなくなります。                                                                                                                                                            |
 | `/api/auth/*`                    | 管理者             | Better Auth。パスキーの登録とログイン。                                                                                                                                                                                           |
 | `/api/admin/*`                   | 管理画面           | 一覧（50 件ずつ、受信日時の順。未読件数とスパムの疑いの件数、メールアドレスの検索付き）、詳細、未読・既読とスパムの疑いの変更、削除、CSV の書き出し、フォームの編集とそのバージョン、Turnstile が設定済みかを返すステータス API。 |
 | `/admin/*`                       | 管理者             | ビルド済みの管理画面（React アプリ）。データの取得には必ずセッションが必要です。                                                                                                                                                  |
@@ -50,10 +50,10 @@ description: Static Assets 付きの Worker 1 つと D1 データベース 1 つ
 `POST /api/contact` は次の順に処理します。
 
 1. **Origin とサイズ。** サイト自身のオリジンからのリクエストで、`Content-Type` が想定どおりで、小さい（32 KB まで）ことを確認します。それ以外は本文を読む前に拒否します。
-2. **honeypot。** フォームには人には見えない欄（`gnw_hp_x`）があります。Worker は、ここが埋まっているかを記録して先へ進みます。honeypot が埋まっていても応答は変わらず、5 で印を付けるだけです。
+2. **honeypot。** フォームには人には見えない欄（`gnw_hp_x`）があります。Worker は、ここが埋まっているかを記録して先へ進みます。honeypot が埋まっていても応答は変わらず、手順 5 でスパムの疑いの印を付けるだけです。
 3. **Turnstile。** Worker がトークンを Turnstile の siteverify に送り、`success`、`hostname`、`action` を確認します。失敗したら 400 を返し、何も保存しません。
 4. **回数制限。** Rate Limiting binding が `ip_hash` ごとにリクエストを数えます。上限を超えたら 429 を返します。
-5. **入力の検証とスパムスコア。** zod でメールアドレスと同意を確認します。フォームの項目は、ブラウザーから送られたものではなく、D1 にある現在のフォームの定義から組み立てた zod のスキーマで確認し、知らない項目や、リクエストの本文にある知らないキーは拒否します。訪問者のページが古いバージョンのフォームだった場合は 409 `form_outdated` を返します。簡単なルールでスパムスコアを加点します。スコアが 3 以上か honeypot が埋まっていれば、スパムの疑いの印を付けます。その場合も、状態 `unread`（未読）で保存します。
+5. **入力の検証とスパムスコア。** zod でメールアドレスと同意を確認します。フォームの項目は、ブラウザから送られたものではなく、D1 にある現在のフォームの定義から組み立てた zod のスキーマで確認し、知らない項目や、リクエストの本文にある知らないキーは拒否します。訪問者のページが古いバージョンのフォームだった場合は 409 `form_outdated` を返します。簡単なルールでスパムスコアを加点します。スコアが 3 以上か honeypot が埋まっていれば、スパムの疑いの印を付けます。その場合も、状態 `unread`（未読）で保存します。
 6. **保存してから応答。** D1 に行を INSERT します。INSERT が成功してから、訪問者に 200 を返します。この後の処理が応答を変えることはありません。
 7. **応答の後、`ctx.waitUntil` の中で:**
    - スパムの疑いがなく、Slack Webhook が設定されていれば、「新しい問い合わせ 1 件・受信日時・管理画面の URL」を送り、`notified_at` を記録します。
@@ -85,7 +85,7 @@ export default createGoodnightWorker({ locale: siteConfig.defaultLocale });
 },
 ```
 
-ファクトリーは Hono アプリを 1 つ作ります。最初にセキュリティヘッダー、HTTPS、Cloudflare Access のミドルウェアが動き、続いて機能ごとに自分のルートをマウントします。どのルートにも当たらないリクエストは `ASSETS` binding に渡ります。
+ファクトリーは Hono アプリを 1 つ作ります。最初にセキュリティヘッダー、HTTPS、Cloudflare Access のミドルウェアが動き、続いて機能ごとのルートをマウントします。どのルートにも一致しないリクエストは `ASSETS` binding に渡ります。
 
 ```ts title="packages/server/src/app.ts"
 app.use('*', securityHeaders);
@@ -104,7 +104,7 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 );
 ```
 
-機能（問い合わせ、セットアップ、認証、管理 API、管理画面）は、それぞれ `packages/server/src/features/` の下の自分のフォルダーにあります。
+機能（問い合わせ、セットアップ、認証、管理 API、管理画面）は、`packages/server/src/features/` の下に機能ごとのフォルダーを持っています。
 
 ## シークレットと binding
 
@@ -123,7 +123,7 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 | `ACCESS_AUD`           | 変数（任意）           | Cloudflare Access アプリケーションの AUD タグ。`ACCESS_TEAM_DOMAIN` と一緒に設定します。              |
 | `ACCESS_TEAM_DOMAIN`   | 変数（任意）           | Cloudflare Access のチームドメイン。たとえば `your-team.cloudflareaccess.com`。                       |
 
-32 文字より短いシークレットは、ないのと同じ扱いで機能を止めます。シークレットは Worker の中にとどめます。ブラウザに返すことも、D1 に書くこともありません。
+32 文字より短いシークレットは設定されていないものとみなし、それを使う機能を止めます。シークレットは Worker の中にとどめます。ブラウザに返すことも、D1 に書くこともありません。
 
 `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` は `https://` でだけ動きます（`localhost` を除きます）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
 
@@ -131,7 +131,7 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 
 Web フォントはどこでも読み込みません。サイトでも、管理画面でも、このドキュメントサイトでもです。それぞれがシステムフォントの並びを CSS のトークンとして 1 か所で決めているので、文字は訪問者の端末にすでにあるフォント（たとえば macOS と iOS ではヒラギノ、Windows ではメイリオや游ゴシック）で表示されます。フォントのファイルも、フォントの配信サービスも使わず、Content Security Policy にフォント用のホストもありません。
 
-スターターは自分のトークンを持ちます。テーマの 3 色は `site.config.ts`（`theme.primary`、`theme.background`、`theme.foreground`）から取り、CSS 変数として `<html>` に設定します。ほかの色合いはこの 3 色から混ぜて作るので、3 つの値を変えればサイト全体の色が変わります。
+スターターは独自のデザイントークン（CSS 変数）を持ちます。テーマの 3 色は `site.config.ts`（`theme.primary`、`theme.background`、`theme.foreground`）から取り、CSS 変数として `<html>` に設定します。ほかの色合いはこの 3 色から混ぜて作るので、3 つの値を変えればサイト全体の色が変わります。
 
 ```css title="templates/starter/src/styles/global.css"
 :root {
@@ -149,7 +149,7 @@ Web フォントはどこでも読み込みません。サイトでも、管理�
   --color-foreground: var(--site-foreground);
 ```
 
-管理画面は `@goodnight-web/server` の中に自分のトークンを持っているので、サイトの色を変えても管理画面の色は変わりません。
+管理画面は `@goodnight-web/server` の中に独自のデザイントークンを持っているので、サイトの色を変えても管理画面の色は変わりません。
 
 ## 関連ページ
 
