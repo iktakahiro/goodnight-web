@@ -47,7 +47,7 @@
         "description": "The Turnstile **site key** (public, not a secret). The contact form reads it from the Worker. Leave it empty until you have created a Turnstile widget.\n\nTurnstile の**サイトキー**です（公開される値で、秘密ではありません）。お問い合わせフォームは Worker からこの値を読み込みます。Turnstile のウィジェットを作るまでは空のままにしてください。"
       },
       "SLACK_WEBHOOK_URL": {
-        "description": "Optional. A Slack incoming webhook URL (`https://hooks.slack.com/...`). Slack gets only \"1 new inquiry\", the topic, and a link to the admin screen; never the name, email address, or message.\n\n任意。Slack の Incoming Webhook URL（`https://hooks.slack.com/...`）です。Slack には「新しいお問い合わせが 1 件」、種類、管理画面へのリンクだけを送り、名前・メールアドレス・本文は送りません。"
+        "description": "Optional. A Slack incoming webhook URL (`https://hooks.slack.com/...`). Slack gets only \"1 new inquiry\", the received time, and a link to the admin screen; never the name, email address, or anything typed in the form.\n\n任意。Slack の Incoming Webhook URL（`https://hooks.slack.com/...`）です。Slack には「新しいお問い合わせが 1 件」、受信日時、管理画面へのリンクだけを送り、名前・メールアドレス・フォームへの入力内容は送りません。"
       },
       "DB": {
         "description": "The D1 database for contact messages and admin accounts. The tables are created by `npm run deploy`.\n\nお問い合わせと管理者アカウントを保存する D1 データベースです。テーブルは `npm run deploy` で作られます。"

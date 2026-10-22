@@ -1,31 +1,146 @@
 ---
 title: 問い合わせフォームの保護
-description: 問い合わせ API は、Origin とサイズ、honeypot、サーバー側での Turnstile、IP ごとの回数制限を確認し、送信内容を保存してから応答します。
+description: 問い合わせ API は、Origin とサイズ、サーバー側での Turnstile、IP ごとの回数制限を確認し、保存済みのフォームで検証してから、送信内容を保存して応答します。honeypot とルールによるスコアは、スパムの疑いの印を付けるだけで、捨てません。
 ---
-
-<Callout type='info'>
-  コードの抜粋は、サーバーのパッケージができたら追加します。
-</Callout>
 
 ## 何をするか
 
 `POST /api/contact` は、次の確認を順に行います。前の確認ほど処理が軽いので、ほとんどの迷惑な送信は早い段階で止まります。
 
-| 確認                                                                                    | 失敗したとき                                           |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `Origin` がサイト自身のオリジンで、`Content-Type` が想定どおりで、本文が 16 KB 程度まで | 本文を読む前に拒否                                     |
-| 見えない honeypot 欄が空である                                                          | 何も保存しない。回数制限には数え、応答は成功のまま     |
-| Turnstile の siteverify で `success`、`hostname`、`action` が一致する                   | 400。何も保存しない                                    |
-| `ip_hash` をキーにした Rate Limiting binding（例: 60 秒に 5 回）                        | 429                                                    |
-| zod で各項目を検証し、スパムスコアを計算する                                            | 不正な入力は拒否。スコアが高ければ状態を `held` にする |
+| 確認                                                                                | 失敗したとき                                                                   |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `Origin` がサイト自身のオリジンで、`Content-Type` が想定どおりで、本文が 32 KB まで | 本文を読む前に拒否                                                             |
+| Turnstile の siteverify で `success`、`hostname`、`action` が一致する               | 400。何も保存しない                                                            |
+| `ip_hash` をキーにした Rate Limiting binding（例: 60 秒に 5 回）                    | 429                                                                            |
+| 現在のフォームの定義をもとに zod で各項目を検証する                                 | 不正な入力や知らない項目は 400。古いバージョンのフォームのページからは 409     |
+| honeypot とスパムスコア                                                             | 失敗にはしない。保存したうえで「スパムの疑い」の印を付け、Slack には通知しない |
 
 確認が終わったら送信内容を D1 に INSERT し、その後で初めて 200 を返します。
 
+## スパム対策
+
+対策は 3 段です。Turnstile でほとんどのボットを止めます。honeypot とスパムスコアは何も拒否せず、送信に**スパムの疑い**の印を付けます。スパムの疑いがある送信もほかと同じように保存しますが、Slack には通知せず、管理画面では**スパムの疑い**に分けて表示します。管理者は開いて**スパムではない**を選べますし、どの問い合わせにもスパムの印を付けられます。
+
+### 1. honeypot
+
+フォームには、人には見えない 1 行の入力欄があります。画面の外に置き、読み上げソフトからも隠し（`aria-hidden`）、Tab キーでも移動しません（`tabindex="-1"`）。ボットの中には、すべての欄を埋めるものがあります。
+
+```astro title="templates/starter/src/features/contact/contact-form.astro"
+<div
+  class='absolute -left-[9999px] h-px w-px overflow-hidden'
+  aria-hidden='true'
+>
+  <label for='contact-gnw-hp-x'>{text.honeypot}</label>
+  <input
+    id='contact-gnw-hp-x'
+    name='gnw_hp_x'
+    data-contact-honeypot
+    type='text'
+    tabindex='-1'
+    autocomplete='off'
+    data-1p-ignore
+    data-lpignore='true'
+    data-bwignore
+    data-form-type='other'
+  />
+</div>
+```
+
+- 欄の名前は `gnw_hp_x` です。ブラウザやパスワード管理アプリにとって意味のない名前にしています。`website` や `url` のような名前だと自動入力の対象になり、自動入力された honeypot は、本物の人の問い合わせにスパムの印を付けてしまいます。`autocomplete="off"` と `data-*` 属性で、よく使われるパスワード管理ツール（1Password、LastPass、Bitwarden など）にこの欄を無視するよう伝えます。
+- honeypot が入力されていても、応答は変わりません。ほかの送信と同じく、有効な Turnstile のトークンが必要で、回数制限に数え、検証を通る必要があります。通れば、理由 `honeypot` を付けて保存します。通らなければ、honeypot がないときと同じエラーを返し、何も保存しません。そのため、ボットは応答から honeypot に引っかかったかどうかを判別できません。
+- honeypot 欄に入力された値そのものは保存しません。
+
+サーバーは、この欄が埋まっているかを記録するだけで、先へ進みます。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+// 2. Honeypot: note it and carry on. A filled honeypot changes nothing
+//    in the response; the submission still needs Turnstile, counts
+//    against the rate limit, and must validate before it is stored as
+//    suspected spam (docs/decisions/0009).
+const honeypotValue = input[CONTACT_HONEYPOT_FIELD];
+const honeypot =
+  typeof honeypotValue === 'string' && honeypotValue.trim() !== '';
+```
+
+### 2. Turnstile
+
+Cloudflare Turnstile はページの中で動き、フォームにトークンを渡します。Worker はそのトークンを siteverify に送り、`success`、`hostname`（サイト自身のホスト）、`action`（`contact`）を確認します。サーバー側でこの確認をしなければ、ボットはウィジェットを飛ばして送信できます。`hostname` と `action` も確認するので、ほかのサイトやほかのフォーム用に作られたトークンは使い回せません。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+const turnstile = await verifyTurnstile({
+  secret: turnstileSecret,
+  token,
+  remoteIp: ip,
+  hostnames: options.contact.turnstileHostnames ?? [
+    new URL(c.req.url).hostname,
+  ],
+  action: CONTACT_TURNSTILE_ACTION,
+});
+if (!turnstile.ok) {
+  console.warn(`contact: turnstile rejected (${turnstile.reason})`);
+  return apiError(c, 400, 'turnstile_failed');
+}
+```
+
+受け付けるホスト名は、既定ではリクエストが来たホスト名だけです。複数のホスト名でフォームを出すサイトは、`createGoodnightWorker()` の `contact.turnstileHostnames` オプションに並べます。`verifyTurnstile()` は、ネットワークのエラー、200 以外の応答、想定外の本文を失敗として扱い、そのうえで 3 つの項目を確かめます。
+
+```ts title="packages/server/src/features/contact/turnstile.ts"
+const result = body as Record<string, unknown>;
+if (result.success !== true) return { ok: false, reason: 'not_success' };
+if (
+  typeof result.hostname !== 'string' ||
+  !expected.hostnames.includes(result.hostname)
+) {
+  return { ok: false, reason: 'hostname_mismatch' };
+}
+if (result.action !== expected.action) {
+  return { ok: false, reason: 'action_mismatch' };
+}
+return { ok: true };
+```
+
+Turnstile がなければ止めます。`TURNSTILE_SECRET` と `TURNSTILE_SITE_KEY` がそろっていなければ、問い合わせ API は 503 を返し、フォームには「まだ利用できません」と表示します。`IP_HASH_SECRET` か Rate Limiting binding がない場合も同じです。どちらもないと回数制限が動かないからです。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
+
+### 3. ルールによるスパムスコア
+
+検証の後、`spam-score.ts` の `scoreSubmission()` が、決まったいくつかのルールで点数を足します。ルールは現在のフォームに合わせて働きます。決まった項目名ではなく、項目の種類を見ます。
+
+| ルール（保存する理由） | 点数                                                        | 対象                                                   |
+| ---------------------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| `links:N`              | リンク（`http://`、`https://`、`www.`）1 つにつき 1。最大 3 | すべての `textarea` の項目の合計                       |
+| `link_in_field`        | 3                                                           | 名前や会社名など、1 行の `text` の項目のどれかにリンク |
+| `too_fast`             | 3                                                           | フォームを表示してから 3 秒未満で送信                  |
+
+```ts title="packages/server/src/features/contact/spam-score.ts"
+const links = textOf('textarea').join('\n').match(LINKS)?.length ?? 0;
+if (links > 0) {
+  score += Math.min(links, 3);
+  reasons.push(`links:${links}`);
+}
+if (textOf('text').some((value) => HAS_LINK.test(value))) {
+  score += 3;
+  reasons.push('link_in_field');
+}
+if (elapsedMs !== undefined && elapsedMs < SPAM_MIN_ELAPSED_MS) {
+  score += 3;
+  reasons.push('too_fast');
+}
+return { score, reasons };
+```
+
+`url` の項目はリンクを書く欄なので数えません。合計が 3 以上（`SPAM_SUSPECT_THRESHOLD`）なら、スパムの疑いの印を付けます。本文にリンクが 1 つあるだけでは付きません。`textarea` の項目に合わせて 3 つ以上のリンクがある、名前などの 1 行の欄にリンクがある、3 秒未満で送信された、のどれかに当てはまれば付きます。点数と理由（`spam_reasons`。わなにかかったときは `honeypot` も）は保存し、問い合わせの詳細に表示します。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+const suspectedSpam = honeypot || spam.score >= SPAM_SUSPECT_THRESHOLD;
+const spamReasons = honeypot ? ['honeypot', ...spam.reasons] : spam.reasons;
+```
+
 ## なぜこう作るか
 
-- **Turnstile はサーバー側で検証します。** ページの中のウィジェットはトークンを作るだけです。siteverify を呼ばなければ、ボットはウィジェットを飛ばして送信できます。`hostname` と `action` も確認するので、ほかのサイトやほかのフォーム用に作られたトークンは使い回せません。
-- **honeypot に引っかかったら成功を装い、何も保存しません。** エラーを受け取ったボットは、内容を変えて送り直します。成功を受け取ったボットは次へ移ります。honeypot の確認は Turnstile より前に行うので、送信内容を保存すると、ボットが Turnstile を通らずに D1 へ書き込めてしまいます。そのリクエストも回数制限に数えるので、同じアドレスから本物らしい送信を続けて大量に送ることはできません。残るのは、個人情報を含まない 1 行のログだけです。
-- **怪しい送信は捨てずに保留します。** 問い合わせを取りこぼす損失は、少しのスパムより大きいので、スパムスコアが高い送信は削除せず `held` にします。保留した送信では通知を送りません。
+- **怪しい送信は捨てずに印を付けます。** 問い合わせを取りこぼす損失は、少しのスパムより大きいからです。本物の人がルールに当てはまることもあります（リンクを 3 つ書いた、パスワード管理アプリが隠れた欄を埋めた、など）。そのため、スパムの疑いがある送信も保存して分けておき、判断は管理者に任せます。
+- **スパムの疑いは別に表示します。** 通常の一覧に混ぜると、スパムに本物の問い合わせが埋もれ、未読件数にも数えてしまいます。未読件数と Slack 通知は、スパムの疑いがない問い合わせだけが対象です。[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)を参照してください。
+- **honeypot は Turnstile の後で扱います。** Turnstile より前に honeypot の送信を保存すると、ボットが Turnstile を通らずに D1 へ書き込めてしまいます。honeypot に引っかかった送信も、Turnstile、回数制限、検証を先に通すので、ボットが保存できる数は回数制限の範囲までで、保存される行はすべて検証済みです。
+- **項目は、D1 に保存した定義で確かめます。** フォームの項目は管理者が管理画面で編集し、定義は D1 に保存します。送信のたびに、サーバーはその保存済みの定義から zod のスキーマを組み立てます。受け付けるのは現在の項目 ID だけなので、手で作ったリクエストで項目を増やすことはできません。必須、文字数、形式、選択肢の値も確かめ、問い合わせ 1 件の保存する値は 16 KB までです。[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)を参照してください。
 - **回数制限には Cloudflare の binding を使います。** Rate Limiting binding は Worker のインスタンスをまたいで数え、無料プランでも使えます。Better Auth に組み込まれたメモリ上の制限はインスタンスをまたいで数えないので、ここでは使いません。
 - **ページにキーを埋め込みません。** 問い合わせページに API キーを入れても誰でも読めるので、何も守れません。守るのは Turnstile と回数制限です。
 - **Turnstile がなければ止めます。** `TURNSTILE_SECRET` がなければ、API は 503 を返します。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。

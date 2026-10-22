@@ -14,7 +14,7 @@ description: Deploy to Cloudflare ボタンを使う予定の手順です。star
 
 - Cloudflare のアカウント。小さな会社のサイトなら無料プランで足ります。
 - GitHub のアカウント。
-- 自分のドメインでサイトを公開するなら、そのドメイン名。パスキーを登録する前に決めてください（[ドメインを追加する](#custom-domain)を参照）。
+- 独自ドメインでサイトを公開するなら、そのドメイン名。パスキーを登録する前に決めてください（[ドメインを追加する](#custom-domain)を参照）。
 
 <Steps>
 
@@ -22,7 +22,7 @@ description: Deploy to Cloudflare ボタンを使う予定の手順です。star
 
 ### Deploy to Cloudflare ボタンを押す
 
-ボタンは starter の README にあります。Cloudflare が GitHub との連携を求めた後、starter をあなたのアカウントの新しいリポジトリにコピーし、D1 データベースを作り、Workers Builds で Worker をビルドしてデプロイします（[Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)）。
+ボタンは、サイトのひな形である starter リポジトリの README にあります。Cloudflare が GitHub との連携を求めた後、starter をあなたのアカウントの新しいリポジトリにコピーし、D1 データベースを作り、Workers Builds で Worker をビルドしてデプロイします（[Cloudflare: Deploy buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)）。
 
 設定フォームでは **「Create private Git repository」にチェックを入れてください**。リポジトリは private にする必要があります。理由は[配布と更新のしくみ](/ja/docs/distribution/#private-repository)で説明しています。
 
@@ -54,7 +54,7 @@ Deploy のフォームで次の値を求められます。後から Cloudflare �
 | `TURNSTILE_SECRET`   | Turnstile のシークレットキー。ここでは空のままにして、次の手順で入れても構いません。                       |
 | `SLACK_WEBHOOK_URL`  | 任意。新しい問い合わせを通知する Slack の Incoming Webhook の URL。                                        |
 
-短い値は、ないのと同じ扱いで機能を止めます。44 文字のランダムな文字列は、たとえば手元のパソコンで次のように作れます。
+32 文字より短い値は設定されていないものとみなされ、その値を使う機能は止まります。44 文字のランダムな文字列は、たとえば手元のパソコンのターミナルで次のコマンドを実行すると作れます。
 
 ```sh
 openssl rand -base64 32
@@ -76,7 +76,7 @@ Turnstile のウィジェットを作り、サイトキーを `wrangler.jsonc`�
 
 ### 最初のデプロイを確認する
 
-Workers Builds に表示されるアドレスでサイトを開きます。ページが表示されれば大丈夫です。deploy スクリプトがデプロイの前に D1 のマイグレーションを適用するので、データベースのテーブルもできています。
+Workers Builds に表示されるアドレスでサイトを開き、ページが表示されることを確かめます。`deploy` スクリプトがデプロイの前に D1 のマイグレーションを適用するので、データベースのテーブルもできています。
 
 </Step>
 
@@ -84,9 +84,9 @@ Workers Builds に表示されるアドレスでサイトを開きます。ペ�
 
 ### パスキーを登録する前にドメインを追加する [#custom-domain]
 
-パスキーは 1 つのドメイン（relying party ID）に結びつきます。`workers.dev` のアドレスで登録したパスキーは、管理画面を自分のドメインに移した後は使えません。先にドメインを追加してください。
+パスキーは、登録したときのドメイン（WebAuthn の relying party ID）に結びつきます。`workers.dev` のアドレスで登録したパスキーは、管理画面を独自ドメインに移したあとは使えません。先に独自ドメインを追加してください。
 
-Cloudflare のダッシュボードで、Worker にカスタムドメインを追加します。その後、`workers.dev` のアドレスとプレビュー URL を無効にして、管理画面に自分のドメインからしか入れないようにします。
+Cloudflare のダッシュボードで、Worker にカスタムドメインを追加します。その後、`workers.dev` のアドレスとプレビュー URL を無効にして、管理画面に独自ドメインからしか入れないようにします。
 
 別のアドレスでパスキーを登録してしまった場合は、新しいドメインで登録し直す必要があります。管理者アカウントの復旧方法は、まだ決まっていません。
 
@@ -96,7 +96,7 @@ Cloudflare のダッシュボードで、Worker にカスタムドメインを�
 
 ### 最初の管理者を作る
 
-`https://<自分のドメイン>/admin/` を開きます。管理画面は `https://` でだけ動きます。セットアップ画面で、`SETUP_TOKEN` と、`ADMIN_EMAILS` に入れたメールアドレスを入力します。続けて、ブラウザやパスワードマネージャーがパスキーを作ります。最初のパスキーを登録すると、セットアップは閉じます。そのときシークレットの `SETUP_TOKEN` を削除してください。決まりは[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)で説明しています。
+`https://<独自ドメイン>/admin/` を開きます。管理画面は `https://` でだけ動きます。セットアップ画面で、`SETUP_TOKEN` と、`ADMIN_EMAILS` に入れたメールアドレスを入力します。続けて、ブラウザやパスワード管理アプリでパスキーを作ります。最初のパスキーを登録するとセットアップは完了し、それ以降セットアップ画面は使えなくなります。完了したら、シークレットの `SETUP_TOKEN` を削除してください。決まりは[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)で説明しています。
 
 </Step>
 
@@ -116,7 +116,7 @@ Worker にも Access のトークンを確認させるには、変数を 2 つ�
 
 ### サイトを編集する
 
-会社の情報は `site.config.ts`、ページは `src/pages`、記事は `src/content` で、日本語と英語の両方を編集します。プライバシーポリシーの雛形は、公開する前に専門家に確認してもらってください。雛形の内容は[プライバシーについて](/ja/docs/privacy/)にまとめています。
+会社の情報とテーマの 3 色は `site.config.ts`、ページは `src/pages`、記事は `src/content` で、日本語と英語の両方を編集します。問い合わせフォームの項目はコードにはありません。管理画面で変えてください。[お問い合わせフォームの項目を変える](/ja/docs/contact-form/)を参照してください。プライバシーポリシーの雛形は、公開する前に専門家に確認してもらってください。雛形の内容は[プライバシーについて](/ja/docs/privacy/)にまとめています。
 
 </Step>
 

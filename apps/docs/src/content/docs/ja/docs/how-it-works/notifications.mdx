@@ -3,20 +3,67 @@ title: Slack 通知
 description: 任意の Slack 通知で、新しい問い合わせが来たことを知らせます。通知は応答の後に送り、個人情報も本文も含みません。
 ---
 
-<Callout type='info'>
-  コードの抜粋は、サーバーのパッケージができたら追加します。
-</Callout>
-
 ## 何をするか
 
-- `SLACK_WEBHOOK_URL` が設定されていれば、Worker は状態が `new` の問い合わせを保存した後、その Slack Incoming Webhook に投稿します。
-- 通知に含めるのは、件数（「新しい問い合わせ 1 件」）、種別、管理画面へのリンクだけです。名前、メールアドレス、電話番号、本文は含めません。
+- `SLACK_WEBHOOK_URL` が設定されていれば、Worker はスパムの疑いがない問い合わせを保存した後、その Slack Incoming Webhook に投稿します。呼び出すのは `https://hooks.slack.com/...` のアドレスだけで、ほかの URL は無視します。
+- 通知に含めるのは、件数（「新しい問い合わせ 1 件」）、受信日時、管理画面へのリンクだけです。メールアドレスもフォームの項目の値も含めません。セレクトの回答も含めません。管理者がフォームに項目を足しても、これは変わりません。
+- 受信日時は Slack の日付トークンで送るので、Slack は読む人それぞれのタイムゾーンで表示します。
 - 投稿に成功したら、Worker は `notified_at` を記録します。再送はしません。
-- 保留やスパムの送信では通知しません。
+- スパムの疑いがある送信（honeypot が埋まっている、またはスパムスコアが 3 以上）では通知しません。保存して、管理画面の**スパムの疑い**に表示します。[問い合わせフォームの保護](/ja/docs/how-it-works/contact-protection/)を参照してください。
 
 ## なぜこう作るか
 
 - **応答は Slack を待ちません。** 投稿は、問い合わせを保存して訪問者に応答した後、`ctx.waitUntil` の中で行います。Slack が止まっていても、問い合わせを失ったり、訪問者にエラーを見せたりすることはありません。
-- **個人情報を Cloudflare の外に出しません。** Slack は別のサービスです。件数とリンクだけを送るので、問い合わせの内容はあなたの D1 データベースにとどまります。
+- **個人情報を Cloudflare の外に出しません。** Slack は別のサービスです。件数、日時、リンクだけを送るので、問い合わせの内容はあなたの D1 データベースにとどまります。フォームで何を尋ねるかは管理者が決めるので、どの回答なら送ってよいかをサーバーは判断できません。そのため、どの回答も送りません。
 - **Queues も再送も使いません。** 管理画面のヘッダーには未読件数が常に出ているので、通知を見逃しても問い合わせを見逃すことにはなりません。
 - **Webhook の URL はシークレットです。** URL を知っている人は誰でもチャンネルに投稿できるので、Worker のシークレットとして持ち、管理画面にも表示しません。
+
+## コード
+
+問い合わせ API は、行を保存したあと、スパムの疑いがない問い合わせのときだけ通知を始めます。
+
+```ts title="packages/server/src/features/contact/contact-routes.ts"
+// 7. After the response: notification (never for suspected spam) and
+//    pruning.
+const webhookUrl = env.SLACK_WEBHOOK_URL;
+if (!suspectedSpam && isSlackWebhookUrl(webhookUrl)) {
+  runInBackground(c, 'slack', () =>
+    sendSlackNotification({
+      db: env.DB,
+      webhookUrl,
+      submissionId: id,
+      payload: buildSlackPayload({
+        locale: options.locale,
+        receivedAt: now,
+        adminUrl: `${origin}/admin/inquiries/${id}`,
+      }),
+    }),
+  );
+}
+```
+
+メッセージは、受信日時と管理画面の URL だけから組み立てます。
+
+```ts title="packages/server/src/features/notify/slack.ts"
+export const buildSlackPayload = ({
+  locale,
+  receivedAt,
+  adminUrl,
+}: {
+  locale: Locale;
+  receivedAt: number;
+  adminUrl: string;
+}): SlackPayload => {
+  const seconds = Math.floor(receivedAt / 1000);
+  const fallback = new Date(receivedAt).toISOString().replace(/\.\d+Z$/, 'Z');
+  return {
+    text: [
+      translate(locale, 'notify.newInquiry'),
+      translate(locale, 'notify.receivedAt', {
+        time: `<!date^${seconds}^{date_short_pretty} {time}|${fallback}>`,
+      }),
+      `<${adminUrl}|${translate(locale, 'notify.open')}>`,
+    ].join('\n'),
+  };
+};
+```

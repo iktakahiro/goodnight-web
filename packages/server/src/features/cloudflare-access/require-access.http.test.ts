@@ -165,7 +165,7 @@ describe('Cloudflare Access check', () => {
 
   test('the contact API is not behind Access', async () => {
     const worker = createTestWorker({ env: ACCESS_ENV });
-    expect((await worker.fetch('/api/contact/config')).status).toBe(200);
+    expect((await worker.fetch('/api/contact/form')).status).toBe(200);
     expect(certsCalls).toBe(0);
   });
 

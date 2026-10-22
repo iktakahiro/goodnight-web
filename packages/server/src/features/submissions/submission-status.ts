@@ -1,15 +1,10 @@
 /** Statuses a submission can have, in the order the admin UI lists them. */
-export const SUBMISSION_STATUSES = [
-  'new',
-  'read',
-  'done',
-  'held',
-  'spam',
-] as const;
+export const SUBMISSION_STATUSES = ['unread', 'read'] as const;
 
 /**
- * Status of a submission: `new` (unread), `read`, `done`, `held` (kept for
- * review, never notified), or `spam`.
+ * Status of a submission: `unread` until an admin opens it, then `read`. An
+ * admin can set it back to `unread`. Suspected spam is a separate flag
+ * (`suspectedSpam`), not a status.
  */
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 

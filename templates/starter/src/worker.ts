@@ -4,7 +4,4 @@
 import { createGoodnightWorker } from '@goodnight-web/server';
 import { siteConfig } from '../site.config';
 
-export default createGoodnightWorker({
-  locale: siteConfig.defaultLocale,
-  contact: { categories: siteConfig.contactCategories },
-});
+export default createGoodnightWorker({ locale: siteConfig.defaultLocale });

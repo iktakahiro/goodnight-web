@@ -12,7 +12,7 @@ bindings the server needs.
 
 | Path                                     | Contents                                                                       |
 | ---------------------------------------- | ------------------------------------------------------------------------------ |
-| `site.config.ts`                         | Company details, nav, locales, theme colors, contact categories                |
+| `site.config.ts`                         | Company details (including the contact email), nav, locales, theme colors      |
 | `src/worker.ts`                          | The `createGoodnightWorker()` call                                             |
 | `wrangler.jsonc`                         | Assets, `run_worker_first`, `DB`, `CONTACT_RATE_LIMITER`, `TURNSTILE_SITE_KEY` |
 | `.dev.vars.example`                      | Every secret with a comment; the Deploy button reads it                        |
@@ -50,11 +50,11 @@ added only when a page needs real interactivity.
 
 ## Worker and bindings
 
-- `src/worker.ts` passes `locale: siteConfig.defaultLocale` and
-  `siteConfig.contactCategories` (values with ja/en labels) to
-  `createGoodnightWorker()`. The server accepts only those values, and the
-  admin UI shows the labels in its current language, so the categories are
-  configured in one place.
+- `src/worker.ts` passes `locale: siteConfig.defaultLocale` to
+  `createGoodnightWorker()`. The contact form fields (including the category
+  options) are not in the starter: admins edit them in the admin UI, and the
+  server stores them in D1
+  ([0008](decisions/0008-contact-form-definition-in-d1.md)).
 - `wrangler.jsonc`: `main: src/worker.ts`, `compatibility_date` 2026-10-15
   with `nodejs_compat` (as in the server's e2e config), assets from `./dist`
   with `binding: ASSETS`, `not_found_handling: 404-page`, and
@@ -80,19 +80,27 @@ added only when a page needs real interactivity.
 
 ## Contact form
 
-- The page renders the form hidden. The script
-  (`src/features/contact/contact-form-client.ts`) calls `getContactConfig()`
-  from `@goodnight-web/server/client`. When `available` is false (or the
-  request fails), it shows the "not available yet" notice with the company's
-  email and phone. Otherwise it loads Turnstile with `render=explicit` and
-  renders the widget with the site key and action from the config. The site
-  key is set only in `wrangler.jsonc`; the static pages never contain it.
-- Field names match `contactRequestSchema`: `name`, `email`, `company`,
-  `phone`, `category`, `message`, `consent`, and the honeypot `website`.
-  `maxlength` values come from `CONTACT_FIELD_LIMITS` at build time.
+- The page shows a loading state. The script
+  (`src/features/contact/contact-form-client.ts`) calls `getContactForm()`
+  from `@goodnight-web/server/client` at runtime and renders the fields of
+  the current form definition in order (labels, placeholders, hints,
+  required marks, `maxlength`, and options in the page's language). The
+  email field, the privacy consent, the honeypot `gnw_hp_x` (off screen,
+  `aria-hidden`, `tabindex="-1"`, `autocomplete="off"`, and the
+  password-manager opt-outs `data-1p-ignore`, `data-lpignore`,
+  `data-bwignore`, `data-form-type="other"`), and the Turnstile widget are
+  always there. When the request fails, it shows a
+  short error with the company email from `site.config.ts`. When
+  `available` is false, it shows the "not available yet" notice. Otherwise
+  it loads Turnstile with `render=explicit` and renders the widget with the
+  site key and action from the same response. The site key is set only in
+  `wrangler.jsonc`; the static pages never contain it.
 - On submit the script checks the fields with the browser's constraint
-  validation, then sends them with `submitContact()`, adding the Turnstile
-  token, `elapsedMs`, and `pagePath`. Results: success (thank-you panel),
+  validation, then sends them with `submitContact()`: `email`, `consent`,
+  `fields` (by field id), `formVersion`, `locale`, the Turnstile token,
+  `elapsedMs`, and `pagePath`. On `form_outdated` (the form changed while the
+  visitor was typing) it loads the form again, keeps the values of fields
+  that still exist, and asks the visitor to send again. Results: success (thank-you panel),
   `invalid_input` (per-field messages from `fields`), `turnstile_failed`,
   `rate_limited`, `contact_unavailable` (switches to the notice), and any
   other error. The Turnstile widget is reset after every failed attempt
@@ -187,7 +195,7 @@ local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
 `.dev.vars` does not change the result.
 
 1. `src/worker.ts` without Turnstile keys: the home page in ja and en, the
-   contact page shows "not available yet", `GET /api/contact/config` says
+   contact page shows "not available yet", `GET /api/contact/form` says
    `available: false`, `POST /api/contact` answers 503, and `/admin` returns
    the admin UI (HTML with a CSP header) from the Worker.
 2. `src/worker.ts` with Cloudflare's Turnstile test keys: the widget gives a
@@ -199,23 +207,22 @@ local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
    siteverify answers marked `result_with_testing_key`, sets `hostname` to
    the request's hostname and `action` to `contact`. The production check is
    unchanged. The test checks the ja validation messages, waits 3.5 s (the
-   server holds faster submissions as `too_fast`), submits, and reads the row
-   with `wrangler d1 execute DB --local`: name, email, category, message,
-   `status = new`, `page_path`, and a 64-character hex `ip_hash`. Then it
+   server flags faster submissions as suspected spam (`too_fast`)), submits, and reads the row
+   with `wrangler d1 execute DB --local`: email, `fields` (name, category,
+   message), `form_version`, `status = unread`, `suspected_spam = 0`, empty
+   `spam_reasons`, `page_path`, and a 64-character hex `ip_hash`. Then it
    opens `/admin` in a Japanese browser context with a CDP virtual
    authenticator (as in `packages/server/e2e`): setup with `SETUP_TOKEN` and
    an `ADMIN_EMAILS` address, passkey registration (one resident credential,
    one `passkey` row, `setup_closed_at` set), sign-out (the admin API answers
-   401), passkey sign-in, the submitted inquiry in the list with the Japanese
-   category label from `site.config.ts`, the switch to English (the English
-   label), the detail (marks it read), and a status change to Done that is
-   stored in D1. It fails on any CSP violation or page error in the admin UI.
+   401), passkey sign-in, the submitted inquiry in the list, the switch to
+   English, the detail (marks it read), and marking it unread again, which
+   is stored in D1. It fails on any CSP violation or page error in the admin UI.
 
 The admin steps find buttons and headings by role, with names from
 `@goodnight-web/server/admin-messages.json` (the admin UI strings, written by
-the package build), and take the contact category from `site.config.ts`. A
-change to the admin copy or to the site's categories does not break the
-test.
+the package build), and the form fields from `GET /api/contact/form`. A
+change to the admin copy or to the form does not break the test.
 
 `E2E_SCREENSHOT_DIR` saves screenshots. `E2E_DEBUG_DIR` saves a screenshot
 of each failed admin step and a Playwright trace of the admin screen. The

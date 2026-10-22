@@ -1,6 +1,10 @@
 /**
- * Site settings: company information, navigation, languages, theme colors,
- * and the contact form categories. Edit the values in `siteConfig` below.
+ * Site settings: company information, navigation, languages, and theme
+ * colors. Edit the values in `siteConfig` below.
+ *
+ * The contact form fields are not set here. Admins edit them in the admin
+ * screen (`/admin`, "Form" page), and the contact page loads them from the
+ * Worker.
  *
  * Every text that visitors see has a Japanese (`ja`) and an English (`en`)
  * version. When you change one, change the other in the same edit.
@@ -26,18 +30,6 @@ export interface NavItem {
 export interface ProfileRow {
   label: Localized;
   value: Localized;
-}
-
-/** One choice in the contact form's category select. */
-export interface ContactCategory {
-  /**
-   * Value sent to the server and stored with the inquiry. Use lowercase ASCII.
-   * The server accepts only the values listed here (`src/worker.ts` passes
-   * them on), and the optional Slack notification shows this value.
-   */
-  value: string;
-  /** Shown in the contact form and, for each stored inquiry, in the admin screen. */
-  label: Localized;
 }
 
 /**
@@ -82,12 +74,6 @@ export interface SiteConfig {
   };
   nav: NavItem[];
   theme: ThemeColors;
-  /**
-   * Choices for "category" in the contact form, in order. The Turnstile keys
-   * are not set here: the site key is `TURNSTILE_SITE_KEY` in
-   * `wrangler.jsonc`, and the secret key is a Worker secret.
-   */
-  contactCategories: ContactCategory[];
 }
 
 /** The settings for this site. */
@@ -177,12 +163,4 @@ export const siteConfig: SiteConfig = {
     background: '#fbfaf5',
     foreground: '#253229',
   },
-
-  contactCategories: [
-    { value: 'service', label: { ja: 'サービスについて', en: 'Services' } },
-    { value: 'press', label: { ja: '取材について', en: 'Press' } },
-    { value: 'recruit', label: { ja: '採用について', en: 'Careers' } },
-    { value: 'sales', label: { ja: '営業・ご提案', en: 'Business proposal' } },
-    { value: 'other', label: { ja: 'その他', en: 'Other' } },
-  ],
 };

@@ -7,6 +7,9 @@ const MIGRATIONS_DIR = join(import.meta.dir, '../../migrations');
 
 type Value = SQLQueryBindings;
 
+// D1 refuses a statement with more bound parameters than this.
+const MAX_BOUND_PARAMETERS = 100;
+
 const toBinding = (value: unknown): Value => {
   // D1 accepts null, numbers, strings, booleans, and ArrayBuffers. Reject the
   // rest like D1 does, so tests catch values D1 would not store.
@@ -57,6 +60,11 @@ class Statement {
   ) {}
 
   bind(...values: unknown[]): Statement {
+    if (values.length > MAX_BOUND_PARAMETERS) {
+      throw new Error(
+        `D1_ERROR: too many SQL variables (${values.length} > ${MAX_BOUND_PARAMETERS})`,
+      );
+    }
     return new Statement(this.db, this.gate, this.sql, values.map(toBinding));
   }
 
@@ -115,7 +123,7 @@ class Statement {
  * Test-only D1 stand-in backed by an in-memory `bun:sqlite` database with the
  * package migrations applied. It covers the D1 API the package and Better
  * Auth use (`prepare`, `bind`, `first`, `all`, `run`, `raw`, `batch`,
- * `exec`). The end-to-end test runs against real local D1 in `wrangler dev`.
+ * `exec`), and refuses more than 100 bound parameters per statement like D1. The end-to-end test runs against real local D1 in `wrangler dev`.
  *
  * `pauseAt(pattern)` holds the next statement whose SQL matches `pattern`
  * (each call catches one statement, in call order) until the test releases

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { createTestD1 } from '../../testing/sqlite-d1.ts';
+import { testSubmission } from '../../testing/submissions.ts';
 import { insertSubmission } from '../submissions/submission-store.ts';
 import { PRUNE_INTERVAL_MS, pruneIfDue } from './prune.ts';
 
@@ -9,24 +10,7 @@ const NOW = Date.UTC(2026, 9, 22);
 const setup = async () => {
   const { d1, sqlite } = createTestD1();
   const add = (id: string, createdAt: number) =>
-    insertSubmission(d1, {
-      id,
-      createdAt,
-      name: 'n',
-      email: 'e@example.org',
-      company: null,
-      phone: null,
-      category: null,
-      body: 'b',
-      status: 'new',
-      spamScore: 0,
-      spamReasons: [],
-      ipHash: null,
-      userAgent: null,
-      country: null,
-      pagePath: null,
-      consentAt: createdAt,
-    });
+    insertSubmission(d1, testSubmission(id, { createdAt }));
   const ids = () =>
     (
       sqlite.query('SELECT id FROM submissions ORDER BY id').all() as {

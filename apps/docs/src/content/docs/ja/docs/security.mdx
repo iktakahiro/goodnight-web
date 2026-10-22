@@ -11,9 +11,9 @@ description: 管理画面、最初の管理者の作成、問い合わせフォ�
 
 ## 原則
 
-- **安全側に倒します。** 必要な設定やシークレットが足りないときは、それを必要とする機能を止めます。`TURNSTILE_SECRET` がなければ、問い合わせ API は 503 を返します。
+- **フェイルクローズにします。** 必要な設定やシークレットが足りないときは、それを必要とする機能を止めます。`TURNSTILE_SECRET` がなければ、問い合わせ API は 503 を返します。
 - **ログインなしで管理画面を開かせません。** 開発用の抜け道、既定のアカウント、共有のキーはありません。
-- **問い合わせを失いません。** 応答の前に保存します。スパムスコアが高い問い合わせは捨てずに保留します。
+- **問い合わせを失いません。** 応答の前に保存します。スパムの疑いがある問い合わせ（honeypot が埋まっている、スパムスコアが高い）も捨てずに保存し、別に表示します。
 - **個人情報を Cloudflare の外に出しません。** 通知に個人情報を含めず、生の IP アドレスも保存しません。
 
 ## 管理画面
@@ -25,8 +25,8 @@ description: 管理画面、最初の管理者の作成、問い合わせフォ�
 | `ADMIN_EMAILS`                 | リクエストのたびに読み直します。アドレスを外すと、そのセッションは次のリクエストから使えなくなります。[管理者を外す](#removing-an-admin)を参照してください。                                                                                                                                                                              |
 | HTTPS                          | 管理画面、管理 API、セットアップ、ログインは `https://` でだけ動きます。[HTTPS](#https) を参照してください。                                                                                                                                                                                                                              |
 | Cloudflare Access              | 強く推奨しますが、任意です。管理用のパスに Access のアプリケーションを設定します。たとえば Google のログインや、メールで届くワンタイムコードを使えます。50 ユーザーまで無料です。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すると、Worker も Access のトークンを確認します。[Cloudflare Access](#cloudflare-access) を参照してください。 |
-| 最初の管理者                   | `SETUP_TOKEN` と、`ADMIN_EMAILS` にあるメールアドレスが必要です。Access の 2 つの設定があるときは、正しい Access のトークンも必要です。最初のパスキーを登録するとセットアップは閉じます。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照してください。                                                                     |
-| `workers.dev` とプレビュー URL | Access のポリシーから漏れやすいアドレスです。自分のドメインで動くようになったら無効にしてください。Access がなくても、管理画面にはパスキーでのログインが必要です。                                                                                                                                                                        |
+| 最初の管理者                   | `SETUP_TOKEN` と、`ADMIN_EMAILS` にあるメールアドレスが必要です。Access の 2 つの設定があるときは、正しい Access のトークンも必要です。最初のパスキーを登録するとセットアップは完了し、それ以降は使えません。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照してください。                                                 |
+| `workers.dev` とプレビュー URL | Access のポリシーから漏れやすいアドレスです。独自ドメインで動くようになったら無効にしてください。Access がなくても、管理画面にはパスキーでのログインが必要です。                                                                                                                                                                          |
 | CSRF                           | `Origin` の確認と `SameSite` の Cookie で防ぎます。                                                                                                                                                                                                                                                                                       |
 | ヘッダー                       | Worker の応答に Content Security Policy などのセキュリティヘッダーを付けます。どのヘッダーを付けるかはパスを正規化してから決めるので、`/%61dmin`、`//admin`、`/admin/..%2f` にも `/admin` と同じヘッダーが付きます。                                                                                                                      |
 
@@ -35,8 +35,8 @@ description: 管理画面、最初の管理者の作成、問い合わせフォ�
 ### セッションとセットアップ [#sessions-and-setup]
 
 - すでにユーザーがいるアドレスでセットアップをもう一度行うと、そのユーザーの以前のセッションを先に削除します。
-- 最初のパスキーを登録するとセットアップが閉じ、データベースにあるすべてのセッションを削除します。ブラウザには、パスキーの登録そのものから、パスキーより後に作られた新しいセッションが渡されます。
-- セットアップが閉じたあとは、パスキーを持たないユーザーはパスキーを登録できません。セットアップのときのセッションが残っていても、別の管理者は作れません。
+- 最初のパスキーを登録するとセットアップが完了し、データベースにあるすべてのセッションを削除します。ブラウザには、パスキーの登録そのものから、パスキーより後に作られた新しいセッションが渡されます。
+- セットアップが完了したあとは、パスキーを持たないユーザーはパスキーを登録できません。セットアップのときのセッションが残っていても、別の管理者は作れません。
 - 最初のパスキーより前に作られたセッションには、削除されずに残っていても、管理 API は 401 を返します。
 
 ### HTTPS [#https]
@@ -82,14 +82,14 @@ Worker は `ADMIN_EMAILS` をリクエストのたびに読みます。アドレ
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
 ```
 
-これでセットアップがまた開くことはありません。`settings.setup_closed_at` は残ります。
+これでセットアップがまた使えるようになることはありません。`settings.setup_closed_at` は残ります。
 
 ## 問い合わせフォーム
 
 - Turnstile はサーバー側で検証し、`hostname` と `action` も確認します。
 - 本文を読む前に、`Origin`、`Content-Type`、本文のサイズを確認します。
-- honeypot 欄が入力されていたら、通常の成功の応答を返しますが、何も保存しません。そのリクエストも回数制限に数えます。
-- スパムスコアが高い送信は `held` にします。
+- honeypot 欄が入力されていても、応答は変えません。その送信も Turnstile と回数制限と検証を通す必要があり、通ればスパムの疑いとして保存します。honeypot 欄の値そのものは保存しません。
+- スパムスコアが高い送信には、スパムの疑いの印を付けます。スパムの疑いがある送信は Slack に通知せず、管理画面では別に表示します。
 - Rate Limiting binding で、`ip_hash` ごとに送信回数を制限します。
 - ページに API キーを入れません。ブラウザが読めるキーは秘密ではないので、守っているという誤解を生むだけです。
 
@@ -101,11 +101,11 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id
 
 - すべてのクエリで [Drizzle ORM](https://orm.drizzle.team/) のクエリビルダーを使います。管理画面の一覧の件数とオフセットも含めて、値はバインドされたパラメーターとして D1 に送ります。
 - URL から来る数値は、クエリに渡す前にルートで確認します。`page` は 1 から 100,000、`limit` は 1 から 100 で、数字だけで書かれている必要があります。`1; DROP TABLE submissions`、`-1`、`1e9`、`50 OFFSET 0` のような値には 400 を返します。
-- 生の SQL は Drizzle の `sql` テンプレートでだけ書けます。このテンプレートも値をバインドします。サーバーのコードが `sql.raw()` や D1 の `prepare()` を直接呼ぶと、CI のチェックが失敗します。
+- 生の SQL は Drizzle の `sql` テンプレートでだけ書けます。このテンプレートも値をバインドします。サーバーのコードが `sql.raw()` や D1 の `prepare()` を直接呼んだり、Drizzle の `$client` で D1 の binding に触れたりすると、CI のチェックが失敗します（`bun run check:sql`。[データベースとマイグレーション](/ja/docs/database/#how-queries-are-written)を参照）。
+- メールアドレスの検索では、`%`、`_`、`\` をエスケープし、パターンを 1 つのバインドされたパラメーターとして `ESCAPE '\'` 付きで送ります。
 - テストでは、一覧の API にインジェクション用の文字列を送って 400 になることを確かめます。また、データベースに送った文を記録して、入力がパラメーターにだけ現れることを確かめます。
 
-```ts
-// packages/server/src/features/admin-api/admin-query.ts
+```ts title="packages/server/src/features/admin-api/admin-query.ts"
 const boundedInteger = (max: number) =>
   z
     .string()
@@ -113,39 +113,42 @@ const boundedInteger = (max: number) =>
     .regex(/^[1-9][0-9]*$/)
     .transform(Number)
     .pipe(z.number().int().min(1).max(max));
-
-export const listQuerySchema = z.object({
-  status: statusParam,
-  page: boundedInteger(ADMIN_MAX_PAGE).default(1),
-  limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
-});
-
-// packages/server/src/features/submissions/submission-store.ts
-orm
-  .select()
-  .from(submissions)
-  .where(statusIs(status))
-  .orderBy(...NEWEST_FIRST)
-  .limit(limit)
-  .offset(offset);
 ```
 
+```ts title="packages/server/src/features/admin-api/admin-query.ts"
+export const listQuerySchema = z
+  .strictObject({
+    ...filterShape,
+    dir: z.enum(['asc', 'desc']).default('desc'),
+    page: boundedInteger(ADMIN_MAX_PAGE).default(1),
+    limit: boundedInteger(ADMIN_MAX_PAGE_SIZE).default(ADMIN_PAGE_SIZE),
+  })
+  .refine(bothOrNeither);
+```
+
+`filterShape` には、`view`（`unread`、`read`、`all`、`spam`）、`q`（メールアドレスの検索。254 文字まで）、バージョンと選択肢の絞り込みがあり、それぞれ zod のスキーマを持ちます。続いて、ストアが Drizzle でクエリを組み立てます（[データベースとマイグレーション](/ja/docs/database/#how-queries-are-written)を参照）。`?view=unread&q=50%_off&page=3` のとき、テストで使う記録用の D1 には、次の文とパラメーターが届きます。
+
 ```sql
-select "id", "created_at", ... from "submissions"
-where "submissions"."status" = ?
+select "id", "created_at", "email", "status", "suspected_spam", ... from "submissions"
+where (("submissions"."status" = ? and "submissions"."suspected_spam" = ?)
+  and lower("submissions"."email") like ? escape '\')
 order by "submissions"."created_at" desc, "submissions"."id" desc
 limit ? offset ?
 ```
 
-SQL の文字列は、状態、ページ、件数が何であっても同じです。変わるのはパラメーターだけです。[データベースとマイグレーション](/ja/docs/database/)を参照してください。
+```json
+["unread", 0, "%50\\%\\_off%", 50, 100]
+```
+
+SQL の文字列は、検索する文字、ページ、件数が何であっても同じです。変わるのはパラメーターだけです。[データベースとマイグレーション](/ja/docs/database/)を参照してください。
 
 ## シークレット
 
 - シークレット（`SETUP_TOKEN`、`ADMIN_EMAILS`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET`、`TURNSTILE_SECRET`、`SLACK_WEBHOOK_URL`）はすべて Worker のシークレットに置きます。
-- `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は、ないのと同じ扱いで機能を止めます。セットアップ、ログイン、問い合わせフォームが 503 を返します。セットアップが開いている間は、`GET /api/setup` が足りない設定や短すぎる設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときは、管理画面にも表示します。
+- `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は設定されていないものとみなされ、それを使うセットアップ、ログイン、問い合わせフォームが 503 を返します。セットアップが完了するまでは、`GET /api/setup` が足りない設定や短すぎる設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときは、管理画面にも表示します。
 - セットアップが終わったら `SETUP_TOKEN` は削除してください。もう使いません。
 - ブラウザに返すことも、D1 に書くこともありません。Slack の Webhook URL は管理画面にも表示しません。
-- 管理画面に更新ボタンはありません。あなたの GitHub リポジトリに書き込める token が必要になるからです。
+- 管理画面に更新ボタンはありません。あなたの GitHub リポジトリに書き込めるトークンが必要になるからです。
 
 ## CSV の書き出し
 
@@ -156,15 +159,15 @@ SQL の文字列は、状態、ページ、件数が何であっても同じで�
 
 - 修正は Dependabot の PR で届きます。公式アップデートのコメントが付いた PR だけをマージしてください。[配布と更新のしくみ](/ja/docs/distribution/)を参照してください。
 - リポジトリは private にしてください。public の間は、starter の公開範囲チェックが失敗します。
-- goodnight-web は、自分の依存関係を少なくし、バージョンを固定しています。
+- goodnight-web は、それ自体の依存関係を少なくし、バージョンを固定しています。
 
 ## 守れないもの
 
-- あなたの Cloudflare アカウントや GitHub リポジトリに入れる人。
+- あなたの Cloudflare アカウントや GitHub リポジトリに入れる人が行うこと。
 - あなたのパスキーが入った端末を、ほかの人が使うこと。
 - 公式アップデートではない PR をマージすること。
-- あなたが自分のサイトに載せる内容と、starter に加えた変更のコード。
-- Turnstile と回数制限をすり抜けるスパム。保留やスパムとして扱いますが、完全には防げません。
+- あなたがサイトに載せる内容と、starter に加えた変更のコード。
+- Turnstile と回数制限をすり抜けるスパム。honeypot とスパムスコアで多くにスパムの疑いの印を付けますが、通常の一覧に届くものもあります。
 
 ## 脆弱性の報告
 

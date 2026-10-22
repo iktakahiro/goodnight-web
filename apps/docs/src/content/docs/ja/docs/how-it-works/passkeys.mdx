@@ -3,20 +3,66 @@ title: パスキーでのログイン
 description: 管理者は Better Auth のパスキーでログインします。メールとパスワードでのログインは無効にしています。このページではその理由を説明します。
 ---
 
-<Callout type='info'>
-  コードの抜粋は、サーバーのパッケージができたら追加します。
-</Callout>
-
 ## 何をするか
 
 - 管理画面と管理 API は、[Better Auth](https://better-auth.com/) とそのパスキープラグインを使います。Better Auth は、ユーザー、セッション、パスキーを同じ D1 データベースに保存します。
 - メールとパスワードでのログインは無効です。開発用の抜け道、既定のアカウント、共有のキーはありません。
 - Better Auth のインスタンスは、リクエストで必要になったときに Worker の binding から作り、同じ isolate の後のリクエストでも使い回します。作るのに CPU を約 5 ms 使うので、毎回作ると無料プランの上限の半分を使ってしまいます。binding が変われば、新しいインスタンスを作ります。
 - Better Auth はセッションに IP アドレスを記録しません。パスキーの登録とログインには、本人確認（PIN や生体認証）が必要です。
-- ログインのリクエストには、お問い合わせフォームと同じ Rate Limiting binding で、ハッシュ化した IP アドレスごとに回数の制限をかけます。その binding か `IP_HASH_SECRET` がなければ、ログインは使えません。
+- ログインのリクエストには、問い合わせフォームと同じ Rate Limiting binding で、ハッシュ化した IP アドレスごとに回数の制限をかけます。その binding か `IP_HASH_SECRET` がなければ、ログインは使えません。
 - ログイン、セットアップ、管理画面、管理 API は `https://` でだけ動きます（`wrangler dev` のために `localhost` では平文の HTTP も使えます）。`http://` での `GET` は `https://` にリダイレクトし、それ以外のリクエストには 403 を返します。
 - `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` の前に Cloudflare Access を置くこともできます。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すれば、Worker も Access のトークンを確認します。Access を使っても、パスキーでのログインは必要です。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。
 - 管理 API が受け付けるのは、最初のパスキーと同時かそれより後に作られたセッション、つまりパスキーでのログインか最初のパスキーの登録で作られたセッションだけです。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/#sessions)を参照してください。
+
+## コードでは
+
+Better Auth は `emailAndPassword: { enabled: false }` で、IP アドレスの記録も切って（`advanced.ipAddress.disableIpTracking`）設定しています。パスキープラグインは、リクエストのホスト名を relying party ID にし、本人確認を必須にします。プラグイン自体はこれを強制しないので、登録のフックでもう一度確かめます。
+
+```ts title="packages/server/src/features/auth/auth.ts"
+passkey({
+  rpID: new URL(origin).hostname,
+  rpName: 'goodnight-web',
+  origin,
+  authenticatorSelection: {
+    residentKey: 'required',
+    userVerification: 'required',
+  },
+  // The plugin verifies with requireUserVerification: false, so enforce
+  // user verification (PIN or biometrics) here.
+  registration: {
+    afterVerification: async ({ ctx, verification, user }) => {
+      if (!verification.registrationInfo?.userVerified) {
+        throw new APIError('UNAUTHORIZED', {
+          message: 'user verification required',
+        });
+      }
+```
+
+インスタンスは isolate ごとにキャッシュし、`env` オブジェクトとオリジンをキーにします。
+
+```ts title="packages/server/src/features/auth/auth.ts"
+// Building betterAuth() costs about 5 ms of CPU, close to the free plan's
+// 10 ms limit, so instances are reused within an isolate. They are keyed by
+// the env object (a new env means new bindings or secrets) and by origin
+// (passkeys are bound to the hostname). See docs/decisions/0001.
+const cache = new WeakMap<GoodnightEnv, Map<string, GoodnightAuth>>();
+```
+
+```ts title="packages/server/src/features/auth/auth.ts"
+export const getAuth = (env: GoodnightEnv, origin: string): GoodnightAuth => {
+  let byOrigin = cache.get(env);
+  if (!byOrigin) {
+    byOrigin = new Map();
+    cache.set(env, byOrigin);
+  }
+  let auth = byOrigin.get(origin);
+  if (!auth) {
+    auth = buildAuth(env, origin);
+    byOrigin.set(origin, auth);
+  }
+  return auth;
+};
+```
 
 ## なぜパスキーか
 
@@ -26,8 +72,8 @@ description: 管理者は Better Auth のパスキーでログインします。
 
 ## 知っておくこと
 
-- **パスキーは 1 つのドメインに結びつきます。** パスキーは自分のドメインを追加してから登録してください。`workers.dev` のアドレスで登録したパスキーは、自分のドメインでは使えません。
-- **パスキーをすべてなくすとログインできなくなります。** パスキーを複数（たとえばスマートフォンとノートパソコン）登録してください。セットアップが閉じたあとは、パスキーを持たないユーザーはパスキーを登録できないので、2 人目の管理者は追加できません。復旧の手順は、まだ決まっていません。
+- **パスキーは 1 つのドメインに結びつきます。** パスキーは独自ドメインを追加してから登録してください。`workers.dev` のアドレスで登録したパスキーは、独自ドメインでは使えません。
+- **パスキーをすべてなくすとログインできなくなります。** パスキーを複数（たとえばスマートフォンとノートパソコン）登録してください。セットアップが完了したあとは、パスキーを持たないユーザーは新しくパスキーを登録できません。そのため、2 人目の管理者は追加できません。パスキーをすべてなくしたときの復旧の手順は、まだ決まっていません。
 
 <Callout type='warn' title='下書き / 未検証'>
   `wrangler dev` と手元の D1 に対して、Chromium

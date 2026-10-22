@@ -4,7 +4,6 @@
 // "contact" action, and any other token fails.
 import { createGoodnightWorker } from '../src/index.ts';
 import { TURNSTILE_SITEVERIFY_URL } from '../src/features/contact/turnstile.ts';
-import { e2eCategories } from './categories.ts';
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (
@@ -24,9 +23,4 @@ globalThis.fetch = (async (
   return realFetch(input, init);
 }) as typeof fetch;
 
-export default createGoodnightWorker({
-  locale: 'en',
-  contact: {
-    categories: e2eCategories,
-  },
-});
+export default createGoodnightWorker({ locale: 'en' });

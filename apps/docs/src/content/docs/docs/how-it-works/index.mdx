@@ -3,12 +3,9 @@ title: How it works
 description: One page for each part of goodnight-web, with what it does and why it is built that way.
 ---
 
-<Callout type='info'>
-  These pages describe the design from the product requirements. Code excerpts
-  will be added once the server package lands.
-</Callout>
+Each page says what the part does, quotes the code that does it (with the file path above each excerpt), and explains why it is built that way. The excerpts are short and copied from the repository; follow the path to read the whole file.
 
-- [Contact form protection](/docs/how-it-works/contact-protection/): Turnstile verified on the server, a honeypot field, and the Rate Limiting binding.
+- [Contact form protection](/docs/how-it-works/contact-protection/): Turnstile verified on the server, a honeypot field, a rule-based spam score, and the Rate Limiting binding.
 - [Passkey sign-in](/docs/how-it-works/passkeys/): why admins use passkeys and not passwords.
 - [First admin setup](/docs/how-it-works/first-admin/): how `SETUP_TOKEN` and `ADMIN_EMAILS` stop a stranger from becoming the first admin.
 - [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/): how the retention period works with no scheduled job.

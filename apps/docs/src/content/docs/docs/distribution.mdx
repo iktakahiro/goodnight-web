@@ -30,7 +30,20 @@ The Deploy to Cloudflare button copies the public starter repository into a **ne
 ## How updates reach you
 
 1. goodnight-web publishes a new version of `@goodnight-web/server`. If it fixes a vulnerability, a GitHub security advisory comes with it.
-2. The starter ships a `.github/dependabot.yml` that groups `@goodnight-web/*` updates and sets a cooldown of a few days. Dependabot only proposes a version after it has been public for that long. Security updates are not delayed by the cooldown.
+2. The starter ships a `.github/dependabot.yml` that groups `@goodnight-web/*` updates and sets a cooldown of 5 days. Dependabot only proposes a version after it has been public for that long. Security updates are not delayed by the cooldown. Minor and patch updates of the site's other packages (such as Astro) come in a second group.
+
+   ```yaml title="templates/starter/.github/dependabot.yml"
+   cooldown:
+     default-days: 5
+   groups:
+     goodnight-web:
+       patterns: ['@goodnight-web/*']
+     site-dependencies:
+       patterns: ['*']
+       exclude-patterns: ['@goodnight-web/*']
+       update-types: [minor, patch]
+   ```
+
 3. Dependabot opens one pull request in your repository.
 4. Workers Builds builds the pull request and shows a preview.
 5. You check the preview and merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
@@ -45,21 +58,80 @@ A pull request counts as an **official update** only if all of these are true:
 
 - The author is `dependabot[bot]` and the account type is `Bot`.
 - The branch is in your own repository, not in a fork.
-- The only changed files are `package.json` and lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`).
+- The only changed files are `package.json` and lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`), and each of them is modified, not added or removed.
 - In `package.json`, every changed line is the version of a `@goodnight-web/*` dependency.
 
 The lockfile may change in other ways. A new `@goodnight-web/server` version can bring new versions of the packages it uses (for example `hono`), and those changes appear only in the lockfile. The packages your site depends on directly are listed in `package.json`, and that diff is checked line by line. If the check cannot see every change, the pull request is not counted as official: for example, when GitHub leaves out or cuts short the `package.json` diff, or when the list of changed files may be incomplete.
+
+The script `.github/scripts/update-check.cjs` collects a reason for every rule that fails. The pull request is official only when the list stays empty. The first two rules:
+
+{/* prettier-ignore */}
+```js title="templates/starter/.github/scripts/update-check.cjs"
+const user = pullRequest.user;
+if (!user || user.login !== OFFICIAL_AUTHOR || user.type !== 'Bot') {
+  reasons.push(
+    `author is not ${OFFICIAL_AUTHOR}: ${user ? user.login : 'unknown'}`,
+  );
+}
+
+const headRepo = pullRequest.head.repo
+  ? pullRequest.head.repo.full_name
+  : null;
+if (headRepo !== pullRequest.base.repo.full_name) {
+  reasons.push(
+    `branch is not in this repository: ${headRepo ?? 'deleted repository'}`,
+  );
+}
+```
+
+Then every changed line in `package.json` must be an `@goodnight-web/*` entry set to a version number:
+
+```js title="templates/starter/.github/scripts/update-check.cjs"
+for (const change of packageJsonChanges(hunks)) {
+  if (change.name === null) {
+    reasons.push(
+      `package.json: change outside a dependency entry: ${change.line}`,
+    );
+  } else if (!change.name.startsWith(OFFICIAL_SCOPE)) {
+    reasons.push(
+      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${change.name}`,
+    );
+  } else if (change.invalidSpec) {
+    reasons.push(
+      `package.json: ${change.name} is not set to a version number: ${change.line}`,
+    );
+  } else {
+    officialChanges += 1;
+  }
+}
+```
 
 For an official update, the workflow posts: "Official goodnight-web update. Safe to merge after checking the preview." For anything else it posts: "This is not an official update. If you don't understand the changes, don't merge." The comment is in Japanese and English, and the workflow updates the same comment instead of adding new ones.
 
 **Merge only pull requests that have the official update comment.**
 
-The workflow runs on `pull_request_target`, so it has the permission to comment, but it never checks out or runs code from the pull request. It reads only the pull request's metadata and its list of changed files through the GitHub API.
+The workflow runs on `pull_request_target`, so it has the permission to comment, but it never checks out or runs code from the pull request. It checks out only `.github/scripts` from the base branch, so the script that runs is the one already in your repository, and it reads the pull request's metadata and its list of changed files through the GitHub API:
+
+```yaml title="templates/starter/.github/workflows/update-check.yml"
+steps:
+  - name: Check out the script from the base branch
+    uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    with:
+      ref: ${{ github.event.pull_request.base.sha }}
+      persist-credentials: false
+      sparse-checkout: .github/scripts
+  - name: Classify the pull request and comment
+    uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+    with:
+      script: |
+        const { run } = require('./.github/scripts/update-check.cjs');
+        await run({ github, context, core });
+```
 
 ## Your repository must be private [#private-repository]
 
 Keep your copy of the site in a **private** repository. A public repository shows anyone your full site source, your configuration, and the history of every change, including anything committed by mistake. It also lets strangers open pull requests, which is exactly the situation the update check workflow warns about.
 
-The starter includes `.github/workflows/visibility-check.yml`. It runs on every push (and can be started by hand). If the repository is public, the job fails with an error in Japanese and English that tells you to make it private. It needs no token and no permissions.
+The starter includes `.github/workflows/visibility-check.yml`. It runs on every push (and can be started by hand). If the repository is public, the job fails with an error in Japanese and English that tells you to make it private. It needs no token and no permissions. The job is skipped only in the public starter repository that sites are copied from.
 
 To make a GitHub repository private: **Settings > General > Danger Zone > Change visibility**, then choose private.

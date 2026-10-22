@@ -10,9 +10,12 @@ import {
   ORIGIN,
   type TestWorker,
 } from '../../testing/test-worker.ts';
+import { testSubmission } from '../../testing/submissions.ts';
 import {
   EXPORT_BATCH_SIZE,
+  getSubmission,
   insertSubmission,
+  updateSubmission,
 } from '../submissions/submission-store.ts';
 import type { SubmissionStatus } from '../submissions/submission-status.ts';
 
@@ -22,35 +25,31 @@ const seed = async (
   worker: TestWorker,
   id: string,
   {
-    status = 'new',
+    status = 'unread',
+    suspectedSpam = false,
     createdAt = Date.now(),
     name = 'Taro',
     body = 'Hello',
+    email,
   }: {
     status?: SubmissionStatus;
+    suspectedSpam?: boolean;
+    email?: string;
     createdAt?: number;
     name?: string;
     body?: string;
   } = {},
 ) =>
-  insertSubmission(worker.env.DB, {
-    id,
-    createdAt,
-    name,
-    email: `${id}@example.org`,
-    company: null,
-    phone: null,
-    category: 'sales',
-    body,
-    status,
-    spamScore: 0,
-    spamReasons: [],
-    ipHash: 'hash',
-    userAgent: null,
-    country: 'JP',
-    pagePath: '/contact',
-    consentAt: createdAt,
-  });
+  insertSubmission(
+    worker.env.DB,
+    testSubmission(id, {
+      status,
+      suspectedSpam,
+      createdAt,
+      ...(email ? { email } : {}),
+      fields: { f_name: name, f_category: 'sales', f_message: body },
+    }),
+  );
 
 const ENDPOINTS: [string, string][] = [
   ['GET', '/api/admin/me'],
@@ -60,7 +59,20 @@ const ENDPOINTS: [string, string][] = [
   ['PATCH', '/api/admin/submissions/abc'],
   ['DELETE', '/api/admin/submissions/abc'],
   ['GET', '/api/admin/submissions.csv'],
+  ['GET', '/api/admin/form'],
+  ['PUT', '/api/admin/form'],
+  ['GET', '/api/admin/form/versions/1'],
+  ['POST', '/api/admin/form/versions/1/restore'],
 ];
+
+const requestBody = (method: string) =>
+  method === 'PATCH'
+    ? JSON.stringify({ status: 'read' })
+    : method === 'PUT'
+      ? JSON.stringify({ baseVersion: 1, fields: [] })
+      : method === 'POST'
+        ? JSON.stringify({ baseVersion: 1 })
+        : undefined;
 
 describe('admin API without a valid admin session', () => {
   test.each(ENDPOINTS)(
@@ -71,8 +83,7 @@ describe('admin API without a valid admin session', () => {
       const response = await worker.fetch(path, {
         method,
         headers: { origin: ORIGIN, 'content-type': 'application/json' },
-        body:
-          method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+        body: requestBody(method),
       });
       expect(response.status).toBe(401);
       expect((await response.json()).error.code).toBe('unauthorized');
@@ -122,8 +133,7 @@ describe('admin API without a valid admin session', () => {
             origin: ORIGIN,
             'content-type': 'application/json',
           },
-          body:
-            method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+          body: requestBody(method),
         });
       expect(
         (await worker.fetch('/api/admin/me', { headers: { cookie } })).status,
@@ -136,7 +146,10 @@ describe('admin API without a valid admin session', () => {
         worker.sqlite
           .query("SELECT status FROM submissions WHERE id = 'abc'")
           .get(),
-      ).toEqual({ status: 'new' });
+      ).toEqual({ status: 'unread' });
+      expect(
+        worker.sqlite.query('SELECT COUNT(*) AS n FROM form_definitions').get(),
+      ).toEqual({ n: 1 });
     },
   );
 
@@ -218,7 +231,7 @@ describe('admin API with an admin session', () => {
     for (let i = 0; i < 55; i++) {
       await seed(worker, `id-${String(i).padStart(2, '0')}`, {
         createdAt: now - i * 1000,
-        status: i % 5 === 0 ? 'done' : 'new',
+        status: i % 5 === 0 ? 'read' : 'unread',
       });
     }
     const first = await (await get('/api/admin/submissions')).json();
@@ -239,10 +252,12 @@ describe('admin API with an admin session', () => {
       'id-53',
       'id-54',
     ]);
-    const done = await (await get('/api/admin/submissions?status=done')).json();
-    expect(done.total).toBe(11);
-    expect(done.unreadCount).toBe(44);
-    expect((await get('/api/admin/submissions?status=bogus')).status).toBe(400);
+    const read = await (await get('/api/admin/submissions?view=read')).json();
+    expect(read.total).toBe(11);
+    expect(read.unreadCount).toBe(44);
+    const asc = await (await get('/api/admin/submissions?dir=asc')).json();
+    expect(asc.items[0].id).toBe('id-54');
+    expect((await get('/api/admin/submissions?view=bogus')).status).toBe(400);
     expect((await get('/api/admin/submissions?page=0')).status).toBe(400);
   });
 
@@ -259,9 +274,12 @@ describe('admin API with an admin session', () => {
 
   // Each value must be rejected at the route before it reaches a query.
   const MALICIOUS_QUERIES: [string, string][] = [
-    ['status', "new' OR 1=1 --"],
-    ['status', 'new; DROP TABLE submissions'],
-    ['status', 'NEW'],
+    ['view', "unread' OR 1=1 --"],
+    ['view', 'unread; DROP TABLE submissions'],
+    ['view', 'UNREAD'],
+    ['view', 'held'],
+    ['status', 'unread'],
+    ['q', 'a'.repeat(255)],
     ['limit', '1; DROP TABLE submissions'],
     ['limit', '-1'],
     ['limit', '0'],
@@ -290,6 +308,18 @@ describe('admin API with an admin session', () => {
     ['page', ' 1'],
     ['page', 'abc'],
     ['page', ''],
+    ['version', "1' OR '1'='1"],
+    ['version', '0'],
+    ['version', '1.5'],
+    ['sort', 'received_at'],
+    ['sort', 'email'],
+    ['sort', 'f_name'],
+    ['sort', 'created_at; DROP TABLE submissions'],
+    ['dir', 'sideways'],
+    ['field', 'f_category'],
+    ['value', 'sales'],
+    ['search', 'Taro'],
+    ['keyword', 'Taro'],
   ];
 
   test.each(MALICIOUS_QUERIES)(
@@ -307,38 +337,166 @@ describe('admin API with an admin session', () => {
     },
   );
 
-  test('GET /submissions.csv rejects a malicious status with 400', async () => {
-    const query = new URLSearchParams({ status: "new' OR 1=1 --" });
+  test('GET /submissions.csv rejects a malicious view with 400', async () => {
+    const query = new URLSearchParams({ view: "unread' OR 1=1 --" });
     const response = await get(`/api/admin/submissions.csv?${query}`);
     expect(response.status).toBe(400);
   });
 
-  test('the detail view marks a new submission as read', async () => {
+  test('the detail view marks an unread submission as read', async () => {
     await seed(worker, 'abc');
     const detail = await (await get('/api/admin/submissions/abc')).json();
-    expect(detail).toMatchObject({ id: 'abc', status: 'read', body: 'Hello' });
+    expect(detail).toMatchObject({
+      id: 'abc',
+      status: 'read',
+      formVersion: 1,
+      currentFormVersion: 1,
+    });
+    expect(
+      detail.entries.find((entry: { id: string }) => entry.id === 'f_message'),
+    ).toEqual({
+      id: 'f_message',
+      type: 'textarea',
+      label: { ja: 'お問い合わせ内容', en: 'Message' },
+      value: { kind: 'text', text: 'Hello' },
+      inCurrentForm: true,
+    });
     expect(detail.readAt).toBeNumber();
     expect(detail).not.toHaveProperty('ipHash');
+    expect(detail).not.toHaveProperty('fields');
     const list = await (await get('/api/admin/submissions')).json();
     expect(list.unreadCount).toBe(0);
     expect((await get('/api/admin/submissions/missing')).status).toBe(404);
   });
 
-  test('changes the status', async () => {
+  test('the detail view returns the stored state', async () => {
     await seed(worker, 'abc');
-    const response = await send('PATCH', '/api/admin/submissions/abc', {
-      status: 'spam',
+    const detail = await (await get('/api/admin/submissions/abc')).json();
+    const stored = await getSubmission(worker.env.DB, 'abc');
+    expect(stored).toMatchObject({ status: 'read' });
+    expect(detail).toMatchObject({
+      status: stored?.status,
+      readAt: stored?.readAt,
+      suspectedSpam: stored?.suspectedSpam,
     });
-    expect(response.status).toBe(200);
-    expect((await response.json()).status).toBe('spam');
-    const invalid = await send('PATCH', '/api/admin/submissions/abc', {
-      status: 'archived',
+  });
+
+  test('the detail view keeps the read time of a read submission', async () => {
+    await seed(worker, 'abc');
+    await updateSubmission(worker.env.DB, 'abc', { status: 'read' }, 1234);
+    const detail = await (await get('/api/admin/submissions/abc')).json();
+    expect(detail).toMatchObject({ status: 'read', readAt: 1234 });
+    expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
+      status: 'read',
+      readAt: 1234,
     });
-    expect(invalid.status).toBe(400);
+  });
+
+  test('sets the status back to unread and to read', async () => {
+    await seed(worker, 'abc', { status: 'read' });
+    const unread = await send('PATCH', '/api/admin/submissions/abc', {
+      status: 'unread',
+    });
+    expect(unread.status).toBe(200);
+    expect(await unread.json()).toMatchObject({
+      status: 'unread',
+      readAt: null,
+    });
+    expect((await (await get('/api/admin/status')).json()).unreadCount).toBe(1);
+    const read = await send('PATCH', '/api/admin/submissions/abc', {
+      status: 'read',
+    });
+    expect((await read.json()).status).toBe('read');
+    for (const body of [
+      { status: 'done' },
+      { status: 'held' },
+      { status: 'spam' },
+      { status: 'new' },
+      {},
+      { suspectedSpam: 'yes' },
+      { status: 'read', extra: 1 },
+      [],
+      null,
+    ]) {
+      const invalid = await send('PATCH', '/api/admin/submissions/abc', body);
+      expect(invalid.status).toBe(400);
+    }
     const missing = await send('PATCH', '/api/admin/submissions/nope', {
-      status: 'done',
+      status: 'read',
     });
     expect(missing.status).toBe(404);
+  });
+
+  test('sets and clears the suspected spam flag', async () => {
+    await seed(worker, 'abc');
+    const marked = await send('PATCH', '/api/admin/submissions/abc', {
+      suspectedSpam: true,
+    });
+    expect(marked.status).toBe(200);
+    expect(await marked.json()).toMatchObject({
+      status: 'unread',
+      suspectedSpam: true,
+    });
+    const status = await (await get('/api/admin/status')).json();
+    expect(status.unreadCount).toBe(0);
+    const spam = await (await get('/api/admin/submissions?view=spam')).json();
+    expect(spam.items.map((s: { id: string }) => s.id)).toEqual(['abc']);
+    expect(spam.suspectedSpamCount).toBe(1);
+    const cleared = await send('PATCH', '/api/admin/submissions/abc', {
+      suspectedSpam: false,
+    });
+    expect((await cleared.json()).suspectedSpam).toBe(false);
+    const unread = await (
+      await get('/api/admin/submissions?view=unread')
+    ).json();
+    expect(unread.items.map((s: { id: string }) => s.id)).toEqual(['abc']);
+  });
+
+  test('keeps suspected spam out of every view but its own', async () => {
+    await seed(worker, 'unread');
+    await seed(worker, 'read', { status: 'read' });
+    await seed(worker, 'spam-unread', { suspectedSpam: true });
+    await seed(worker, 'spam-read', { status: 'read', suspectedSpam: true });
+    const ids = async (query: string) => {
+      const list = await (await get(`/api/admin/submissions${query}`)).json();
+      expect(list).toMatchObject({ unreadCount: 1, suspectedSpamCount: 2 });
+      return list.items.map((s: { id: string }) => s.id).sort();
+    };
+    expect(await ids('')).toEqual(['read', 'unread']);
+    expect(await ids('?view=all')).toEqual(['read', 'unread']);
+    expect(await ids('?view=unread')).toEqual(['unread']);
+    expect(await ids('?view=read')).toEqual(['read']);
+    expect(await ids('?view=spam')).toEqual(['spam-read', 'spam-unread']);
+    const list = await (await get('/api/admin/submissions?view=spam')).json();
+    expect(list.items[0]).toHaveProperty('suspectedSpam', true);
+  });
+
+  test('searches part of the email address only, ignoring case', async () => {
+    await seed(worker, 'a', { email: 'Hanako.Sato@Example.JP', name: 'Taro' });
+    await seed(worker, 'b', { email: 'taro@example.org' });
+    await seed(worker, 'c', { email: 'a_b@example.org' });
+    await seed(worker, 'd', { email: 'spam@example.org', suspectedSpam: true });
+    const ids = async (q: string, view = 'all') => {
+      const query = new URLSearchParams({ q, view });
+      const list = await (await get(`/api/admin/submissions?${query}`)).json();
+      return list.items.map((s: { id: string }) => s.id).sort();
+    };
+    expect(await ids('sato@example')).toEqual(['a']);
+    expect(await ids('TARO')).toEqual(['b']);
+    expect(await ids('  example.org  ')).toEqual(['b', 'c']);
+    expect(await ids('_')).toEqual(['c']);
+    expect(await ids('%')).toEqual([]);
+    expect(await ids('spam')).toEqual([]);
+    expect(await ids('spam', 'spam')).toEqual(['d']);
+    expect(await ids('')).toEqual(['a', 'b', 'c']);
+    const longest = new URLSearchParams({ q: 'a'.repeat(254) });
+    expect((await get(`/api/admin/submissions?${longest}`)).status).toBe(200);
+    const csv = await (
+      await get('/api/admin/submissions.csv?q=TARO&lang=en')
+    ).text();
+    const lines = csv.split('\r\n').filter((line) => line !== '');
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('taro@example.org');
   });
 
   test('deletes a submission', async () => {
@@ -357,7 +515,7 @@ describe('admin API with an admin session', () => {
     const patch = await send(
       'PATCH',
       '/api/admin/submissions/abc',
-      { status: 'done' },
+      { status: 'read' },
       'https://evil.example',
     );
     expect(patch.status).toBe(403);
@@ -387,7 +545,9 @@ describe('admin API with an admin session', () => {
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const text = new TextDecoder().decode(bytes);
-    expect(text.startsWith('"id","created_at"')).toBe(true);
+    expect(text.split('\r\n')[0]).toBe(
+      '"id","received_at","status","suspected_spam","email","locale","form_version","page_path","country","spam_score","spam_reasons","Name","Company or organization","Phone","Category","Message"',
+    );
     expect(text).toContain(
       '"\'=HYPERLINK(""https://evil.example"",""click"")"',
     );
@@ -456,29 +616,10 @@ describe('admin API with an admin session', () => {
     });
   });
 
-  test('GET /status lists no categories when none are configured', async () => {
-    expect((await (await get('/api/admin/status')).json()).categories).toEqual(
-      [],
+  test('GET /status lists no categories', async () => {
+    expect(await (await get('/api/admin/status')).json()).not.toHaveProperty(
+      'categories',
     );
-  });
-
-  test('GET /status lists the configured categories with labels', async () => {
-    worker = createTestWorker({
-      options: {
-        contact: {
-          categories: [
-            { value: 'sales', label: { ja: '営業', en: 'Sales' } },
-            'other',
-          ],
-        },
-      },
-    });
-    cookie = await signInAsAdmin(worker);
-    const status = await (await get('/api/admin/status')).json();
-    expect(status.categories).toEqual([
-      { value: 'sales', label: { ja: '営業', en: 'Sales' } },
-      { value: 'other', label: null },
-    ]);
   });
 
   test('listing prunes rows past the retention period', async () => {
@@ -503,8 +644,7 @@ describe('admin API database errors', () => {
       const response = await worker.fetch(path, {
         method,
         headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
-        body:
-          method === 'PATCH' ? JSON.stringify({ status: 'done' }) : undefined,
+        body: requestBody(method),
       });
       return { response, logged: logs.text() };
     } finally {

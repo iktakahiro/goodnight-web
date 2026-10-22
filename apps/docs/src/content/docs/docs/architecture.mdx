@@ -5,8 +5,9 @@ description: One Worker with Static Assets and one D1 database serve the site, t
 ---
 
 <Callout type='warn' title='Draft / not verified yet'>
-  This is the planned design. The server package is not written yet, so details
-  such as route names can still change.
+  This page describes the code in the repository. It is tested with the test
+  suite and with end-to-end tests against `wrangler dev` and a local D1
+  database. It has not run on a real Cloudflare deployment yet (planned for M2).
 </Callout>
 
 <ArchitectureDiagram locale='en' />
@@ -20,7 +21,7 @@ description: One Worker with Static Assets and one D1 database serve the site, t
 | Hono app                     | Created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*`, `/admin`, and `/admin/*` reach it, through `run_worker_first`.                                                                       |
 | D1                           | One SQLite database: inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                                                                                                 |
 | Turnstile                    | Cloudflare's bot check on the contact form. The Worker verifies each token on the server.                                                                                                                                     |
-| Rate Limiting binding        | A Workers binding that limits contact submissions per `ip_hash`. It works on the free plan.                                                                                                                                   |
+| Rate Limiting binding        | A Workers binding that limits contact submissions, setup attempts, and passkey sign-ins per `ip_hash`. It works on the free plan.                                                                                             |
 | Better Auth with passkeys    | Admin sign-in. Passkeys only; email and password sign-in is turned off.                                                                                                                                                       |
 | Admin UI                     | A React app (TanStack Router, Form, and Table) built with Vite. It ships prebuilt in `@goodnight-web/server`, and the Worker serves it.                                                                                       |
 | Slack webhook (optional)     | A short "new inquiry" message, with no personal data.                                                                                                                                                                         |
@@ -34,49 +35,121 @@ Constraints that shape the design:
 
 ## Routes
 
-| Path                             | Who uses it      | What it does                                                                                                                                              |
-| -------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                        |
-| `POST /api/contact`              | The contact form | Checks, rate limits, and stores a submission.                                                                                                             |
-| `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                             |
-| `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                            |
-| `/api/admin/*`                   | The admin screen | List (50 per page, with the unread count), detail, status change, delete, CSV export, and a status endpoint that reports whether Turnstile is configured. |
-| `/admin/*`                       | Admins           | The prebuilt admin UI (a React app). Every data request needs a session.                                                                                  |
+| Path                             | Who uses it      | What it does                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                                                                                                                                                     |
+| `GET /api/contact/form`          | The contact page | The current form fields and whether the form is available. Read-only and public.                                                                                                                                                                                                       |
+| `POST /api/contact`              | The contact form | Checks, rate limits, and stores a submission.                                                                                                                                                                                                                                          |
+| `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                                                                                                                                                          |
+| `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                                                                                                                                                         |
+| `/api/admin/*`                   | The admin screen | List (50 per page, sorted by received time, with the unread and suspected spam counts and an email search), detail, unread/read and suspected spam changes, delete, CSV export, the form editor with its versions, and a status endpoint that reports whether Turnstile is configured. |
+| `/admin/*`                       | Admins           | The prebuilt admin UI (a React app). Every data request needs a session.                                                                                                                                                                                                               |
 
 ## A contact submission, step by step
 
 `POST /api/contact` runs these steps in this order:
 
-1. **Origin and size.** The request must come from the site's own origin, use the expected `Content-Type`, and be small (about 16 KB). Anything else is rejected before the body is parsed.
-2. **Honeypot.** The form has a field that people cannot see. If it is filled in, nothing is saved, the request is counted against the rate limit, and the reply is a normal success, so the bot learns nothing. The honeypot runs before Turnstile, so storing the submission would let a bot write to D1 without passing Turnstile.
+1. **Origin and size.** The request must come from the site's own origin, use the expected `Content-Type`, and be small (at most 32 KB). Anything else is rejected before the body is parsed.
+2. **Honeypot.** The form has a field that people cannot see (`gnw_hp_x`). The Worker notes whether it is filled in and carries on. A filled honeypot never changes the reply; it only flags the submission in step 5.
 3. **Turnstile.** The Worker sends the token to Turnstile siteverify and checks `success`, `hostname`, and `action`. If the check fails, the reply is 400 and nothing is saved.
 4. **Rate limit.** The Rate Limiting binding counts requests per `ip_hash`. Over the limit, the reply is 429.
-5. **Validation and spam score.** zod checks the fields. Simple rules add to a spam score. Above the threshold, the status becomes `held` instead of `new`.
+5. **Validation and spam score.** zod checks the email address and consent. The form fields are checked with a zod schema built from the current form definition in D1, not from anything the browser sent; unknown fields and unknown keys in the request body are rejected. If the visitor's page showed an older version of the form, the reply is 409 `form_outdated`. Simple rules add to a spam score. A score of 3 or more, or a filled honeypot, flags the submission as suspected spam. It is still saved, with the status `unread`.
 6. **Save, then reply.** The row is inserted into D1. Only after the insert succeeds does the visitor get a 200 reply. Nothing after this step can change the reply.
 7. **After the reply, in `ctx.waitUntil`:**
-   - If the status is `new` and a Slack webhook is set, post "1 new inquiry, category, admin URL" and record `notified_at`.
+   - If the submission is not suspected spam and a Slack webhook is set, post "1 new inquiry, received time, admin URL" and record `notified_at`.
    - If the last cleanup was more than an hour ago, delete inquiries older than the retention period (180 days by default) and expired passkey challenges.
 
-If `TURNSTILE_SECRET` is not set, the endpoint returns 503 and the form says it is not available yet. See [Set up Turnstile](/docs/setup/turnstile/).
+The contact API fails closed. If `TURNSTILE_SECRET` or `TURNSTILE_SITE_KEY` is not set, `IP_HASH_SECRET` is missing or shorter than 32 characters, or the Rate Limiting binding is missing, the endpoint returns 503 and the form says it is not available yet. See [Set up Turnstile](/docs/setup/turnstile/).
+
+## In the code
+
+The site's Worker is three lines. It passes the site's default language to the factory from `@goodnight-web/server`:
+
+```ts title="templates/starter/src/worker.ts"
+import { createGoodnightWorker } from '@goodnight-web/server';
+import { siteConfig } from '../site.config';
+
+export default createGoodnightWorker({ locale: siteConfig.defaultLocale });
+```
+
+`wrangler.jsonc` sends only the API and admin paths to the Worker. Static Assets serves every other path without running Worker code:
+
+```jsonc title="templates/starter/wrangler.jsonc"
+"assets": {
+  "directory": "./dist",
+  "binding": "ASSETS",
+  "not_found_handling": "404-page",
+  // The contact API and the admin screen run in the Worker. Every other
+  // path is a page from ./dist.
+  "run_worker_first": ["/api/*", "/admin", "/admin/*"],
+},
+```
+
+The factory builds one Hono app. Middleware for security headers, HTTPS, and Cloudflare Access runs first, then each feature mounts its own routes. A request that matches no route falls through to the `ASSETS` binding:
+
+```ts title="packages/server/src/app.ts"
+app.use('*', securityHeaders);
+// The admin UI, admin API, setup, and Better Auth: HTTPS only (except on
+// localhost), then Cloudflare Access when ACCESS_AUD and
+// ACCESS_TEAM_DOMAIN are set.
+app.use('*', requireHttps);
+app.use('*', requireAccess);
+app.route('/api/contact', contactRoutes);
+app.route('/api/setup', setupRoutes);
+app.route('/api/auth', authRoutes);
+app.route('/api/admin', adminRoutes);
+app.all('/api/*', (c) => apiError(c, 404, 'not_found'));
+app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
+  serveAdminFile(c.req.raw),
+);
+```
+
+Each feature (contact, setup, auth, admin API, admin UI) lives in its own folder under `packages/server/src/features/`.
 
 ## Secrets and bindings
 
-| Name                 | Kind                  | Purpose                                                                             |
-| -------------------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `DB`                 | D1 binding            | All stored data                                                                     |
-| rate limit binding   | Rate Limiting binding | Limits contact submissions per `ip_hash`                                            |
-| `SETUP_TOKEN`        | Secret                | Required to create the first admin. At least 32 characters. Delete it after setup.  |
-| `ADMIN_EMAILS`       | Secret or variable    | Addresses that may become admins                                                    |
-| `BETTER_AUTH_SECRET` | Secret                | Better Auth signing secret. At least 32 characters.                                 |
-| `IP_HASH_SECRET`     | Secret                | Key for `HMAC-SHA256(ip, IP_HASH_SECRET)`. At least 32 characters.                  |
-| `TURNSTILE_SECRET`   | Secret                | Turnstile siteverify. Without it the contact API is off.                            |
-| `SLACK_WEBHOOK_URL`  | Secret, optional      | New-inquiry notification                                                            |
-| `ACCESS_AUD`         | Variable, optional    | Cloudflare Access application audience tag. Set together with `ACCESS_TEAM_DOMAIN`. |
-| `ACCESS_TEAM_DOMAIN` | Variable, optional    | Cloudflare Access team domain, such as `your-team.cloudflareaccess.com`.            |
+| Name                   | Kind                  | Purpose                                                                                |
+| ---------------------- | --------------------- | -------------------------------------------------------------------------------------- |
+| `DB`                   | D1 binding            | All stored data                                                                        |
+| `ASSETS`               | Static Assets binding | The pages built by Astro                                                               |
+| `CONTACT_RATE_LIMITER` | Rate Limiting binding | Limits contact submissions, setup attempts, and passkey sign-ins per `ip_hash`         |
+| `TURNSTILE_SITE_KEY`   | Variable              | The public Turnstile site key, in `wrangler.jsonc`. Without it the contact API is off. |
+| `SETUP_TOKEN`          | Secret                | Required to create the first admin. At least 32 characters. Delete it after setup.     |
+| `ADMIN_EMAILS`         | Secret or variable    | Addresses that may become admins                                                       |
+| `BETTER_AUTH_SECRET`   | Secret                | Better Auth signing secret. At least 32 characters.                                    |
+| `IP_HASH_SECRET`       | Secret                | Key for `HMAC-SHA256(ip, IP_HASH_SECRET)`. At least 32 characters.                     |
+| `TURNSTILE_SECRET`     | Secret                | Turnstile siteverify. Without it the contact API is off.                               |
+| `SLACK_WEBHOOK_URL`    | Secret, optional      | New-inquiry notification                                                               |
+| `ACCESS_AUD`           | Variable, optional    | Cloudflare Access application audience tag. Set together with `ACCESS_TEAM_DOMAIN`.    |
+| `ACCESS_TEAM_DOMAIN`   | Variable, optional    | Cloudflare Access team domain, such as `your-team.cloudflareaccess.com`.               |
 
 A secret shorter than 32 characters turns its features off, the same as a missing one. Secrets stay in the Worker. They are never sent to the browser or written to D1.
 
 `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` work only over `https://` (except on `localhost`). See [Security model](/docs/security/#https).
+
+## Styles and fonts [#styles-and-fonts]
+
+No web fonts are loaded anywhere: not on the site, not in the admin screen, and not on this documentation site. Each one defines a system font stack once, as a CSS token, so text uses the fonts that the visitor's device already has (for example Hiragino on macOS and iOS, and Yu Gothic or Meiryo on Windows). There are no font files, no font services, and no font hosts in the Content Security Policy.
+
+The starter owns its own tokens. Its three theme colors come from `site.config.ts` (`theme.primary`, `theme.background`, `theme.foreground`) and are set on `<html>` as CSS variables. The other shades are mixed from them, so changing three values restyles the whole site:
+
+```css title="templates/starter/src/styles/global.css"
+:root {
+  --site-primary: #7357c8;
+  --site-background: #fcfbff;
+  --site-foreground: #2f2a40;
+}
+
+@theme inline {
+  --font-sans:
+    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+    'BIZ UDPGothic', Meiryo, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-background: var(--site-background);
+  --color-foreground: var(--site-foreground);
+```
+
+The admin screen has its own tokens in `@goodnight-web/server`, so changing the site's colors does not change the admin screen.
 
 ## Related pages
 

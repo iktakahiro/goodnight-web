@@ -72,8 +72,16 @@ test easier.
   `ADMIN_EMAILS`. Setup closes once an admin exists.
 - Save a contact submission to D1 before responding. Notifications and cleanup
   run in `ctx.waitUntil` and never change the response.
-- Slack notifications contain no personal data and no message body: only the
-  count, the category, and the admin URL.
+- Slack notifications contain no personal data and no form values: only the
+  count, the received time, and the admin URL. Suspected spam is never
+  notified.
+- Do not drop doubtful submissions. A filled honeypot or a spam score of
+  `SPAM_SUSPECT_THRESHOLD` or more stores the submission with
+  `suspected_spam = 1`; it is not a status. Store nothing before Turnstile
+  passes, and give a honeypot hit the same response as the same request
+  without it (docs/decisions/0009).
+- Validate contact submissions against the form definition stored in D1,
+  never against one sent by the client. Reject unknown field keys.
 - Verify Turnstile on the server, including `hostname` and `action`. Check
   `Origin` and the body size before parsing.
 - Keep secrets in Worker secrets. Never return them to the browser or write
@@ -91,6 +99,9 @@ D1 is accessed through Drizzle ORM only (see
   test helpers.
 - Validate numbers from requests (page, limit) as bounded integers with zod
   at the route, and pass them to `.limit()` and `.offset()`.
+- A `LIKE` search binds the whole pattern as one parameter, escapes `%`,
+  `_`, and `\` with `escapeLike()`, and adds `ESCAPE '\'`. The admin list
+  searches the email column only and sorts by `created_at` only.
 - Schema change workflow: edit `packages/server/src/db/schema.ts`, run
   `bun run db:generate` (drizzle-kit generate), read the generated SQL, and
   commit it with the schema. `bun run db:check` fails when the schema and the
@@ -105,6 +116,11 @@ D1 is accessed through Drizzle ORM only (see
   file. If it rebuilds the `user` table, do not commit it: on D1 the rebuild
   deletes every session and passkey. Change the schema so that it needs only
   `ALTER TABLE ... ADD`.
+- `form_definitions` is append-only: the triggers `form_definitions_no_update`
+  and `form_definitions_no_delete` in `0004_form_definition_seed.sql` refuse
+  `UPDATE` and `DELETE`. Never change or delete a saved form version; add a
+  new one. If the generated SQL rebuilds `form_definitions`, append both
+  `CREATE TRIGGER` statements to the new file.
 - Data and triggers that drizzle-kit does not model go in a custom migration
   (`bunx drizzle-kit generate --custom --name <name>` in `packages/server`).
 - Better Auth tables come from the Better Auth CLI

@@ -14,13 +14,14 @@
 // 2. src/worker.ts with the test keys: the server rejects the test-key token
 //    (siteverify answers with hostname "example.com" and no action) and
 //    stores nothing.
-// 3. e2e/worker.ts with the test keys (see that file): validation messages,
-//    then a submission that is saved to D1. Then the admin screen in a
-//    Japanese browser with a CDP virtual authenticator: first-admin setup
-//    with SETUP_TOKEN and an ADMIN_EMAILS address -> passkey registration ->
-//    sign-out -> passkey sign-in -> the inquiry in the list with its
-//    category label -> switch to English -> the detail -> status change,
-//    stored in D1.
+// 3. e2e/worker.ts with the test keys (see that file): the form rendered
+//    from GET /api/contact/form, validation messages, then a submission that
+//    is saved to D1 (`fields` JSON and `form_version`). Then the admin screen
+//    in a Japanese browser with a CDP virtual authenticator: first-admin
+//    setup with SETUP_TOKEN and an ADMIN_EMAILS address -> passkey
+//    registration -> sign-out -> passkey sign-in -> the inquiry in the list
+//    -> switch to English -> the detail with the field labels, marked read
+//    -> back to unread, stored in D1.
 //
 // Every secret is passed with --var, so a local .dev.vars does not change the
 // result. Set E2E_PORT to change the port (default 8841),
@@ -29,8 +30,9 @@
 // screen (trace.zip, open it with `npx playwright show-trace`).
 //
 // Button names and headings in the admin screen come from
-// @goodnight-web/server/admin-messages.json, and the contact categories from
-// site.config.ts, so wording changes do not break the test.
+// @goodnight-web/server/admin-messages.json, and the contact form fields and
+// their labels from GET /api/contact/form (edited in the admin screen), so
+// wording changes do not break the test.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -42,6 +44,10 @@ import {
   type BrowserContext,
   type Page,
 } from 'playwright';
+import type {
+  PublicContactForm,
+  PublicFormField,
+} from '@goodnight-web/server/client';
 import { siteConfig } from '../site.config.ts';
 
 const siteDir = resolve(import.meta.dirname, '..');
@@ -87,12 +93,33 @@ function ui(
   );
 }
 
-// The test sends the first contact category in site.config.ts.
-const category = (() => {
-  const first = siteConfig.contactCategories[0];
-  if (!first) throw new Error('site.config.ts has no contact categories');
-  return first;
-})();
+const VISITOR_NAME = 'E2E 訪問者';
+const MESSAGE =
+  'テーブルの修理について相談したいです。\nHello from the end-to-end test.';
+
+/** The contact form as the Worker serves it. */
+async function loadForm(): Promise<PublicContactForm> {
+  return (await (
+    await fetch(`${base}/api/contact/form`)
+  ).json()) as PublicContactForm;
+}
+
+/**
+ * The fields the test fills in: the first text field (the name), the first
+ * text area (the message), and the first select (the category). The test
+ * fails early when the form has none of them.
+ */
+function pickFields(form: PublicContactForm) {
+  const first = (type: PublicFormField['type']) => {
+    const field = form.fields.find((entry) => entry.type === type);
+    if (!field) throw new Error(`the contact form has no ${type} field`);
+    return field;
+  };
+  const select = first('select');
+  const option = select.options?.[0];
+  if (!option) throw new Error('the select field has no options');
+  return { name: first('text'), message: first('textarea'), select, option };
+}
 
 let failures = 0;
 function check(name: string, ok: boolean, detail?: unknown): void {
@@ -189,7 +216,7 @@ async function startDev(
   );
   for (let i = 0; i < 120; i++) {
     try {
-      const response = await fetch(`${base}/api/contact/config`);
+      const response = await fetch(`${base}/api/contact/form`);
       if (response.ok) return dev;
     } catch {
       // Not up yet.
@@ -226,14 +253,49 @@ async function screenshot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: join(screenshotDir, name), fullPage: true });
 }
 
-async function fillContactForm(page: Page, name: string): Promise<void> {
-  await page.fill('#contact-name', name);
+/** Fills every field of the rendered form, found by its label from the API. */
+async function fillContactForm(
+  page: Page,
+  form: PublicContactForm,
+  name: string,
+): Promise<void> {
+  const picked = pickFields(form);
+  // The email field is fixed (not part of the editable form).
   await page.fill('#contact-email', 'visitor@example.org');
-  await page.selectOption('#contact-category', category.value);
-  await page.fill(
-    '#contact-message',
-    'テーブルの修理について相談したいです。\nHello from the end-to-end test.',
-  );
+  for (const field of form.fields) {
+    const label = field.label.ja || field.label.en;
+    if (field.type === 'radio' || field.type === 'checkbox') {
+      const option = field.options?.[0];
+      if (option) {
+        await page
+          .getByRole('group', { name: label })
+          .getByLabel(option.label.ja || option.label.en)
+          .check();
+      }
+      continue;
+    }
+    const control = page.getByLabel(label).first();
+    if (field.type === 'select') {
+      await control.selectOption(
+        field === picked.select ? picked.option.value : '',
+      );
+    } else if (field === picked.name) {
+      await control.fill(name);
+    } else if (field === picked.message) {
+      await control.fill(MESSAGE);
+    } else if (field.type === 'tel') {
+      await control.fill('03-1234-5678');
+    } else if (field.required) {
+      const sample = {
+        text: 'e2e',
+        textarea: 'e2e',
+        url: 'https://example.org/',
+        number: '3',
+        date: '2026-11-02',
+      } as const;
+      await control.fill(sample[field.type as keyof typeof sample] ?? 'e2e');
+    }
+  }
   await page.check('#contact-consent');
 }
 
@@ -287,7 +349,7 @@ async function withoutTurnstile(browser: Browser): Promise<void> {
   await mobile.close();
 
   await page.goto(`${base}/contact/`);
-  const notice = page.locator('[data-contact-unavailable]');
+  const notice = page.locator('[data-contact-notice="unavailable"]');
   await notice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
   check(
     'contact page says the form is not available yet',
@@ -295,10 +357,26 @@ async function withoutTurnstile(browser: Browser): Promise<void> {
       !(await page.locator('[data-contact-form]').isVisible()),
   );
 
-  const config = (await (await fetch(`${base}/api/contact/config`)).json()) as {
-    available?: boolean;
-  };
-  check('contact config is not available', config.available === false, config);
+  const form = await loadForm();
+  check(
+    'GET /api/contact/form says the form is not available',
+    form.available === false && form.turnstileSiteKey === null,
+    form,
+  );
+
+  // A failed request for the form shows the email address instead.
+  await page.route('**/api/contact/form', (route) => route.abort());
+  await page.goto(`${base}/contact/`);
+  const failed = page.locator('[data-contact-notice="failed"]');
+  await failed.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+  check(
+    'contact page shows the email address when the form cannot be loaded',
+    (await failed.isVisible()) &&
+      (await failed
+        .getByRole('link', { name: siteConfig.company.email })
+        .isVisible()),
+  );
+  await page.unroute('**/api/contact/form');
   const response = await fetch(`${base}/api/contact`, {
     method: 'POST',
     headers: { origin: base, 'content-type': 'application/json' },
@@ -327,7 +405,7 @@ async function rejectedTestToken(browser: Browser): Promise<void> {
   const page = await browser.newPage();
   await page.goto(`${base}/contact/`);
   await page.locator('[data-contact-form]').waitFor({ state: 'visible' });
-  await fillContactForm(page, 'Rejected Visitor');
+  await fillContactForm(page, await loadForm(), 'Rejected Visitor');
   check(
     'Turnstile test widget gives a token',
     await waitForTurnstileToken(page),
@@ -348,12 +426,50 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 800 },
   });
+  const definition = await loadForm();
+  const picked = pickFields(definition);
   await page.goto(`${base}/contact/`);
   const form = page.locator('[data-contact-form]');
   await form.waitFor({ state: 'visible' });
   check('contact form is shown with test keys', await form.isVisible());
-  // The server holds messages sent within 3 seconds of showing the form
-  // (spam score `too_fast`). Take as long as a person would.
+  const rendered = await page
+    .locator('[data-contact-fields] [name]')
+    .evaluateAll((controls) => [
+      ...new Set(controls.map((control) => control.getAttribute('name'))),
+    ]);
+  check(
+    'the form renders the email field and then the fields from the API, in order',
+    JSON.stringify(rendered) ===
+      JSON.stringify(['email', ...definition.fields.map((field) => field.id)]),
+    rendered,
+  );
+  const honeypot = await page
+    .locator('[data-contact-honeypot]')
+    .evaluate((input) => ({
+      name: input.getAttribute('name'),
+      tabindex: input.getAttribute('tabindex'),
+      autocomplete: input.getAttribute('autocomplete'),
+      ignored: [
+        'data-1p-ignore',
+        'data-lpignore',
+        'data-bwignore',
+        'data-form-type',
+      ].every((name) => input.hasAttribute(name)),
+      hidden: input.parentElement?.getAttribute('aria-hidden'),
+      value: (input as HTMLInputElement).value,
+    }));
+  check(
+    'the honeypot is gnw_hp_x, hidden, empty, and opted out of autofill',
+    honeypot.name === 'gnw_hp_x' &&
+      honeypot.tabindex === '-1' &&
+      honeypot.autocomplete === 'off' &&
+      honeypot.ignored &&
+      honeypot.hidden === 'true' &&
+      honeypot.value === '',
+    honeypot,
+  );
+  // The server flags messages sent within 3 seconds of showing the form as
+  // suspected spam (spam score `too_fast`). Take as long as a person would.
   const shownAt = Date.now();
 
   await page.click('[data-contact-form] [type="submit"]');
@@ -361,24 +477,24 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
     'empty form shows the validation message',
     await page.locator('[data-result="invalid"]').isVisible(),
   );
-  // The form takes its messages from data attributes (the text is in
-  // contact-form.astro), so compare with the attribute, not a fixed text.
-  const requiredText = await page.getAttribute(
-    '[data-contact]',
-    'data-message-required',
-  );
+  // The form takes its messages from the JSON in contact-form.astro, so
+  // compare with that, not a fixed text.
+  const texts = JSON.parse(
+    (await page.locator('[data-contact-texts]').textContent()) ?? '{}',
+  ) as { fieldRequired?: string };
+  const nameId = `contact-${picked.name.id}`;
   check(
     'empty name shows the field error',
-    Boolean(requiredText) &&
-      (await page.locator('#contact-name-error').textContent()) ===
-        requiredText &&
-      (await page.getAttribute('#contact-name', 'aria-invalid')) === 'true',
+    Boolean(texts.fieldRequired) &&
+      (await page.locator(`#${nameId}-error`).textContent()) ===
+        texts.fieldRequired &&
+      (await page.getAttribute(`#${nameId}`, 'aria-invalid')) === 'true',
   );
 
-  await fillContactForm(page, 'E2E 訪問者');
+  await fillContactForm(page, definition, VISITOR_NAME);
   check(
     'filled fields clear their errors and the summary message',
-    (await page.locator('#contact-name-error').isHidden()) &&
+    (await page.locator(`#${nameId}-error`).isHidden()) &&
       (await page.locator('[data-result="invalid"]').isHidden()),
   );
   check(
@@ -404,18 +520,26 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
   check('contact form shows the thank-you message', await sent.isVisible());
 
   const rows = await query(
-    'SELECT name, email, category, body, status, ip_hash, page_path FROM submissions',
+    'SELECT email, fields, form_version, locale, status, suspected_spam, spam_reasons, ip_hash, page_path FROM submissions',
   );
   const row = rows[0];
+  const values = JSON.parse(String(row?.fields ?? '{}')) as Record<
+    string,
+    unknown
+  >;
   check(
-    'the submission is in D1',
+    'the submission is in D1 with its field values and form version',
     rows.length === 1 &&
-      row?.name === 'E2E 訪問者' &&
-      row.email === 'visitor@example.org' &&
-      row.category === category.value &&
-      row.status === 'new' &&
-      row.page_path === '/contact/' &&
-      String(row.body).startsWith('テーブルの修理'),
+      row?.email === 'visitor@example.org' &&
+      values[picked.name.id] === VISITOR_NAME &&
+      values[picked.select.id] === picked.option.value &&
+      String(values[picked.message.id]).startsWith('テーブルの修理') &&
+      row.form_version === definition.version &&
+      row.locale === 'ja' &&
+      row.status === 'unread' &&
+      row.suspected_spam === 0 &&
+      row.spam_reasons === '[]' &&
+      row.page_path === '/contact/',
     rows,
   );
   check(
@@ -477,7 +601,8 @@ async function adminFlow(browser: Browser): Promise<void> {
 
   const [submission] = await query('SELECT id FROM submissions');
   const id = String(submission?.id);
-  const row = page.getByTestId('inquiry-row').filter({ hasText: 'E2E 訪問者' });
+  const picked = pickFields(await loadForm());
+  const row = page.getByTestId('inquiry-row').filter({ hasText: VISITOR_NAME });
   const registerButton = page.getByRole('button', {
     name: ui('ja', 'admin.setup.registerPasskey'),
   });
@@ -557,10 +682,9 @@ async function adminFlow(browser: Browser): Promise<void> {
   });
   await step(
     page,
-    'the inquiry from the form is in the list with the Japanese category label',
+    'the inquiry from the form is in the list with its message preview',
     async () => {
       await row.waitFor();
-      await row.getByText(category.label.ja, { exact: true }).waitFor();
       await row.getByText('テーブルの修理について相談したいです。').waitFor();
       await page
         .getByTestId('unread-count')
@@ -583,7 +707,7 @@ async function adminFlow(browser: Browser): Promise<void> {
     await page.keyboard.press('Escape');
     await page.getByRole('menu').waitFor({ state: 'hidden' });
     await page.getByRole('heading', { name: ui('en', 'list.title') }).waitFor();
-    await row.getByText(category.label.en, { exact: true }).waitFor();
+    await row.waitFor();
   });
   await step(
     page,
@@ -591,15 +715,18 @@ async function adminFlow(browser: Browser): Promise<void> {
     async () => {
       await row.click();
       await page.waitForURL(`${base}/admin/inquiries/${id}`);
-      await page.getByRole('heading', { name: 'E2E 訪問者' }).waitFor();
+      await page.getByRole('heading', { name: VISITOR_NAME }).waitFor();
+      await page.getByText('Hello from the end-to-end test.').waitFor();
+      for (const field of [picked.message, picked.select]) {
+        await page.getByText(field.label.en, { exact: true }).first().waitFor();
+      }
       await page
-        .getByTestId('inquiry-body')
-        .getByText('Hello from the end-to-end test.')
+        .getByText(picked.option.label.en, { exact: true })
+        .first()
         .waitFor();
-      await page.getByText(category.label.en, { exact: true }).waitFor();
       await page
-        .getByTestId('status-select')
-        .getByText(ui('en', 'status.read'))
+        .getByTestId('read-toggle')
+        .getByText(ui('en', 'list.markUnread'))
         .waitFor();
       await page
         .getByTestId('unread-count')
@@ -607,18 +734,23 @@ async function adminFlow(browser: Browser): Promise<void> {
         .waitFor();
     },
   );
-  const statusChanged = page.getByText(
-    ui('en', 'detail.statusChanged', { status: ui('en', 'status.done') }),
-  );
-  await step(page, 'change the status to Done', async () => {
-    await page.getByTestId('status-select').click();
-    await page.getByRole('option', { name: ui('en', 'status.done') }).click();
+  const statusChanged = page.getByText(ui('en', 'detail.markedUnread'));
+  await step(page, 'mark the inquiry unread again', async () => {
+    await page.getByTestId('read-toggle').click();
     await statusChanged.waitFor();
+    await page
+      .getByTestId('unread-count')
+      .getByText(ui('en', 'admin.unreadCount', { count: 1 }))
+      .waitFor();
   });
   const status = await query(
     `SELECT status FROM submissions WHERE id = '${id}'`,
   );
-  check('the new status is stored in D1', status[0]?.status === 'done', status);
+  check(
+    'the unread status is stored in D1',
+    status[0]?.status === 'unread',
+    status,
+  );
   check(
     'no CSP violations or page errors in the admin screen',
     pageErrors.length === 0,

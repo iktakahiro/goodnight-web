@@ -58,3 +58,25 @@ export const MenuRadioItem = ({
     <span className='col-start-2'>{children}</span>
   </BaseMenu.RadioItem>
 );
+
+/** An item that turns something on or off, with a check mark when on. */
+export const MenuCheckboxItem = ({
+  className,
+  children,
+  ...props
+}: Omit<ComponentProps<typeof BaseMenu.CheckboxItem>, 'children'> & {
+  children: ReactNode;
+}) => (
+  <BaseMenu.CheckboxItem
+    className={cn(
+      'grid cursor-pointer grid-cols-[1rem_1fr] items-center gap-2.5 rounded-lg py-2 pr-6 pl-2.5 text-[0.95rem] outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground',
+      className,
+    )}
+    {...props}
+  >
+    <BaseMenu.CheckboxItemIndicator className='col-start-1 text-primary'>
+      <Check aria-hidden='true' className='size-4' />
+    </BaseMenu.CheckboxItemIndicator>
+    <span className='col-start-2'>{children}</span>
+  </BaseMenu.CheckboxItem>
+);

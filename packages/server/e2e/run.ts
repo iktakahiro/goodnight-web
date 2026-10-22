@@ -11,10 +11,16 @@
 // Covers: contact POST -> row in D1; then the real admin UI: first-admin
 // setup with empty, wrong, and right input -> passkey registration (CDP
 // virtual authenticator) -> sign-out -> passkey sign-in -> list (URL search
-// parameters, not-found) -> detail -> status
-// change -> Slack-style deep link while signed out -> language switch ->
-// light/dark switch -> delete with confirmation. Also checks the API rules the UI relies on, and
-// that the UI runs under the admin CSP without violations.
+// parameters, not-found) -> detail (marks read) -> back to unread from the
+// detail -> read and unread from the list, with the view, total, and counts
+// following without a reload -> email search -> a honeypot submission in the
+// suspected spam view, with its badge and reasons, cleared and set again ->
+// Slack-style deep link while signed out -> language switch -> light/dark
+// switch -> delete with confirmation -> the form editor: add a field and
+// remove one, save version 2, submit with the new field, see it in the list
+// (column toggle) and the detail, see an old submission with its own labels,
+// and restore version 1. Also checks the API rules the UI relies on, and that
+// the UI runs under the admin CSP without violations.
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Page } from 'playwright';
@@ -30,7 +36,6 @@ import {
   testVars,
   ui,
 } from './support.ts';
-import { e2eCategories } from './categories.ts';
 
 const stateDir = join(packageDir, '.wrangler/e2e-state');
 const port = Number(process.env.E2E_PORT ?? '8790');
@@ -98,14 +103,36 @@ const gnw = <K extends keyof Gnw>(
     [name, args] as const,
   ) as Promise<Awaited<ReturnType<Gnw[K]>>>;
 
-const [sales] = e2eCategories;
+/** The public form, as `GET /api/contact/form` returns it. */
+interface PublicForm {
+  available: boolean;
+  version: number;
+  fields: {
+    id: string;
+    label: { ja: string; en: string };
+    options?: { value: string; label: { ja: string; en: string } }[];
+  }[];
+}
 
-const contactBody = (token: string, name: string) => ({
-  name,
+// An option of the built-in category field (migrations/0004).
+const SALES = 'sales';
+
+const contactBody = (
+  token: string,
+  name: string,
+  extra: Record<string, string> = {},
+  formVersion = 1,
+) => ({
   email: 'visitor@example.org',
-  category: sales.value,
-  message: 'Hello from the end-to-end test.\nSecond line.',
+  fields: {
+    f_name: name,
+    f_category: SALES,
+    f_message: 'Hello from the end-to-end test.\nSecond line.',
+    ...extra,
+  },
   consent: true,
+  formVersion,
+  locale: 'en',
   turnstileToken: token,
   elapsedMs: 15_000,
   pagePath: '/contact',
@@ -163,12 +190,21 @@ const main = async () => {
     await openTestPage();
 
     // Contact form API.
-    const config = await gnw(page, 'call', '/api/contact/config');
+    const formResponse = await gnw(page, 'call', '/api/contact/form');
+    const publicForm = formResponse.body as PublicForm;
     check(
-      'contact config is available',
-      (config.body as { available?: boolean }).available === true,
-      config,
+      'the public form is available as version 1',
+      publicForm.available === true &&
+        publicForm.version === 1 &&
+        publicForm.fields.some((field) => field.id === 'f_name'),
+      formResponse,
     );
+    const salesLabel = publicForm.fields
+      .find((field) => field.id === 'f_category')
+      ?.options?.find((option) => option.value === SALES)?.label ?? {
+      ja: SALES,
+      en: SALES,
+    };
     const sent = await gnw(
       page,
       'submitContact',
@@ -185,16 +221,35 @@ const main = async () => {
       rejected.code === 'turnstile_failed',
       rejected,
     );
+    const trapped = await gnw(page, 'submitContact', {
+      ...contactBody('e2e-pass', 'Trap Visitor'),
+      email: 'trap@example.org',
+      gnw_hp_x: 'filled by a bot',
+    });
+    check('a filled honeypot gets the same success', trapped.ok, trapped);
     const stored = await query(
-      'SELECT id, name, status, ip_hash FROM submissions ORDER BY created_at',
+      "SELECT id, json_extract(fields, '$.f_name') AS name, status, ip_hash, form_version FROM submissions WHERE suspected_spam = 0 ORDER BY created_at",
     );
     check(
-      'exactly one row is in D1 with status new',
+      'exactly one row is in D1 that is not suspected spam, unread',
       stored.length === 1 &&
         stored[0]?.name === 'E2E Visitor' &&
-        stored[0]?.status === 'new',
+        stored[0]?.status === 'unread' &&
+        stored[0]?.form_version === 1,
       stored,
     );
+    const spamRows = await query(
+      'SELECT id, status, spam_reasons, notified_at FROM submissions WHERE suspected_spam = 1',
+    );
+    check(
+      'the honeypot submission is stored as suspected spam',
+      spamRows.length === 1 &&
+        spamRows[0]?.status === 'unread' &&
+        spamRows[0]?.spam_reasons === '["honeypot"]' &&
+        spamRows[0]?.notified_at === null,
+      spamRows,
+    );
+    const spamId = String(spamRows[0]?.id);
     check(
       'ip_hash is an HMAC, not an IP',
       /^[0-9a-f]{64}$/.test(String(stored[0]?.ip_hash)),
@@ -305,26 +360,41 @@ const main = async () => {
         .click();
       await page.waitForURL(`${base}/admin`);
     });
-    await step('the list shows the inquiry as new', async () => {
+    await step('the list shows the inquiry as unread', async () => {
       const row = page.getByTestId('inquiry-row').filter({
         hasText: 'E2E Visitor',
       });
-      await row.getByText(ui('en', 'status.new')).waitFor();
-      await row.getByText(sales.label.en, { exact: true }).waitFor();
+      await row.locator('[data-status="unread"]').waitFor();
       await row.getByText('Hello from the end-to-end test.').waitFor();
+    });
+    await step('suspected spam is left out, with a hint', async () => {
+      await page.getByTestId('spam-hint').waitFor();
+      await page.getByTestId('view-count-spam').getByText('1').waitFor();
+      const rows = await page.getByTestId('inquiry-row').count();
+      if (rows !== 1) throw new Error(`expected 1 row, got ${rows}`);
     });
 
     await step('an invalid list URL falls back to the defaults', async () => {
-      await page.goto(`${base}/admin?status=deleted&page=abc`);
+      await page.goto(`${base}/admin?view=held&page=abc&sort=email`);
       await page
-        .getByRole('tab', { name: ui('en', 'list.filter.all'), selected: true })
+        .getByRole('tab', { name: ui('en', 'list.view.all'), selected: true })
         .waitFor();
       await page.getByTestId('inquiry-row').first().waitFor();
     });
-    await step('the status tab is kept in the URL', async () => {
-      await page.getByRole('tab', { name: ui('en', 'status.new') }).click();
-      await page.waitForURL(`${base}/admin?status=new`);
+    await step('the view tab is kept in the URL', async () => {
+      await page
+        .getByRole('tab', {
+          name: new RegExp(`^${ui('en', 'list.view.unread')}`),
+        })
+        .click();
+      await page.waitForURL(`${base}/admin?view=unread`);
       await page.getByTestId('inquiry-row').first().waitFor();
+    });
+    await step('the received column switches to oldest first', async () => {
+      await page.getByTestId('sort-received').click();
+      await page.waitForURL(`${base}/admin?view=unread&dir=asc`);
+      await page.locator('th[aria-sort="ascending"]').waitFor();
+      await page.goto(`${base}/admin`);
     });
     await step('an unknown admin path shows not found', async () => {
       await page.goto(`${base}/admin/nope`);
@@ -346,29 +416,28 @@ const main = async () => {
         .getByText('Second line.')
         .waitFor();
       await page
-        .getByTestId('status-select')
-        .getByText(ui('en', 'status.read'))
+        .getByTestId('read-toggle')
+        .getByText(ui('en', 'list.markUnread'))
         .waitFor();
       await page
         .getByTestId('unread-count')
         .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
         .waitFor();
     });
-    await step('status change to Done', async () => {
-      await page.getByTestId('status-select').click();
-      await page.getByRole('option', { name: ui('en', 'status.done') }).click();
+    await step('the detail sets it back to unread', async () => {
+      await page.getByTestId('read-toggle').click();
+      await page.getByText(ui('en', 'detail.markedUnread')).waitFor();
       await page
-        .getByText(
-          ui('en', 'detail.statusChanged', { status: ui('en', 'status.done') }),
-        )
+        .getByTestId('unread-count')
+        .getByText(ui('en', 'admin.unreadCount', { count: 1 }))
         .waitFor();
     });
     const afterChange = await query(
-      `SELECT status FROM submissions WHERE id = '${id}'`,
+      `SELECT status, read_at FROM submissions WHERE id = '${id}'`,
     );
     check(
-      'the new status is stored',
-      afterChange[0]?.status === 'done',
+      'unread is stored and read_at is cleared',
+      afterChange[0]?.status === 'unread' && afterChange[0]?.read_at === null,
       afterChange,
     );
     await step('back to the list keeps working', async () => {
@@ -379,8 +448,121 @@ const main = async () => {
       await page
         .getByTestId('inquiry-row')
         .filter({ hasText: 'E2E Visitor' })
-        .getByText(ui('en', 'status.done'))
+        .locator('[data-status="unread"]')
         .waitFor();
+    });
+    await step('a row marked read leaves the unread view', async () => {
+      await page.goto(`${base}/admin?view=unread`);
+      await page.getByTestId('view-count-unread').getByText('1').waitFor();
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'E2E Visitor' })
+        .getByRole('button', { name: ui('en', 'list.markRead') })
+        .click();
+      await page.getByText(ui('en', 'list.empty.unread')).waitFor();
+      await page.getByText(ui('en', 'list.total', { count: 0 })).waitFor();
+      await page
+        .getByTestId('view-count-unread')
+        .waitFor({ state: 'detached' });
+      await page
+        .getByTestId('unread-count')
+        .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
+        .waitFor();
+    });
+    await step(
+      'the list toggle updates the counts without a reload',
+      async () => {
+        await page.goto(`${base}/admin`);
+        const row = page
+          .getByTestId('inquiry-row')
+          .filter({ hasText: 'E2E Visitor' });
+        await row.locator('[data-status="read"]').waitFor();
+        // Records whether the table was ever replaced by the loading skeleton.
+        await page.evaluate(() => {
+          const flags = window as unknown as { listEmptied?: boolean };
+          flags.listEmptied = false;
+          new MutationObserver(() => {
+            if (!document.querySelector('[data-testid="inquiry-row"]')) {
+              flags.listEmptied = true;
+            }
+          }).observe(document.body, { childList: true, subtree: true });
+        });
+        await row
+          .getByRole('button', { name: ui('en', 'list.markUnread') })
+          .click();
+        await page.getByTestId('view-count-unread').getByText('1').waitFor();
+        await row
+          .getByRole('button', { name: ui('en', 'list.markRead') })
+          .click();
+        await page
+          .getByTestId('view-count-unread')
+          .waitFor({ state: 'detached' });
+        await row.locator('[data-status="read"]').waitFor();
+        const emptied = await page.evaluate(
+          () => (window as unknown as { listEmptied?: boolean }).listEmptied,
+        );
+        if (emptied !== false) throw new Error('the list flickered');
+      },
+    );
+    const afterRow = await query(
+      `SELECT status FROM submissions WHERE id = '${id}'`,
+    );
+    check(
+      'the list toggle is stored',
+      afterRow[0]?.status === 'read',
+      afterRow,
+    );
+
+    await step('the email search matches part of the address', async () => {
+      await page.getByTestId('email-search').fill('VISITOR@example');
+      await page.getByTestId('email-search').press('Enter');
+      await page.waitForURL(`${base}/admin?q=VISITOR%40example`);
+      await page.getByTestId('inquiry-row').first().waitFor();
+      await page.getByTestId('email-search').fill('nobody@');
+      await page.getByTestId('email-search').press('Enter');
+      await page.getByText(ui('en', 'list.emptyFiltered')).waitFor();
+      await page
+        .getByRole('button', { name: ui('en', 'list.search.clear') })
+        .click();
+      await page.waitForURL(`${base}/admin`);
+    });
+
+    await step('the suspected spam view lists the honeypot row', async () => {
+      await page
+        .getByRole('tab', {
+          name: new RegExp(`^${ui('en', 'list.view.spam')}`),
+        })
+        .click();
+      await page.waitForURL(`${base}/admin?view=spam`);
+      await page.getByTestId('spam-view-hint').waitFor();
+      const row = page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'trap@example.org' });
+      await row.getByTestId('suspected-spam-badge').waitFor();
+      await row.click();
+      await page.waitForURL(`${base}/admin/inquiries/${spamId}`);
+      await page
+        .getByTestId('spam-notice')
+        .getByText(ui('en', 'spam.reason.honeypot'))
+        .waitFor();
+    });
+    await step('Not spam and Mark as spam switch the flag', async () => {
+      await page
+        .getByRole('button', { name: ui('en', 'detail.notSpam') })
+        .click();
+      await page.getByText(ui('en', 'detail.notSpamDone')).waitFor();
+      const cleared = await query(
+        `SELECT suspected_spam FROM submissions WHERE id = '${spamId}'`,
+      );
+      if (cleared[0]?.suspected_spam !== 0) throw new Error('not cleared');
+      await page
+        .getByRole('button', { name: ui('en', 'detail.markSpam') })
+        .click();
+      await page.getByText(ui('en', 'detail.markSpamDone')).waitFor();
+      const flagged = await query(
+        `SELECT suspected_spam FROM submissions WHERE id = '${spamId}'`,
+      );
+      if (flagged[0]?.suspected_spam !== 1) throw new Error('not flagged');
     });
 
     // API rules that the UI relies on.
@@ -449,7 +631,7 @@ const main = async () => {
       await page
         .getByRole('button', { name: ui('ja', 'app.backToList') })
         .waitFor();
-      await page.getByText(sales.label.ja).first().waitFor();
+      await page.getByText(salesLabel.ja).first().waitFor();
     });
 
     // The class on <html> when #root is parsed: theme-init.js has run, the
@@ -533,8 +715,234 @@ const main = async () => {
       await page.waitForURL(`${base}/admin`);
       await page.getByText(ui('ja', 'admin.empty')).waitFor();
     });
-    const remaining = await query('SELECT COUNT(*) AS n FROM submissions');
+    const remaining = await query(
+      `SELECT COUNT(*) AS n FROM submissions WHERE id = '${id}'`,
+    );
     check('the row is deleted', remaining[0]?.n === 0, remaining);
+
+    // The form editor (the UI is in Japanese now). A version 1 submission
+    // first, to check later that it keeps its own labels.
+    await openTestPage();
+    const v1 = await gnw(
+      page,
+      'submitContact',
+      contactBody('e2e-pass', 'V1 Visitor', { f_company: 'Old Company' }),
+    );
+    check('a version 1 submission with a company succeeds', v1.ok, v1);
+    const companyLabel =
+      publicForm.fields.find((field) => field.id === 'f_company')?.label.ja ??
+      'f_company';
+
+    await step('the header links to the form editor', async () => {
+      await page.goto(`${base}/admin`);
+      await page.getByTestId('nav-form').click();
+      await page.waitForURL(`${base}/admin/form`);
+      await page
+        .getByRole('heading', { name: ui('ja', 'form.title'), level: 1 })
+        .waitFor();
+      await page.getByText(ui('ja', 'form.emailNote')).waitFor();
+    });
+    await step('add a field and fill in its labels', async () => {
+      await page.getByTestId('form-add-field').click();
+      await page.getByLabel(ui('ja', 'form.labelJa')).last().fill('ご予算');
+      await page.getByLabel(ui('ja', 'form.labelEn')).last().fill('Budget');
+      await page.getByTestId('form-preview').getByText('ご予算').waitFor();
+      await page
+        .getByTestId('form-dirty')
+        .getByText(ui('ja', 'form.unsaved'))
+        .waitFor();
+    });
+    await step('remove the company field; it moves to archived', async () => {
+      await page
+        .getByTestId('form-field-card')
+        .filter({ hasText: companyLabel })
+        .getByRole('button', { name: companyLabel })
+        .first()
+        .click();
+      await page
+        .getByRole('button', {
+          name: ui('ja', 'form.removeLabel', { label: companyLabel }),
+        })
+        .click();
+      await page.getByTestId('form-archived').getByText(companyLabel).waitFor();
+    });
+    await step('save creates version 2', async () => {
+      await page.getByTestId('form-save').click();
+      await page.getByText(ui('ja', 'form.saved', { version: 2 })).waitFor();
+      await page
+        .getByTestId('form-history')
+        .getByText(ui('ja', 'form.version', { version: 2 }))
+        .waitFor();
+    });
+    const versions = await query(
+      'SELECT version, created_by FROM form_definitions ORDER BY version',
+    );
+    check(
+      'version 2 is stored with the admin who saved it',
+      versions.length === 2 && versions[1]?.created_by === ADMIN_EMAIL,
+      versions,
+    );
+
+    await openTestPage();
+    // The public form is cached for 30 seconds; skip the browser cache like
+    // the starter does after `form_outdated`.
+    const v2Form = (
+      await gnw(page, 'call', '/api/contact/form', { cache: 'no-cache' })
+    ).body as PublicForm;
+    const budget = v2Form.fields.find((field) => field.label.en === 'Budget');
+    check(
+      'the public form serves version 2 with the new field',
+      v2Form.version === 2 &&
+        budget !== undefined &&
+        /^f_[a-z0-9]+$/.test(budget.id) &&
+        !v2Form.fields.some((field) => field.id === 'f_company'),
+      v2Form,
+    );
+    const budgetId = budget?.id ?? 'f_missing';
+    const v2 = await gnw(
+      page,
+      'submitContact',
+      contactBody('e2e-pass', 'V2 Visitor', { [budgetId]: '500万円' }, 2),
+    );
+    check('a submission with the new field succeeds', v2.ok, v2);
+    const outdated = await gnw(
+      page,
+      'submitContact',
+      contactBody('e2e-pass', 'Late Visitor', {}, 1),
+    );
+    check(
+      'a submission for the old version is refused as outdated',
+      outdated.code === 'form_outdated',
+      outdated,
+    );
+    const v2Rows = await query(
+      `SELECT id, form_version, json_extract(fields, '$.${budgetId}') AS budget FROM submissions WHERE json_extract(fields, '$.f_name') = 'V2 Visitor'`,
+    );
+    check(
+      'the new value is stored under the field id with version 2',
+      v2Rows.length === 1 &&
+        v2Rows[0]?.form_version === 2 &&
+        v2Rows[0]?.budget === '500万円',
+      v2Rows,
+    );
+    const csvEn = await gnw(page, 'call', '/api/admin/submissions.csv?lang=en');
+    check(
+      'the CSV has a column for the new field and the archived one',
+      csvEn.status === 200 &&
+        String(csvEn.body).includes('"Budget"') &&
+        String(csvEn.body).includes('(v1)') &&
+        String(csvEn.body).includes('500万円'),
+      String(csvEn.body).split('\r\n')[0],
+    );
+
+    await step('the new field can be shown as a list column', async () => {
+      await page.goto(`${base}/admin`);
+      const row = page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V2 Visitor' });
+      await row.waitFor();
+      if (await row.getByText('500万円').count()) {
+        throw new Error('the new field is shown although showInList is off');
+      }
+      await page.getByTestId('columns-menu').click();
+      await page.getByRole('menuitemcheckbox', { name: 'ご予算' }).click();
+      await page.keyboard.press('Escape');
+      await row.getByText('500万円').waitFor();
+      await page.reload();
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V2 Visitor' })
+        .getByText('500万円')
+        .waitFor();
+    });
+    await step('a table wider than the page scrolls sideways', async () => {
+      await page.setViewportSize({ width: 900, height: 720 });
+      const region = page.getByRole('region', {
+        name: ui('ja', 'list.tableRegion'),
+      });
+      const more = page.getByTestId('inquiry-table-more');
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="inquiry-table-more"]')
+            ?.getAttribute('data-visible') === 'true',
+      );
+      if ((await region.getAttribute('tabindex')) !== '0') {
+        throw new Error('the scrollable table cannot be reached by keyboard');
+      }
+      await region.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth;
+      });
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="inquiry-table-more"]')
+            ?.getAttribute('data-visible') === 'false',
+      );
+      if ((await more.getAttribute('aria-hidden')) !== 'true') {
+        throw new Error('the scroll hint is exposed to assistive technology');
+      }
+      await page.setViewportSize({ width: 1280, height: 720 });
+    });
+    await step('the detail shows the new field with its label', async () => {
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V2 Visitor' })
+        .click();
+      await page.getByRole('heading', { name: 'V2 Visitor' }).waitFor();
+      const answer = page.locator(`[data-field-id="${budgetId}"]`);
+      await answer.getByText('ご予算').waitFor();
+      await answer.getByText('500万円').waitFor();
+    });
+    await step('an old submission keeps its own labels', async () => {
+      await page.goto(`${base}/admin`);
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V1 Visitor' })
+        .click();
+      await page.getByRole('heading', { name: 'V1 Visitor' }).waitFor();
+      await page
+        .getByText(ui('ja', 'detail.oldVersion', { version: 1 }))
+        .waitFor();
+      const company = page.locator('[data-field-id="f_company"]');
+      await company.getByText(companyLabel).waitFor();
+      await company.getByText('Old Company').waitFor();
+      await company
+        .getByText(ui('ja', 'detail.archivedField', { version: 1 }))
+        .waitFor();
+    });
+    await step('restoring version 1 saves it as version 3', async () => {
+      await page.goto(`${base}/admin/form`);
+      await page
+        .getByRole('button', {
+          name: ui('ja', 'form.restoreLabel', { version: 1 }),
+        })
+        .click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog
+        .getByText(ui('ja', 'form.restoreTitle', { version: 1 }))
+        .waitFor();
+      await dialog
+        .getByRole('button', { name: ui('ja', 'form.restore'), exact: true })
+        .click();
+      await page
+        .getByText(ui('ja', 'form.restored', { version: 1, next: 3 }))
+        .waitFor();
+      await page.getByTestId('form-archived').getByText('ご予算').waitFor();
+    });
+    await openTestPage();
+    // The public form is cached for 30 seconds; skip the browser cache like
+    // the starter does after `form_outdated`.
+    const v3Form = (
+      await gnw(page, 'call', '/api/contact/form', { cache: 'no-cache' })
+    ).body as PublicForm;
+    check(
+      'version 3 has the company field back with its id, and no budget',
+      v3Form.version === 3 &&
+        v3Form.fields.some((field) => field.id === 'f_company') &&
+        !v3Form.fields.some((field) => field.id === budgetId),
+      v3Form,
+    );
 
     const sessions = await query('SELECT ip_address FROM session');
     check(

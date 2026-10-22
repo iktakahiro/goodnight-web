@@ -62,7 +62,8 @@ const alerts: Record<string, string> = { info: 'NOTE', warn: 'WARNING' };
 /**
  * Makes router-relative links absolute and turns callouts into GitHub alerts,
  * leaving fenced code untouched. The architecture diagram is dropped because
- * each page describes it in text as well; other MDX components stay as JSX.
+ * each page describes it in text as well, and so are MDX comments; other MDX
+ * components stay as JSX.
  */
 function toMarkdown(body: string): string {
   let fence = '';
@@ -93,6 +94,10 @@ function toMarkdown(body: string): string {
         continue;
       }
       if (/^<ArchitectureDiagram\b.*\/>$/u.test(line)) {
+        continue;
+      }
+      // MDX comments, such as `{/* prettier-ignore */}` above a code excerpt.
+      if (/^\{\/\*.*\*\/\}$/u.test(line.trim())) {
         continue;
       }
       text = line.replace(

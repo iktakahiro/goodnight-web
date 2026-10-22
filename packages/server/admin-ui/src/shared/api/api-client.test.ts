@@ -11,6 +11,22 @@ test('parseErrorBody reads the API error shape', () => {
   });
 });
 
+test('parseErrorBody keeps string field codes only', () => {
+  expect(
+    parseErrorBody({
+      error: {
+        code: 'invalid_input',
+        message: 'x',
+        fields: { 'fields.0.label': 'label_required', bad: 3 },
+      },
+    }),
+  ).toEqual({
+    code: 'invalid_input',
+    message: 'x',
+    fields: { 'fields.0.label': 'label_required' },
+  });
+});
+
 test('parseErrorBody returns null for anything else', () => {
   for (const body of [
     null,

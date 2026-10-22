@@ -9,8 +9,9 @@ admin screen for reading inquiries, and one D1 database stores the inquiries.
 - Pages: home, about (company profile), services, news, blog, contact,
   privacy policy, and a 404 page, in Japanese and English.
 - Content: Markdown files in `src/content/`.
-- Settings: company details, menu, colors, and contact form categories in
-  `site.config.ts`.
+- Settings: company details, menu, and colors in `site.config.ts`.
+- Contact form fields: edited in the admin screen (`/admin`, **Form** page),
+  not in the code. See [Contact form](#contact-form).
 - The contact form API and the admin screen come from the
   `@goodnight-web/server` package. You do not edit it; updates arrive as
   pull requests.
@@ -50,7 +51,20 @@ lists them with notes.
 | `BETTER_AUTH_SECRET` | yes      | A long random string (32 characters or more) that signs admin sessions.                               |
 | `IP_HASH_SECRET`     | yes      | A random string (32 characters or more) used to hash IP addresses. Raw IP addresses are never stored. |
 | `TURNSTILE_SECRET`   | yes      | The Turnstile secret key. Without it, the contact form does not accept inquiries.                     |
-| `SLACK_WEBHOOK_URL`  | no       | A Slack incoming webhook for new-inquiry notices. Notices contain no names or message text.           |
+| `SLACK_WEBHOOK_URL`  | no       | A Slack incoming webhook for new-inquiry notices. Notices contain no names or form contents.          |
+
+## Contact form
+
+The fields of the contact form (name, company, category, message, and any
+fields you add) are edited in the admin screen: open `/admin` and go to the
+**Form** page. Each save creates a new version, and a change shows on the
+site within about a minute, without a deploy. The contact page loads the
+fields from the Worker (`GET /api/contact/form`) when it opens.
+
+Some parts are fixed and cannot be removed: the email address field, the
+privacy policy consent, the hidden spam trap (honeypot), and the Turnstile
+check. When you change the fields, also update the list of collected
+information in the privacy policy (`src/content/pages/`).
 
 ## Turnstile
 

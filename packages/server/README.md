@@ -9,22 +9,20 @@ Sites use it from `src/worker.ts` and do not edit it:
 ```ts
 import { createGoodnightWorker } from '@goodnight-web/server';
 
-export default createGoodnightWorker({
-  locale: 'ja',
-  contact: {
-    categories: [
-      { value: 'sales', label: { ja: '製品・料金について', en: 'Sales' } },
-      { value: 'press', label: { ja: '取材・メディア', en: 'Press' } },
-      'other',
-    ],
-  },
-});
+export default createGoodnightWorker({ locale: 'ja' });
 ```
 
-Each category is a plain value (`'other'`) or `{ value, label: { ja, en } }`.
-The contact API accepts, stores, and sends to Slack only the `value`; the
-admin UI shows the label in the admin's language, or the value when there is
-no label.
+Options: `locale` (`ja` or `en`: Slack messages, CSV headers when none is
+asked for, and API messages when `Accept-Language` matches neither) and
+`contact.turnstileHostnames` (hostnames accepted from Turnstile siteverify;
+defaults to the request's hostname).
+
+The contact form fields are not options. Admins edit them in the admin UI
+(**Form**), and each save is a new, append-only version in the
+`form_definitions` table. The email address and the privacy consent are
+fixed. Submissions store the values by immutable field id with the form
+version, so old inquiries keep their own labels. The documentation site's
+"Customizing the contact form" page describes the rules.
 
 `wrangler.jsonc` needs:
 
@@ -39,9 +37,30 @@ no label.
 A feature whose settings are missing is turned off: for example, the contact
 API answers 503 until Turnstile is set up.
 
-The contact form uses `@goodnight-web/server/client` (`getContactConfig()`,
-`submitContact()`) and, for client-side checks, the schema in
-`@goodnight-web/server/contact`. Japanese and English strings are in
+Endpoints:
+
+- `GET /api/contact/form`: the current form fields, the form version, and
+  whether the form is available (public, cached for 30 seconds).
+- `POST /api/contact`: `{ email, consent, fields, formVersion, locale,
+  turnstileToken, gnw_hp_x, elapsedMs, pagePath }`. `fields` is validated
+  against the current definition in D1; unknown keys are 400, an old
+  `formVersion` is 409 `form_outdated`. A filled honeypot (`gnw_hp_x`) or a
+  spam score of 3 or more stores the submission as suspected spam, with no
+  Slack notification.
+- `/api/setup`, `/api/auth/*`: first-admin setup and Better Auth.
+- `/api/admin/*` (admin session with a passkey): status, the inquiry list
+  (views `unread`, `read`, `all`, `spam`; email search `q`; filters
+  `version`, `field` + `value`; sorted by received time, `dir`), detail
+  (marks it read), unread/read and suspected spam changes, delete, and CSV
+  export.
+- `/api/admin/form`: `GET` the current definition and history, `PUT` a new
+  version (`{ baseVersion, fields }`, 409 `form_conflict` when someone saved
+  first), `GET /versions/:version`, and
+  `POST /versions/:version/restore`.
+
+The contact form uses `@goodnight-web/server/client` (`getContactForm()`,
+`submitContact()`). `@goodnight-web/server/contact` has the request schema,
+the form definition types and limits, and `buildFieldValuesSchema()`. Japanese and English strings are in
 `@goodnight-web/server/messages`. The admin UI strings, as JSON, are in
 `@goodnight-web/server/admin-messages.json`; a site's end-to-end test reads
 button names and headings from it.
@@ -51,7 +70,8 @@ security rules.
 
 ## Database
 
-All tables (contact submissions, settings, and the Better Auth tables) are
+All tables (contact submissions, form definitions, settings, and the Better
+Auth tables) are
 defined with Drizzle ORM in `src/db/schema.ts`. drizzle-kit generates the SQL
 migrations in `migrations/`, and the package ships those `.sql` files. A site
 applies them with `wrangler d1 migrations apply DB` (the starter's deploy
@@ -64,8 +84,8 @@ The admin UI source is in `admin-ui/`: a Vite-built React SPA with Base UI,
 Tailwind v4, TanStack Router (typed code-based routes under `/admin`, search
 parameters validated with zod), TanStack Form (setup and sign-in; the setup
 form uses the exported `setupInputSchema`), and TanStack Table (the inquiry
-list, with server-side pagination; the order is fixed to newest first because
-the admin API has no other sort). It does not use TanStack Start.
+list, with server-side pagination, sorting by received time only, and column
+visibility saved in the browser; and the form editor). It does not use TanStack Start.
 `bun run build` builds it and embeds it in
 `src/features/admin-ui/admin-files.gen.ts`, and writes the admin UI strings
 to `src/features/admin-ui/admin-messages.gen.json`. Neither file is
@@ -75,7 +95,7 @@ directory (Turborepo does it for you from the repository root).
 
 Schema changes: edit `src/db/schema.ts`, run `bun run db:generate`, read the
 generated SQL, and commit it. Never edit a released migration. The rules for
-table rebuilds and the setup trigger are in the repository's `AGENTS.md` and
+table rebuilds, the setup trigger, and the `form_definitions` triggers are in the repository's `AGENTS.md` and
 `docs/decisions/0005-drizzle-orm.md`.
 
 ```sh

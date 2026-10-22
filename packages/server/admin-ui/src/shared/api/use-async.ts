@@ -9,40 +9,69 @@ export type AsyncState<T> =
 
 type Settled<T> = Exclude<AsyncState<T>, { status: 'loading' }>;
 
+/** The last settled load: its key, its attempt, and its state. */
+export interface AsyncResult<T> {
+  key: string;
+  attempt: number;
+  state: Settled<T>;
+}
+
+/**
+ * Picks the state to show for `key` and `attempt`. The result of exactly
+ * this load is shown when it has settled. While a background refresh
+ * (`quiet`) of the same key runs, the data of an earlier attempt stays.
+ * Anything else is loading: a new key never shows another key's data.
+ */
+export const visibleState = <T>(
+  result: AsyncResult<T> | null,
+  key: string,
+  attempt: number,
+  quiet: boolean,
+): AsyncState<T> => {
+  if (result?.key !== key) return { status: 'loading' };
+  if (result.attempt === attempt) return result.state;
+  return quiet && result.state.status === 'success'
+    ? result.state
+    : { status: 'loading' };
+};
+
 const toApiError = (error: unknown): ApiError =>
   error instanceof ApiError
     ? error
     : new ApiError(0, 'server_error', 'unexpected error');
 
 /**
- * Runs `load` when `key` changes and returns its state, plus `reload()` and
- * `setData()` for local updates. Results of outdated loads are ignored.
+ * Runs `load` when `key` changes and returns its state, plus `reload()`,
+ * `refresh()`, and `setData()` for local updates. `reload()` shows loading
+ * again; `refresh()` loads again in the background and keeps the current
+ * data until the new result arrives. Results of outdated loads are ignored.
  */
 export const useAsync = <T>(
   load: () => Promise<T>,
   key: string,
 ): AsyncState<T> & {
   reload: () => void;
+  refresh: () => void;
   setData: (data: T) => void;
 } => {
-  const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{
-    token: string;
-    state: Settled<T>;
-  } | null>(null);
-  const token = `${attempt}:${key}`;
+  const [request, setRequest] = useState({ attempt: 0, quiet: false });
+  const [result, setResult] = useState<AsyncResult<T> | null>(null);
+  const { attempt, quiet } = request;
   const run = useEffectEvent(load);
 
   useEffect(() => {
     let active = true;
     run().then(
       (data) => {
-        if (active) setResult({ token, state: { status: 'success', data } });
+        if (active) {
+          setResult({ key, attempt, state: { status: 'success', data } });
+        }
       },
       (error: unknown) => {
         if (active) {
           setResult({
-            token,
+            key,
+            attempt,
             state: { status: 'error', error: toApiError(error) },
           });
         }
@@ -51,14 +80,27 @@ export const useAsync = <T>(
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [key, attempt]);
 
-  const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  const setData = useCallback(
-    (data: T) => setResult({ token, state: { status: 'success', data } }),
-    [token],
+  const reload = useCallback(
+    () =>
+      setRequest((current) => ({ attempt: current.attempt + 1, quiet: false })),
+    [],
   );
-  const state: AsyncState<T> =
-    result?.token === token ? result.state : { status: 'loading' };
-  return { ...state, reload, setData };
+  const refresh = useCallback(
+    () =>
+      setRequest((current) => ({ attempt: current.attempt + 1, quiet: true })),
+    [],
+  );
+  const setData = useCallback(
+    (data: T) =>
+      setResult({ key, attempt, state: { status: 'success', data } }),
+    [key, attempt],
+  );
+  return {
+    ...visibleState(result, key, attempt, quiet),
+    reload,
+    refresh,
+    setData,
+  };
 };

@@ -30,10 +30,10 @@ Cloudflare then shows two values ([Cloudflare: create a widget in the dashboard]
 
 ## Put the keys in place
 
-| Key        | Where it goes                            | Public?                                                    |
-| ---------- | ---------------------------------------- | ---------------------------------------------------------- |
-| Secret key | The Worker secret `TURNSTILE_SECRET`     | No. Never commit it or put it in a page.                   |
-| Site key   | The Worker variable `TURNSTILE_SITE_KEY` | Yes. The contact page reads it from `/api/contact/config`. |
+| Key        | Where it goes                            | Public?                                                  |
+| ---------- | ---------------------------------------- | -------------------------------------------------------- |
+| Secret key | The Worker secret `TURNSTILE_SECRET`     | No. Never commit it or put it in a page.                 |
+| Site key   | The Worker variable `TURNSTILE_SITE_KEY` | Yes. The contact page reads it from `/api/contact/form`. |
 
 To set the secret, open the Worker in the Cloudflare dashboard and add `TURNSTILE_SECRET` under variables and secrets. From a terminal in your project, this does the same:
 
@@ -56,7 +56,7 @@ Set it only there. The contact page does not contain the key; it reads the key f
 For each submission, the Worker sends the token from the form to siteverify and accepts it only if:
 
 - `success` is true,
-- `hostname` is your site's hostname, and
+- `hostname` is your site's hostname (the hostname the request came to, or one of the hostnames in the `contact.turnstileHostnames` option of `createGoodnightWorker()`), and
 - `action` is the action that the contact form sets.
 
 A token is valid for 300 seconds and can be verified only once ([Cloudflare: server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)). If the check fails, the reply is 400 and nothing is saved. [Contact form protection](/docs/how-it-works/contact-protection/) describes the other checks.
