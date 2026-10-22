@@ -193,8 +193,9 @@ arrive.
 
 The browser then registers a passkey with the Better Auth passkey client.
 Setup closes when the first passkey is registered, so a person who left before
-registering one can run setup again. A trigger on the `passkey` table records
-`settings.setup_closed_at` in the same transaction, so setup stays closed even
+registering one can run setup again. The first registration writes
+`settings.setup_closed_at` before it saves the passkey, and a trigger on the
+`passkey` table also records it in the same transaction as the insert, so setup stays closed even
 if every passkey is deleted later (migration `0002_setup_closed_trigger.sql`). `GET /api/setup` returns `{ configured, open, problems }`;
 `problems` lists the settings that keep setup off (`{ name, issue }`, issue
 `missing` or `too_short`) and is empty once setup is closed.
@@ -202,9 +203,16 @@ if every passkey is deleted later (migration `0002_setup_closed_trigger.sql`). `
 Session rules ([0006](decisions/0006-admin-sessions-and-setup-closure.md)):
 the passkey plugin's `registration.afterVerification` calls
 `beforePasskeySaved()` (`src/features/setup/first-passkey.ts`). A user who
-already has a passkey may add another. For a user without one it refuses
-(403) when setup is closed; otherwise this passkey closes setup, so it
-deletes every session first. The setup UI registers with
+already has a passkey may add another, but only from a session created at or
+after the first passkey (401 otherwise). For a user without one it refuses
+(403) when setup is closed. Otherwise it claims setup with one
+`INSERT ... ON CONFLICT DO NOTHING RETURNING` on `settings.setup_closed_at`
+(`claimSetup()`); only one concurrent registration wins, the others get 403.
+The winner then deletes every session. If the passkey is not saved, an after
+hook on `/passkey/verify-registration` deletes the claim again, matching its
+value and only while no passkey exists. `createFirstAdmin` checks
+`isSetupClosed()` again after it creates its session and deletes that session
+if setup closed meanwhile. The setup UI registers with
 `createSession: true`, so the browser gets a session created after the
 passkey.
 

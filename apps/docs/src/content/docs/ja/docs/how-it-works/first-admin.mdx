@@ -21,40 +21,58 @@ description: 最初の管理者は、シークレットの SETUP_TOKEN と、ADM
 以前にトークンを知っていた別の人が、同じアドレスでセットアップを行い、そのセッションを持ち続けているかもしれません。次の決まりで、そうしたセッションが管理者のセッションにならないようにします。
 
 - すでにユーザーがいるアドレスでセットアップをもう一度行うと、そのユーザーの以前のセッションを削除します。
-- 最初のパスキーを登録すると、データベースにあるすべてのセッションを削除します。それまでにあるセッションは、セットアップで作ったものだけです。セットアップ画面は `createSession` を付けてパスキーを登録するので、パスキーより後に作られた新しいセッションが渡され、ログインしたままになります。
+- 最初のパスキーを登録するときは、まずセットアップを確保します。`setup_closed_at` がまだないときだけ書き込む 1 つのデータベース文で行うので、最初のパスキーの登録が同時に 2 つあっても、確保できるのは 1 つだけです。もう一方の登録は 403 になります。続けて、データベースにあるすべてのセッションを削除します。それまでにあるセッションは、セットアップで作ったものだけです。セットアップ画面は `createSession` を付けてパスキーを登録するので、パスキーより後に作られた新しいセッションが渡され、ログインしたままになります。
+- 確保したあとでパスキーを保存できなかったときは、確保を取り消すので、セットアップをやり直せます。取り消しは、その確保に一致し、パスキーが 1 つもないときだけ行います。
+- セットアップは、セッションを作ったあとで、まだ開いているかをもう一度確認します。その間にパスキーの登録がセットアップを確保していたら、作ったセッションを削除して 403 を返します。
 - セットアップが閉じたあとは、パスキーを持たないユーザーはパスキーを登録できません。
-- 最初のパスキーより前に作られたセッションは、管理 API が拒否します（401）。
+- 最初のパスキーより前に作られたセッションは、管理 API が拒否します（401）。パスキーを追加で登録するときも同じセッションが必要なので、古いセットアップのセッションではパスキーを追加できません。
 
 ```ts
 // packages/server/src/features/setup/first-passkey.ts
 export const beforePasskeySaved = async (
   db: D1Database,
-  userId: string,
+  { userId, sessionCreatedAt, request }: PasskeyRegistration,
 ): Promise<void> => {
-  const orm = getDatabase(db);
-  const existing = await orm
-    .select({ id: passkey.id })
-    .from(passkey)
-    .where(eq(passkey.userId, userId))
-    .get();
-  if (existing) return;
+  const state = await checkPasskeySession(
+    db,
+    userId,
+    sessionCreatedAt ?? new Date(0),
+  );
+  if (state === 'ok') return;
+  if (state === 'too_old') {
+    throw new APIError('UNAUTHORIZED', { message: 'passkey session required' });
+  }
   if (await isSetupClosed(db)) {
     throw new APIError('FORBIDDEN', { message: 'setup closed' });
   }
-  await orm.delete(session);
+  const claim = await claimSetup(db);
+  if (!claim) throw new APIError('FORBIDDEN', { message: 'setup closed' });
+  claims.set(request, claim);
+  await getDatabase(db).delete(sessionTable);
 };
 
-// packages/server/src/features/auth/require-admin.ts
-const first = await getDatabase(c.env.DB)
+// packages/server/src/features/setup/setup-state.ts
+export const claimSetup = async (db: D1Database): Promise<string | null> => {
+  const value = String(Date.now());
+  const rows = await getDatabase(db)
+    .insert(settings)
+    .values({ key: SETUP_CLOSED_AT, value })
+    .onConflictDoNothing()
+    .returning({ value: settings.value });
+  return rows.length === 1 ? value : null;
+};
+
+// packages/server/src/features/auth/passkey-session.ts
+const first = await getDatabase(db)
   .select({ createdAt: passkey.createdAt })
   .from(passkey)
-  .where(and(eq(passkey.userId, user.id), isNotNull(passkey.createdAt)))
+  .where(and(eq(passkey.userId, userId), isNotNull(passkey.createdAt)))
   .orderBy(asc(passkey.createdAt))
   .get();
-if (!first?.createdAt) return apiError(c, 403, 'passkey_required');
-if (session.createdAt.getTime() < first.createdAt.getTime()) {
-  return apiError(c, 401, 'unauthorized');
-}
+if (!first?.createdAt) return 'no_passkey';
+return sessionCreatedAt.getTime() < first.createdAt.getTime()
+  ? 'too_old'
+  : 'ok';
 ```
 
 ## セットアップ画面

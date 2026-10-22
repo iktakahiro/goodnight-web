@@ -29,15 +29,35 @@ const toBinding = (value: unknown): Value => {
   throw new Error(`D1_TYPE_ERROR: Type ${typeof value} is not supported`);
 };
 
+/**
+ * A statement held back by `pauseAt` until the test releases it, so a test
+ * can interleave concurrent requests at a chosen point.
+ */
+export interface StatementPause {
+  /** Resolves when a matching statement is about to run. */
+  reached: Promise<void>;
+  /** Lets the statement run, or makes it fail with `error`. */
+  release: (error?: Error) => void;
+}
+
+interface PendingPause {
+  pattern: RegExp;
+  reach: () => void;
+  released: Promise<void>;
+}
+
+type Gate = (sql: string) => Promise<void>;
+
 class Statement {
   constructor(
     private readonly db: Database,
-    private readonly sql: string,
+    private readonly gate: Gate,
+    readonly sql: string,
     private readonly params: Value[] = [],
   ) {}
 
   bind(...values: unknown[]): Statement {
-    return new Statement(this.db, this.sql, values.map(toBinding));
+    return new Statement(this.db, this.gate, this.sql, values.map(toBinding));
   }
 
   private execute() {
@@ -65,20 +85,24 @@ class Statement {
   }
 
   async all() {
+    await this.gate(this.sql);
     return this.execute();
   }
 
   async run() {
+    await this.gate(this.sql);
     return this.execute();
   }
 
   async first(column?: string) {
+    await this.gate(this.sql);
     const row = this.execute().results[0];
     if (!row) return null;
     return column === undefined ? row : (row[column] ?? null);
   }
 
   async raw() {
+    await this.gate(this.sql);
     return this.db.query(this.sql).values(...this.params);
   }
 
@@ -92,20 +116,47 @@ class Statement {
  * package migrations applied. It covers the D1 API the package and Better
  * Auth use (`prepare`, `bind`, `first`, `all`, `run`, `raw`, `batch`,
  * `exec`). The end-to-end test runs against real local D1 in `wrangler dev`.
+ *
+ * `pauseAt(pattern)` holds the next statement whose SQL matches `pattern`
+ * (each call catches one statement, in call order) until the test releases
+ * it. Other statements keep running, as on D1.
  */
-export const createTestD1 = (): { d1: D1Database; sqlite: Database } => {
+export const createTestD1 = (): {
+  d1: D1Database;
+  sqlite: Database;
+  pauseAt: (pattern: RegExp) => StatementPause;
+} => {
   const sqlite = new Database(':memory:');
+  const pauses: PendingPause[] = [];
+  const gate: Gate = async (sql) => {
+    const index = pauses.findIndex(({ pattern }) => pattern.test(sql));
+    if (index === -1) return;
+    const [pause] = pauses.splice(index, 1);
+    pause?.reach();
+    await pause?.released;
+  };
+  const pauseAt = (pattern: RegExp): StatementPause => {
+    const { promise: reached, resolve: reach } = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    pauses.push({ pattern, reach, released: released.promise });
+    return {
+      reached,
+      release: (error) => (error ? released.reject(error) : released.resolve()),
+    };
+  };
   for (const file of readdirSync(MIGRATIONS_DIR).sort()) {
     if (file.endsWith('.sql')) {
       sqlite.exec(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
     }
   }
   const d1 = {
-    prepare: (sql: string) => new Statement(sqlite, sql),
-    batch: async (statements: Statement[]) =>
-      sqlite.transaction(() =>
+    prepare: (sql: string) => new Statement(sqlite, gate, sql),
+    batch: async (statements: Statement[]) => {
+      for (const statement of statements) await gate(statement.sql);
+      return sqlite.transaction(() =>
         statements.map((statement) => statement.runInTransaction()),
-      )(),
+      )();
+    },
     exec: async (sql: string) => {
       sqlite.exec(sql);
       return { count: 1, duration: 0 };
@@ -113,5 +164,5 @@ export const createTestD1 = (): { d1: D1Database; sqlite: Database } => {
     dump: async () => new ArrayBuffer(0),
     withSession: () => d1,
   };
-  return { d1: d1 as unknown as D1Database, sqlite };
+  return { d1: d1 as unknown as D1Database, sqlite, pauseAt };
 };

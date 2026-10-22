@@ -72,13 +72,17 @@ const buildAuth = (env: GoodnightEnv, origin: string) =>
         // The plugin verifies with requireUserVerification: false, so enforce
         // user verification (PIN or biometrics) here.
         registration: {
-          afterVerification: async ({ verification, user }) => {
+          afterVerification: async ({ ctx, verification, user }) => {
             if (!verification.registrationInfo?.userVerified) {
               throw new APIError('UNAUTHORIZED', {
                 message: 'user verification required',
               });
             }
-            await beforePasskeySaved(env.DB, user.id);
+            await beforePasskeySaved(env.DB, {
+              userId: user.id,
+              sessionCreatedAt: ctx.context.session?.session.createdAt,
+              request: ctx.context,
+            });
           },
         },
         authentication: {
@@ -110,7 +114,8 @@ const cache = new WeakMap<GoodnightEnv, Map<string, GoodnightAuth>>();
  *
  * Passkeys only: email and password sign-in is disabled. Passkey registration
  * and sign-in require user verification. IP tracking is off. The first
- * passkey deletes every session and closes setup (`beforePasskeySaved`).
+ * passkey claims setup atomically, then deletes every session
+ * (`beforePasskeySaved`).
  *
  * Call {@link isAuthConfigured} first; this function does not check the
  * secret.
