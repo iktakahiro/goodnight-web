@@ -32,6 +32,22 @@
   --color-warning-soft: hsl(40, 90%, 95%);
   --color-warning-border: hsl(38, 70%, 80%);
   --color-warning-foreground: hsl(30, 60%, 26%);
+  /* Opaque table backgrounds, so sticky columns hide what scrolls below. */
+  --color-table-header: color-mix(
+    in srgb,
+    var(--color-muted) 50%,
+    var(--color-card)
+  );
+  --color-table-row-hover: color-mix(
+    in srgb,
+    var(--color-muted) 70%,
+    var(--color-card)
+  );
+  --color-table-row-unread: color-mix(
+    in srgb,
+    var(--color-accent) 30%,
+    var(--color-card)
+  );
 
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;

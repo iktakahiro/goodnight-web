@@ -786,6 +786,35 @@ const main = async () => {
         .getByText('500万円')
         .waitFor();
     });
+    await step('a table wider than the page scrolls sideways', async () => {
+      await page.setViewportSize({ width: 900, height: 720 });
+      const region = page.getByRole('region', {
+        name: ui('ja', 'list.tableRegion'),
+      });
+      const more = page.getByTestId('inquiry-table-more');
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="inquiry-table-more"]')
+            ?.getAttribute('data-visible') === 'true',
+      );
+      if ((await region.getAttribute('tabindex')) !== '0') {
+        throw new Error('the scrollable table cannot be reached by keyboard');
+      }
+      await region.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth;
+      });
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="inquiry-table-more"]')
+            ?.getAttribute('data-visible') === 'false',
+      );
+      if ((await more.getAttribute('aria-hidden')) !== 'true') {
+        throw new Error('the scroll hint is exposed to assistive technology');
+      }
+      await page.setViewportSize({ width: 1280, height: 720 });
+    });
     await step('the detail shows the new field with its label', async () => {
       await page
         .getByTestId('inquiry-row')

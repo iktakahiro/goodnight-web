@@ -26,7 +26,13 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import type { ADMIN_PAGE_SIZE } from '../../../../src/features/admin-api/admin-query.ts';
 import type {
   AdminListColumn,
@@ -46,6 +52,10 @@ import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { Button, buttonVariants } from '../../shared/ui/button.tsx';
 import { Card } from '../../shared/ui/card.tsx';
 import { cn } from '../../shared/ui/cn.ts';
+import {
+  useElementWidth,
+  useScrollEdges,
+} from '../../shared/ui/horizontal-scroll.ts';
 import {
   Menu,
   MenuCheckboxItem,
@@ -143,6 +153,29 @@ const ListSkeleton = () => (
     ))}
   </div>
 );
+
+/**
+ * Keeps the received and email columns in view from the `md` breakpoint
+ * while the other columns scroll. The email column casts a shadow once the
+ * table is scrolled, so the hidden content behind it is visible.
+ */
+const stickyClass = (id: string, scrolled: boolean): string | undefined => {
+  if (id === 'received_at') return 'md:sticky md:left-0 md:z-10';
+  if (id === 'email') {
+    return cn(
+      'md:sticky md:z-10',
+      scrolled && 'md:shadow-[8px_0_8px_-6px_hsl(258_40%_40%/0.16)]',
+    );
+  }
+  return undefined;
+};
+
+/** Places the sticky email column right after the received column. */
+const stickyStyle = (
+  id: string,
+  firstColumnWidth: number,
+): CSSProperties | undefined =>
+  id === 'email' ? { left: firstColumnWidth } : undefined;
 
 /** The received column header: switches between newest and oldest first. */
 const SortHeader = ({ label, query }: { label: string; query: ListQuery }) => {
@@ -407,6 +440,8 @@ export const InquiryListPage = () => {
   const filtered = query.version !== undefined || !!query.field || !!query.q;
 
   const rows = table.getRowModel().rows;
+  const [scrollerRef, edges] = useScrollEdges();
+  const [firstHeaderRef, firstColumnWidth] = useElementWidth();
   const visibleColumns = table.getVisibleLeafColumns();
   const range = data ? pageRange(data.page, data.pageSize, data.total) : null;
   const columnLabel = (id: string): string => {
@@ -476,7 +511,7 @@ export const InquiryListPage = () => {
             className={cn(
               'block break-words',
               long
-                ? 'line-clamp-2 min-w-56 max-w-sm text-muted-foreground'
+                ? 'line-clamp-2 min-w-60 max-w-xs text-muted-foreground'
                 : 'max-w-60 truncate',
               unread && !long && 'font-semibold',
             )}
@@ -744,64 +779,107 @@ export const InquiryListPage = () => {
                   ) : null}
                 </div>
               ) : (
-                <div className='overflow-x-auto'>
-                  <table className='w-full text-left text-sm'>
-                    <caption className='sr-only'>{t('list.title')}</caption>
-                    <thead className='border-b border-border/80 bg-muted/50 text-xs font-semibold text-muted-foreground'>
-                      <tr>
-                        {visibleColumns.map((column) => (
-                          <th
-                            key={column.id}
-                            scope='col'
-                            aria-sort={
-                              column.id === 'received_at'
-                                ? query.dir === 'asc'
-                                  ? 'ascending'
-                                  : 'descending'
-                                : undefined
-                            }
-                            className='px-4 py-3 whitespace-nowrap first:pl-5 sm:first:pl-6'
-                          >
-                            {column.id === 'received_at' ? (
-                              <SortHeader
-                                label={columnLabel(column.id)}
-                                query={query}
-                              />
-                            ) : (
-                              columnLabel(column.id)
-                            )}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className='divide-y divide-border/70'>
-                      {rows.map((row) => (
-                        <tr
-                          key={row.id}
-                          data-testid='inquiry-row'
-                          onClick={() =>
-                            void navigate({
-                              to: '/inquiries/$id',
-                              params: { id: row.original.id },
-                            })
-                          }
-                          className={cn(
-                            'cursor-pointer align-top transition-colors hover:bg-muted/70',
-                            row.original.status === 'unread' && 'bg-accent/30',
-                          )}
-                        >
-                          {row.getVisibleCells().map((visible) => (
-                            <td
-                              key={visible.id}
-                              className='px-4 py-3.5 first:pl-5 sm:first:pl-6'
+                <div className='relative'>
+                  <div
+                    ref={scrollerRef}
+                    role='region'
+                    aria-label={t('list.tableRegion')}
+                    tabIndex={edges.before || edges.after ? 0 : undefined}
+                    data-testid='inquiry-table-scroll'
+                    className='peer overflow-x-auto outline-none'
+                  >
+                    <table className='w-full border-separate border-spacing-0 text-left text-sm'>
+                      <caption className='sr-only'>{t('list.title')}</caption>
+                      <thead className='text-xs font-semibold text-muted-foreground'>
+                        <tr className='[--row-bg:var(--color-table-header)]'>
+                          {visibleColumns.map((column, index) => (
+                            <th
+                              key={column.id}
+                              ref={index === 0 ? firstHeaderRef : undefined}
+                              scope='col'
+                              aria-sort={
+                                column.id === 'received_at'
+                                  ? query.dir === 'asc'
+                                    ? 'ascending'
+                                    : 'descending'
+                                  : undefined
+                              }
+                              style={stickyStyle(column.id, firstColumnWidth)}
+                              className={cn(
+                                'border-b border-border/80 bg-(--row-bg) px-4 py-3 whitespace-nowrap first:pl-5 sm:first:pl-6',
+                                stickyClass(column.id, edges.before),
+                              )}
                             >
-                              {cell(visible.column.id, row.original)}
-                            </td>
+                              {column.id === 'received_at' ? (
+                                <SortHeader
+                                  label={columnLabel(column.id)}
+                                  query={query}
+                                />
+                              ) : (
+                                columnLabel(column.id)
+                              )}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {rows.map((row) => (
+                          <tr
+                            key={row.id}
+                            data-testid='inquiry-row'
+                            onClick={() =>
+                              void navigate({
+                                to: '/inquiries/$id',
+                                params: { id: row.original.id },
+                              })
+                            }
+                            className={cn(
+                              'group/row cursor-pointer align-top [--row-bg:var(--color-card)] hover:[--row-bg:var(--color-table-row-hover)]',
+                              row.original.status === 'unread' &&
+                                '[--row-bg:var(--color-table-row-unread)]',
+                            )}
+                          >
+                            {row.getVisibleCells().map((visible) => (
+                              <td
+                                key={visible.id}
+                                style={stickyStyle(
+                                  visible.column.id,
+                                  firstColumnWidth,
+                                )}
+                                className={cn(
+                                  'border-border/70 bg-(--row-bg) px-4 py-3.5 transition-colors first:pl-5 sm:first:pl-6 group-not-last/row:border-b',
+                                  stickyClass(visible.column.id, edges.before),
+                                )}
+                              >
+                                {cell(visible.column.id, row.original)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* The focus ring sits above the sticky columns. */}
+                  <div
+                    aria-hidden='true'
+                    className='pointer-events-none absolute inset-0 z-20 rounded-2xl ring-ring ring-inset peer-focus-visible:ring-2'
+                  />
+                  <div
+                    aria-hidden='true'
+                    className={cn(
+                      'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-foreground/10 to-transparent transition-opacity md:hidden',
+                      edges.before ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <div
+                    aria-hidden='true'
+                    data-testid='inquiry-table-more'
+                    data-visible={edges.after}
+                    className={cn(
+                      'pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-foreground/10 to-transparent transition-opacity',
+                      edges.after ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
                 </div>
               )}
             </Card>
