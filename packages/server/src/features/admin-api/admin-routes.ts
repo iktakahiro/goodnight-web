@@ -1,10 +1,20 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import packageJson from '../../../package.json' with { type: 'json' };
 import type { HonoEnv } from '../../hono-env.ts';
-import type { LocalizedLabel } from '../../options.ts';
 import { apiError } from '../../shared/api-error.ts';
 import { secretState } from '../../shared/secret-length.ts';
 import { getContactAvailability } from '../contact/contact-availability.ts';
+import {
+  type FormField,
+  type FormFieldType,
+  type LocalizedText,
+} from '../contact-form/form-definition.ts';
+import { formAdminRoutes } from '../contact-form/form-admin-routes.ts';
+import {
+  getCurrentForm,
+  getFormVersion,
+  getFormVersions,
+} from '../contact-form/form-store.ts';
 import { isSlackWebhookUrl } from '../notify/slack.ts';
 import { getRetentionDays, pruneIfDue } from '../retention/prune.ts';
 import { isSubmissionStatus } from '../submissions/submission-status.ts';
@@ -17,47 +27,65 @@ import {
   submissionBatches,
   updateStatus,
   type Submission,
+  type SubmissionFilter,
 } from '../submissions/submission-store.ts';
 import { requireAdmin } from '../auth/require-admin.ts';
 import { safeErrorMessage } from '../../shared/log-error.ts';
 import { exportQuerySchema, listQuerySchema } from './admin-query.ts';
+import {
+  detailEntries,
+  LIST_TEXT_LENGTH,
+  toAdminValue,
+  type AdminFieldEntry,
+  type AdminFieldValue,
+} from './admin-view.ts';
 import { CSV_BOM, csvLine } from './csv.ts';
+import { csvLayout, csvRow } from './csv-export.ts';
 
-const EXCERPT_LENGTH = 120;
+/**
+ * A submission as the admin API returns it. `ipHash` and the raw `fields`
+ * are never included; `entries` holds the field values with the labels of
+ * the submission's own form version.
+ */
+export type AdminSubmission = Omit<Submission, 'ipHash' | 'fields'> & {
+  entries: AdminFieldEntry[];
+  /** The current form version, to tell old submissions apart. */
+  currentFormVersion: number;
+};
 
-/** A submission as the admin API returns it. `ipHash` is never included. */
-export type AdminSubmission = Omit<Submission, 'ipHash'>;
-
-/** A list entry: no full body, only an excerpt. */
+/**
+ * A list entry: the fixed columns and the values of the current form's
+ * fields, with long text cut to 120 characters. Values of fields that are
+ * not on the current form are left out.
+ */
 export type AdminSubmissionSummary = Pick<
   Submission,
-  | 'id'
-  | 'createdAt'
-  | 'name'
-  | 'email'
-  | 'company'
-  | 'category'
-  | 'status'
-  | 'spamScore'
-> & { excerpt: string };
+  'id' | 'createdAt' | 'email' | 'status' | 'spamScore' | 'formVersion'
+> & { fields: Record<string, AdminFieldValue> };
+
+/** A column of the admin list: a field of the current form. */
+export interface AdminListColumn {
+  id: string;
+  type: FormFieldType;
+  label: LocalizedText;
+  /** Shown by default; the admin can hide or show columns in the browser. */
+  showInList: boolean;
+  /** Options of select and radio fields, which can be filtered on. */
+  options?: { value: string; label: LocalizedText }[];
+}
 
 /** Body of `GET /api/admin/submissions`. */
 export interface AdminSubmissionList {
   items: AdminSubmissionSummary[];
+  /** The current form's fields, in form order. */
+  columns: AdminListColumn[];
+  /** The current form version. */
+  formVersion: number;
   page: number;
   pageSize: number;
   total: number;
   /** Submissions with status `new`, across all pages and filters. */
   unreadCount: number;
-}
-
-/**
- * A configured contact category. `label` is `null` when the category was
- * configured as a plain string; show `value` then.
- */
-export interface AdminCategory {
-  value: string;
-  label: LocalizedLabel | null;
 }
 
 /** Body of `GET /api/admin/status`. Never contains secret values. */
@@ -82,48 +110,62 @@ export interface AdminStatus {
   slackConfigured: boolean;
   retentionDays: number;
   unreadCount: number;
-  /**
-   * The `contact.categories` option in its configured order, empty when no
-   * categories are configured.
-   */
-  categories: AdminCategory[];
 }
 
 const isoDate = (ms: number) => new Date(ms).toISOString();
 
-const CSV_HEADER = [
-  'id',
-  'created_at',
-  'status',
-  'name',
-  'email',
-  'company',
-  'phone',
-  'category',
-  'message',
-  'page_path',
-  'country',
-  'spam_score',
-  'spam_reasons',
-] as const;
+const toAdminSubmission = async (
+  c: Context<HonoEnv>,
+  submission: Submission,
+): Promise<AdminSubmission> => {
+  const { ipHash: _ipHash, fields: _fields, ...rest } = submission;
+  const [current, own] = await Promise.all([
+    getCurrentForm(c.env.DB),
+    getFormVersion(c.env.DB, submission.formVersion),
+  ]);
+  return {
+    ...rest,
+    entries: detailEntries(
+      submission,
+      own?.definition ?? null,
+      current.definition,
+    ),
+    currentFormVersion: current.version,
+  };
+};
 
-const csvRow = (s: Submission) => [
-  s.id,
-  isoDate(s.createdAt),
-  s.status,
-  s.name,
-  s.email,
-  s.company,
-  s.phone,
-  s.category,
-  s.body,
-  s.pagePath,
-  s.country,
-  s.spamScore,
-  s.spamReasons.join(' '),
-];
+const listColumn = (field: FormField): AdminListColumn => ({
+  id: field.id,
+  type: field.type,
+  label: field.label,
+  showInList: field.showInList,
+  ...(field.type === 'select' || field.type === 'radio'
+    ? { options: field.options ?? [] }
+    : {}),
+});
 
-const toAdminSubmission = ({ ipHash: _ipHash, ...rest }: Submission) => rest;
+/**
+ * Turns the `field` and `value` query parameters into a filter. The field
+ * must be a select or radio field of the current form and the value one of
+ * its options, so the JSON path is always an id from the definition.
+ *
+ * @returns `null` when the field or value is not allowed.
+ */
+const choiceFilter = (
+  fields: readonly FormField[],
+  query: { field?: string | undefined; value?: string | undefined },
+): SubmissionFilter['choice'] | null => {
+  if (query.field === undefined || query.value === undefined) return undefined;
+  const field = fields.find(
+    (entry) =>
+      entry.id === query.field &&
+      (entry.type === 'select' || entry.type === 'radio'),
+  );
+  if (!field?.options?.some((option) => option.value === query.value)) {
+    return null;
+  }
+  return { fieldId: field.id, value: query.value };
+};
 
 /**
  * Routes under `/api/admin`. Every route requires an admin session with a
@@ -131,17 +173,20 @@ const toAdminSubmission = ({ ipHash: _ipHash, ...rest }: Submission) => rest;
  *
  * - `GET /me`: the signed-in admin.
  * - `GET /status`: {@link AdminStatus}.
- * - `GET /submissions?status=&page=&limit=`: {@link AdminSubmissionList}
- *   (query rules in {@link listQuerySchema}; an invalid value is 400). Also runs
- *   retention pruning (throttled) in the background.
+ * - `GET /submissions?status=&version=&field=&value=&sort=&dir=&page=&limit=`:
+ *   {@link AdminSubmissionList} (query rules in {@link listQuerySchema}; an
+ *   invalid or unknown parameter is 400). Also runs retention pruning
+ *   (throttled) in the background. There is no keyword search.
  * - `GET /submissions/:id`: one submission; marks a `new` one as read.
  * - `PATCH /submissions/:id` with `{ status }`: changes the status.
  * - `DELETE /submissions/:id`: deletes it.
- * - `GET /submissions.csv?status=`: CSV export, streamed in batches of
- *   rows.
+ * - `GET /submissions.csv?status=&version=&field=&value=&lang=`: CSV export,
+ *   streamed in batches of rows.
+ * - `/form/*`: the contact form definition ({@link formAdminRoutes}).
  */
 export const adminRoutes = new Hono<HonoEnv>()
   .use('*', requireAdmin)
+  .route('/form', formAdminRoutes)
   .get('/me', (c) => c.json(c.get('admin')))
   .get('/status', async (c) => {
     const contact = getContactAvailability(c.env);
@@ -168,16 +213,18 @@ export const adminRoutes = new Hono<HonoEnv>()
       slackConfigured: isSlackWebhookUrl(c.env.SLACK_WEBHOOK_URL),
       retentionDays,
       unreadCount,
-      categories: c
-        .get('options')
-        .contact.categoryLabels.map(({ value, label }) => ({ value, label })),
     };
     return c.json(status);
   })
   .get('/submissions', async (c) => {
     const query = listQuerySchema.safeParse(c.req.query());
     if (!query.success) return apiError(c, 400, 'invalid_input');
-    const { status, page, limit } = query.data;
+    const { status, version, page, limit, sort, dir } = query.data;
+    const current = await getCurrentForm(c.env.DB);
+    const choice = choiceFilter(current.definition.fields, query.data);
+    if (choice === null) {
+      return apiError(c, 400, 'invalid_input', { field: 'invalid' });
+    }
     c.executionCtx.waitUntil(
       pruneIfDue(c.env.DB).catch((error: unknown) => {
         console.error('prune failed:', safeErrorMessage(error));
@@ -185,24 +232,44 @@ export const adminRoutes = new Hono<HonoEnv>()
     );
     const [{ items, total }, unreadCount] = await Promise.all([
       listSubmissions(c.env.DB, {
-        status,
+        filter: { status, formVersion: version, choice },
+        sort: { column: sort, direction: dir },
         limit,
         offset: (page - 1) * limit,
       }),
       countUnread(c.env.DB),
     ]);
+    // Option labels come from each row's own version.
+    const versions = await getFormVersions(
+      c.env.DB,
+      items.map((item) => item.formVersion),
+    );
+    const columns = current.definition.fields;
     const body: AdminSubmissionList = {
-      items: items.map((s) => ({
-        id: s.id,
-        createdAt: s.createdAt,
-        name: s.name,
-        email: s.email,
-        company: s.company,
-        category: s.category,
-        status: s.status,
-        spamScore: s.spamScore,
-        excerpt: s.body.slice(0, EXCERPT_LENGTH),
-      })),
+      items: items.map((s) => {
+        const own = versions.get(s.formVersion)?.definition.fields ?? [];
+        const fields: Record<string, AdminFieldValue> = {};
+        for (const column of columns) {
+          const value = s.fields[column.id];
+          if (value === undefined) continue;
+          fields[column.id] = toAdminValue(
+            own.find((field) => field.id === column.id) ?? column,
+            value,
+            LIST_TEXT_LENGTH,
+          );
+        }
+        return {
+          id: s.id,
+          createdAt: s.createdAt,
+          email: s.email,
+          status: s.status,
+          spamScore: s.spamScore,
+          formVersion: s.formVersion,
+          fields,
+        };
+      }),
+      columns: columns.map(listColumn),
+      formVersion: current.version,
       page,
       pageSize: limit,
       total,
@@ -210,16 +277,28 @@ export const adminRoutes = new Hono<HonoEnv>()
     };
     return c.json(body);
   })
-  .get('/submissions.csv', (c) => {
+  .get('/submissions.csv', async (c) => {
     const query = exportQuerySchema.safeParse(c.req.query());
     if (!query.success) return apiError(c, 400, 'invalid_input');
-    const batches = submissionBatches(c.env.DB, query.data.status);
+    const current = await getCurrentForm(c.env.DB);
+    const choice = choiceFilter(current.definition.fields, query.data);
+    if (choice === null) {
+      return apiError(c, 400, 'invalid_input', { field: 'invalid' });
+    }
+    const locale = query.data.lang ?? c.get('options').locale;
+    const layout = csvLayout(current.definition, locale);
+    const batches = submissionBatches(c.env.DB, {
+      status: query.data.status,
+      formVersion: query.data.version,
+      choice,
+    });
+    const db = c.env.DB;
     const encoder = new TextEncoder();
     // Streamed one batch at a time, so a large table never sits in memory
     // as one string. A failed query ends the download with an error.
     const body = new ReadableStream<Uint8Array>({
       start: (controller) => {
-        controller.enqueue(encoder.encode(CSV_BOM + csvLine(CSV_HEADER)));
+        controller.enqueue(encoder.encode(CSV_BOM + csvLine(layout.header)));
       },
       pull: async (controller) => {
         try {
@@ -228,8 +307,16 @@ export const adminRoutes = new Hono<HonoEnv>()
             controller.close();
             return;
           }
+          const versions = await getFormVersions(
+            db,
+            next.value.map((s) => s.formVersion),
+          );
           controller.enqueue(
-            encoder.encode(next.value.map(csvRow).map(csvLine).join('')),
+            encoder.encode(
+              next.value
+                .map((s) => csvLine(csvRow(s, layout, versions, locale)))
+                .join(''),
+            ),
           );
         } catch (error) {
           console.error('csv export failed:', safeErrorMessage(error));
@@ -256,7 +343,7 @@ export const adminRoutes = new Hono<HonoEnv>()
       submission.status = 'read';
       submission.readAt = now;
     }
-    return c.json(toAdminSubmission(submission));
+    return c.json(await toAdminSubmission(c, submission));
   })
   .patch('/submissions/:id', async (c) => {
     let body: unknown;
@@ -278,7 +365,7 @@ export const adminRoutes = new Hono<HonoEnv>()
     }
     const submission = await getSubmission(c.env.DB, id);
     if (!submission) return apiError(c, 404, 'not_found');
-    return c.json(toAdminSubmission(submission));
+    return c.json(await toAdminSubmission(c, submission));
   })
   .delete('/submissions/:id', async (c) => {
     if (!(await deleteSubmission(c.env.DB, c.req.param('id')))) {

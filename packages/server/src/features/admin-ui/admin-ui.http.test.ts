@@ -60,12 +60,20 @@ describe('security headers', () => {
 
   test('API responses get a strict CSP and no-store', async () => {
     const worker = createTestWorker();
-    for (const path of ['/api/contact/config', '/api/admin/me', '/api/nope']) {
+    for (const path of [
+      '/api/contact/form',
+      '/api/admin/me',
+      '/api/admin/form',
+      '/api/nope',
+    ]) {
       const response = await worker.fetch(path);
       expect(response.headers.get('content-security-policy')).toBe(
         "default-src 'none'; frame-ancestors 'none'",
       );
-      expect(response.headers.get('cache-control')).toBe('no-store');
+      // Only the public form definition may be cached, briefly.
+      expect(response.headers.get('cache-control')).toBe(
+        path === '/api/contact/form' ? 'public, max-age=30' : 'no-store',
+      );
       expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     }
   });

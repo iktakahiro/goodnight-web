@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { getContactConfig, submitContact } from './contact-client.ts';
+import { getContactForm, submitContact } from './contact-client.ts';
 
 const input = {
-  name: 'Taro',
   email: 'taro@example.org',
-  message: 'Hello',
-  consent: true as const,
+  consent: true,
+  fields: { f_name: 'Taro', f_message: 'Hello', f_topics: ['a', 'b'] },
+  formVersion: 3,
   turnstileToken: 't',
 };
 
@@ -84,10 +84,45 @@ describe('submitContact', () => {
   });
 });
 
-test('getContactConfig returns null on failure', async () => {
-  expect(
-    await getContactConfig({
-      fetch: fakeFetch(() => new Response('', { status: 500 })),
-    }),
-  ).toBeNull();
+describe('getContactForm', () => {
+  test('reads /api/contact/form', async () => {
+    let seen: Request | undefined;
+    const form = { available: true, version: 2, fields: [] };
+    const result = await getContactForm({
+      fetch: fakeFetch((request) => {
+        seen = request;
+        return Response.json(form);
+      }),
+    });
+    expect(result).toEqual(form as never);
+    expect(new URL(seen?.url ?? '').pathname).toBe('/api/contact/form');
+    expect(seen?.cache).not.toBe('no-cache');
+  });
+
+  test('skips the browser cache with fresh', async () => {
+    let seen: Request | undefined;
+    await getContactForm({
+      fresh: true,
+      fetch: fakeFetch((request) => {
+        seen = request;
+        return Response.json({});
+      }),
+    });
+    expect(seen?.cache).toBe('no-cache');
+  });
+
+  test('returns null on failure', async () => {
+    expect(
+      await getContactForm({
+        fetch: fakeFetch(() => new Response('', { status: 500 })),
+      }),
+    ).toBeNull();
+    expect(
+      await getContactForm({
+        fetch: (async () => {
+          throw new TypeError('offline');
+        }) as unknown as typeof fetch,
+      }),
+    ).toBeNull();
+  });
 });

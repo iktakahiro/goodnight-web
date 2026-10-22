@@ -72,8 +72,10 @@ test easier.
   `ADMIN_EMAILS`. Setup closes once an admin exists.
 - Save a contact submission to D1 before responding. Notifications and cleanup
   run in `ctx.waitUntil` and never change the response.
-- Slack notifications contain no personal data and no message body: only the
-  count, the category, and the admin URL.
+- Slack notifications contain no personal data and no form values: only the
+  count, the received time, and the admin URL.
+- Validate contact submissions against the form definition stored in D1,
+  never against one sent by the client. Reject unknown field keys.
 - Verify Turnstile on the server, including `hostname` and `action`. Check
   `Origin` and the body size before parsing.
 - Keep secrets in Worker secrets. Never return them to the browser or write
@@ -105,6 +107,11 @@ D1 is accessed through Drizzle ORM only (see
   file. If it rebuilds the `user` table, do not commit it: on D1 the rebuild
   deletes every session and passkey. Change the schema so that it needs only
   `ALTER TABLE ... ADD`.
+- `form_definitions` is append-only: the triggers `form_definitions_no_update`
+  and `form_definitions_no_delete` in `0004_form_definition_seed.sql` refuse
+  `UPDATE` and `DELETE`. Never change or delete a saved form version; add a
+  new one. If the generated SQL rebuilds `form_definitions`, append both
+  `CREATE TRIGGER` statements to the new file.
 - Data and triggers that drizzle-kit does not model go in a custom migration
   (`bunx drizzle-kit generate --custom --name <name>` in `packages/server`).
 - Better Auth tables come from the Better Auth CLI

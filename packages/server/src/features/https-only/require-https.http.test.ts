@@ -71,7 +71,7 @@ describe('HTTPS for the admin areas', () => {
   test('the contact API and the site are not redirected', async () => {
     const worker = createTestWorker({ env: { ASSETS: assets } });
     expect(
-      (await worker.fetch('http://example.com/api/contact/config')).status,
+      (await worker.fetch('http://example.com/api/contact/form')).status,
     ).toBe(200);
     expect((await worker.fetch('http://example.com/about')).status).toBe(200);
   });

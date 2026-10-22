@@ -23,35 +23,34 @@ export interface SlackPayload {
   text: string;
 }
 
-const escapeSlack = (value: string): string =>
-  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
 /**
- * Builds the new-inquiry message. It contains the count, the category, and the
- * admin URL only: no name, email, company, phone, or message body.
+ * Builds the new-inquiry message: the count, the received time, and the
+ * admin URL. It contains no personal data and nothing the visitor typed: no
+ * email, no field values, not even the answers of select fields.
  *
- * @param category - Shown only when it is one of `allowedCategories`, so free
- *   text typed by a visitor never reaches Slack.
+ * The time is a Slack date token, so Slack shows it in each reader's own
+ * time zone; the fallback text is UTC.
  */
 export const buildSlackPayload = ({
   locale,
-  category,
-  allowedCategories,
+  receivedAt,
   adminUrl,
 }: {
   locale: Locale;
-  category: string | null;
-  allowedCategories: readonly string[] | undefined;
+  receivedAt: number;
   adminUrl: string;
 }): SlackPayload => {
-  const lines = [translate(locale, 'notify.newInquiry')];
-  if (category && allowedCategories?.includes(category)) {
-    lines.push(
-      translate(locale, 'notify.category', { category: escapeSlack(category) }),
-    );
-  }
-  lines.push(`<${adminUrl}|${translate(locale, 'notify.open')}>`);
-  return { text: lines.join('\n') };
+  const seconds = Math.floor(receivedAt / 1000);
+  const fallback = new Date(receivedAt).toISOString().replace(/\.\d+Z$/, 'Z');
+  return {
+    text: [
+      translate(locale, 'notify.newInquiry'),
+      translate(locale, 'notify.receivedAt', {
+        time: `<!date^${seconds}^{date_short_pretty} {time}|${fallback}>`,
+      }),
+      `<${adminUrl}|${translate(locale, 'notify.open')}>`,
+    ].join('\n'),
+  };
 };
 
 /**
