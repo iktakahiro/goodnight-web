@@ -5,7 +5,7 @@ description: Turnstile のウィジェットを作り、2 つのキーを設定�
 
 このページの手順で Turnstile のウィジェットを作り、サイトキーとシークレットキーを設定します。両方を設定すると、問い合わせフォームが送信を受け付けるようになります。
 
-Turnstile は、訪問者がボットではなく人であることを確かめる、Cloudflare の無料のしくみです。goodnight-web の問い合わせフォームには Turnstile が必要です。
+Turnstile は Cloudflare の無料のボット対策で、訪問者がボットではなく人であることを確かめます。goodnight-web の問い合わせフォームには Turnstile が必要です。
 
 ## ウィジェットを作る
 
@@ -18,7 +18,7 @@ Turnstile は、訪問者がボットではなく人であることを確かめ�
 Cloudflare が 2 つの値を表示します（[Cloudflare: ダッシュボードでウィジェットを作る](https://developers.cloudflare.com/turnstile/get-started/widget-management/dashboard/)）。
 
 - **サイトキー（Site key）:** 公開してよい値です。問い合わせページがウィジェットを表示するのに使います。
-- **シークレットキー（Secret key）:** 秘密の値です。Worker が Turnstile の siteverify で送信を検証するのに使います。
+- **シークレットキー（Secret key）:** 秘密の値です。Worker が Turnstile の検証 API（siteverify）で送信を確かめるのに使います。
 
 ## キーを設定する
 
@@ -39,11 +39,11 @@ starter では、サイトキーを `wrangler.jsonc` に書きます。変更を
 
 設定するのはここだけです。問い合わせページにはキーを書かず、Worker から読み込みます。
 
-ダッシュボードだけで設定した値は、次のデプロイで `wrangler.jsonc` の値に置き換わります。`wrangler deploy` がファイルの変数をアップロードするためです。
+ダッシュボードでは設定しないでください。ダッシュボードだけで設定した値は、次のデプロイで `wrangler.jsonc` の値に置き換わります。`wrangler deploy` がファイルの変数をアップロードするためです。
 
 ### シークレットキー
 
-Cloudflare のダッシュボードで Worker を開き、変数とシークレットに `TURNSTILE_SECRET` を追加します。プロジェクトのフォルダーでターミナルを使うなら、次のコマンドでも同じことができます。
+Cloudflare のダッシュボードで Worker を開き、変数とシークレットに `TURNSTILE_SECRET` を種類 **Secret** で追加します。プロジェクトのフォルダーでターミナルを使うなら、次のコマンドでも同じことができます。
 
 ```sh
 npx wrangler secret put TURNSTILE_SECRET
@@ -87,6 +87,8 @@ Worker は送信のたびに、フォームから届いたトークンを siteve
 site key:   1x00000000000000000000AA
 secret key: 1x0000000000000000000000000000000AA
 ```
+
+テスト用キーは、Git が無視する `.dev.vars`（starter の `.dev.vars.example` をコピーしたファイル）に書きます。`wrangler.jsonc` にはコミットしないでください。
 
 テスト用キーは本番のサイトで使わないでください。すべてのリクエストを通してしまいます。
 

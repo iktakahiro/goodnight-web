@@ -1,10 +1,10 @@
 ---
 title: 配布と更新のしくみ
 icon: Package
-description: サーバーは編集しない npm パッケージで届き、サイトはあなたが持ちます。更新は Dependabot の PR で届きます。
+description: サーバーは編集しない npm パッケージで届き、Webサイトはあなたが編集します。更新は Dependabot の PR で届きます。
 ---
 
-このページでは、どのファイルを自分で編集するか、更新がどう届くか、どの PR をマージしてよいかがわかります。問い合わせ API と管理画面は、編集しない npm パッケージから入ります。Astro のサイトはあなたのものです。
+このページでは、どのファイルを自分で編集するか、更新がどう届くか、どの PR（変更の提案）をマージしてよいかがわかります。問い合わせ API と管理画面は npm パッケージで届き、あなたは編集しません。Astro で作るWebサイトは、あなたが自由に編集します。
 
 ## 編集する人で 2 つに分ける
 
@@ -14,7 +14,7 @@ description: サーバーは編集しない npm パッケージで届き、サ�
 | 中身       | Worker のファクトリー、問い合わせ API、Better Auth とパスキー、管理 API、日本語と英語の文言を含むビルド済みの管理画面、セキュリティヘッダー、D1 のマイグレーション | Astro のページ、Markdown のコンテンツ（日本語と英語）、`site.config.ts`、スタイル、`wrangler.jsonc`、3 行ほどの `src/worker.ts` |
 | 変わり方   | semver に従った新しいバージョン                                                                                                                                    | あなた自身のコミット                                                                                                            |
 
-starter の `src/worker.ts` はファクトリーを呼ぶだけです。サーバーのコードは、パッケージの中にとどまります。
+starter の `src/worker.ts` は、Worker を組み立てる関数（ファクトリー）を呼ぶだけです。サーバーのコードは、パッケージの中にとどまります。
 
 starter の `AGENTS.md` と `CLAUDE.md` は、AI ツールに次のことを伝えます。
 
@@ -42,12 +42,12 @@ public リポジトリでは、サイトのソース全体、設定、すべて�
 
 starter の `.github/workflows/visibility-check.yml` は、push のたびに動きます。手動でも実行できます。リポジトリが public なら、「private にしてください」というエラーを日本語と英語で出し、ジョブを失敗させます。
 
-このワークフローには、トークンも権限もいりません。公開してよいのは、サイトのコピー元である starter リポジトリだけです。そのため、そこでだけジョブを飛ばします。
+このワークフローには、トークンも権限もいりません。public にしてよいのは、サイトのコピー元である公開の starter リポジトリだけです。そのため、そのリポジトリでだけジョブを実行しません。
 
 ## 更新の届き方
 
 1. goodnight-web が `@goodnight-web/server` の新しいバージョンを公開します。脆弱性の修正なら、GitHub の Security Advisory も出します。
-2. Dependabot が、公開から 5 日たったバージョンを提案します。設定は starter の `.github/dependabot.yml` にあります。
+2. Dependabot（更新の PR を自動で作る GitHub の機能）が、公開から 5 日たったバージョンを提案します。設定は starter の `.github/dependabot.yml` にあります。
    - `@goodnight-web/*` の更新は、1 つの PR にまとめます。
    - セキュリティアップデートは、この 5 日の待ち（cooldown）なしで届きます。
    - サイトのほかのパッケージ（Astro など）のマイナーとパッチの更新は、別のグループにまとめます。
@@ -68,7 +68,7 @@ starter の `.github/workflows/visibility-check.yml` は、push のたびに動�
 4. Workers Builds がその PR をビルドし、プレビューを表示します。
 5. プレビューを確認して、マージします。`deploy` スクリプトは `wrangler d1 migrations apply DB --remote && wrangler deploy` を実行します。新しいコードが動く前に、データベースのマイグレーションが済みます。
 
-管理画面からのワンクリック更新はありません。そのためには、あなたの GitHub リポジトリに書き込めるトークンを Worker に持たせる必要があります。goodnight-web は、Worker にその権限を持たせません。
+管理画面からのワンクリック更新はありません。ワンクリックで更新するには、あなたの GitHub リポジトリに書き込めるトークンを Worker に持たせる必要があります。goodnight-web は、Worker にその権限を持たせません。
 
 ### 更新チェックのワークフロー [#the-update-check-workflow]
 

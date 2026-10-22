@@ -4,24 +4,7 @@ icon: Layers
 description: The parts that run in one Worker and one D1 database, and how one contact submission is handled.
 ---
 
-This page shows the parts of goodnight-web and what happens to one contact submission until it is saved. The site, the contact API, and the admin screen run in one Worker with Static Assets and one D1 database.
-
-<ArchitectureDiagram locale='en' />
-
-## The parts
-
-| Part                         | Role                                                                                                                                                                                                                          |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker                       | One Worker per site. It serves the static pages and runs the API.                                                                                                                                                             |
-| Static Assets                | The Astro build (`/`, `/blog/`, `/contact/`, and so on). Cloudflare serves these files without running Worker code.                                                                                                           |
-| Hono app                     | Created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*`, `/admin`, and `/admin/*` reach it, through `run_worker_first`.                                                                       |
-| D1                           | One SQLite database for inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                                                                                              |
-| Turnstile                    | Cloudflare's bot check, used on the contact form. The Worker verifies each token on the server.                                                                                                                               |
-| Rate Limiting binding        | A Workers binding that limits contact submissions, setup attempts, and passkey sign-ins per `ip_hash`. It works on the free plan.                                                                                             |
-| Better Auth with passkeys    | Admin sign-in with passkeys only. Email and password sign-in is turned off.                                                                                                                                                   |
-| Admin screen                 | A React app (TanStack Router, Form, and Table) built with Vite. It ships prebuilt in `@goodnight-web/server`, and the Worker serves it.                                                                                       |
-| Slack webhook (optional)     | A short message about a new inquiry. It contains no personal data.                                                                                                                                                            |
-| Cloudflare Access (optional) | An extra sign-in layer in front of `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. Recommended, not required. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. |
+This page shows the parts of goodnight-web and follows one contact submission from the request to the work done after the response. The website, the contact API, and the admin screen run in one Worker with Static Assets and one D1 database.
 
 Three constraints shape the design:
 
@@ -29,17 +12,34 @@ Three constraints shape the design:
 - Cloudflare and GitHub are the only required services.
 - Fail closed. When a setting or secret is missing, the feature that needs it is turned off.
 
+<ArchitectureDiagram locale='en' />
+
+## The parts
+
+| Part                         | Role                                                                                                                                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker                       | One Worker per website. It serves the static pages through Static Assets and runs the API and the admin screen.                                                                                                               |
+| Static Assets                | The Astro build (`/`, `/blog/`, `/contact/`, and so on). Cloudflare serves these files without running Worker code.                                                                                                           |
+| Hono app                     | The web framework that runs inside the Worker, created by `createGoodnightWorker(options)` from `@goodnight-web/server`. Only `/api/*`, `/admin`, and `/admin/*` reach it, through `run_worker_first`.                        |
+| D1                           | One SQLite database for inquiries, settings, and the Better Auth tables. The migrations ship in the npm package.                                                                                                              |
+| Turnstile                    | Cloudflare's bot check, used on the contact form. The Worker verifies each token on the server side.                                                                                                                          |
+| Rate Limiting binding        | A Workers binding that limits contact submissions, setup attempts, and passkey sign-ins per `ip_hash` (the hashed IP address). It works on the free plan.                                                                     |
+| Better Auth with passkeys    | Admin sign-in with passkeys only. Email and password sign-in is disabled.                                                                                                                                                     |
+| Admin screen                 | A React app (TanStack Router, Form, and Table) built with Vite. It ships prebuilt in `@goodnight-web/server` and is served by the Worker.                                                                                     |
+| Slack webhook (optional)     | Sends a short message when a new inquiry arrives. It contains no personal data.                                                                                                                                               |
+| Cloudflare Access (optional) | An extra sign-in layer in front of `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. Recommended, not required. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. |
+
 ## Routes
 
-| Path                             | Who uses it      | What it does                                                                                                                                                                                                          |
-| -------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                                                                                    |
-| `GET /api/contact/form`          | The contact page | Returns the current form fields and whether the form is available. Public and read-only.                                                                                                                              |
-| `POST /api/contact`              | The contact form | Checks a submission, applies the rate limit, and saves it.                                                                                                                                                            |
-| `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                                                                                         |
-| `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                                                                                        |
-| `/api/admin/*`                   | The admin screen | List, detail, unread/read and suspected spam changes, delete, CSV export, the form editor with its versions, and a status endpoint that reports missing contact form settings and whether Slack notifications are on. |
-| `/admin/*`                       | Admins           | The prebuilt admin screen (a React app). Every data request needs a session.                                                                                                                                          |
+| Path                             | Used by          | What it does                                                                                                                                                                                                                                       |
+| -------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`, `/blog/*`, `/contact/`, ... | Visitors         | Static pages. No Worker code runs.                                                                                                                                                                                                                 |
+| `GET /api/contact/form`          | The contact page | Returns the current form fields and whether the form is available. Public and read-only.                                                                                                                                                           |
+| `POST /api/contact`              | The contact form | Checks a submission, applies the rate limit, and saves it.                                                                                                                                                                                         |
+| `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                                                                                                                      |
+| `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                                                                                                                     |
+| `/api/admin/*`                   | The admin screen | Listing, viewing, and deleting inquiries, marking them unread/read or suspected spam, CSV export, and the form editor with its versions. Also a status endpoint that reports missing contact form settings and whether Slack notifications are on. |
+| `/admin/*`                       | Admins           | The prebuilt admin screen (a React app). Every data request needs a session.                                                                                                                                                                       |
 
 The inquiry list in the admin screen shows 50 inquiries per page, sorted by received time. The list API also returns the unread and suspected spam counts, and you can search it by email address.
 
@@ -47,19 +47,19 @@ The inquiry list in the admin screen shows 50 inquiries per page, sorted by rece
 
 `POST /api/contact` runs these steps in this order:
 
-1. **Origin and size.** The request must come from the site's own origin, use the expected `Content-Type`, and be at most 32 KB. Anything else is rejected before the body is parsed.
-2. **Honeypot.** The form has a field that people cannot see, `gnw_hp_x`. The Worker notes whether it is filled in and carries on. A filled honeypot never changes the reply. It only flags the submission in step 5.
-3. **Turnstile.** The Worker sends the token to Turnstile siteverify and checks `success`, `hostname`, and `action`. If the check fails, the reply is 400 and nothing is saved.
-4. **Rate limit.** The Rate Limiting binding counts requests per `ip_hash`. Over the limit, the reply is 429.
+1. **Origin and size.** The request must come from the website's own origin, use the expected `Content-Type`, and be at most 32 KB. Anything else is rejected before the body is parsed.
+2. **Honeypot.** The form has a field that people cannot see, `gnw_hp_x`. The Worker notes whether it is filled in and continues. A filled honeypot never changes the response. It only flags the submission in step 5.
+3. **Turnstile.** The Worker sends the token to the Turnstile siteverify API and checks `success`, `hostname`, and `action`. If the check fails, the Worker returns 400 and saves nothing.
+4. **Rate limit.** The Rate Limiting binding counts requests per `ip_hash`. Over the limit, the Worker returns 429.
 5. **Validation and spam score.**
    - zod checks the email address and consent.
    - The form fields are checked with a zod schema built from the current form definition in D1, never from a definition the browser sent. Unknown fields and unknown keys in the request body are rejected.
-   - If the visitor's page showed an older version of the form, the reply is 409 `form_outdated`.
+   - If the visitor's page showed an older version of the form, the Worker returns 409 `form_outdated`.
    - Simple rules add to a spam score. A score of 3 or more, or a filled honeypot, flags the submission as suspected spam. A flagged submission is still saved, with the status `unread`.
-6. **Save, then reply.** The row is inserted into D1. The visitor gets a 200 reply only after the insert succeeds. Nothing after this step can change the reply.
-7. **After the reply (in `ctx.waitUntil`).**
-   - If the submission is not suspected spam and a Slack webhook is set, post a notice of 1 new inquiry with the received time and the admin URL, and record `notified_at`.
-   - If the last cleanup was more than an hour ago, delete inquiries older than the retention period (180 days by default) and expired passkey challenges.
+6. **Save, then respond.** The row is inserted into D1. The visitor gets a 200 response only after the insert succeeds. Nothing after this step can change the response.
+7. **After the response (in `ctx.waitUntil`).**
+   - If the submission is not suspected spam and a Slack webhook is set, the Worker posts a notice of 1 new inquiry with the received time and the admin URL, and records `notified_at`.
+   - If the last cleanup was more than an hour ago, the Worker deletes inquiries older than the retention period (180 days by default) and expired passkey challenges.
 
 The contact API fails closed. In any of these cases it returns 503, and the form says "The contact form is not available yet":
 
@@ -71,7 +71,7 @@ To set them up, see [Set up Turnstile](/docs/setup/turnstile/).
 
 ## In the code
 
-The site's Worker is three lines. It only passes the site's default language to the factory from `@goodnight-web/server`:
+The website's Worker is three lines. It only passes the default language to the factory function from `@goodnight-web/server`:
 
 ```ts title="templates/starter/src/worker.ts"
 import { createGoodnightWorker } from '@goodnight-web/server';
@@ -120,26 +120,26 @@ The code for contact, setup, auth, the admin API, and the admin screen lives in 
 | ---------------------- | --------------------- | -------------------------------------------------------------------------------------- |
 | `DB`                   | D1 binding            | All stored data                                                                        |
 | `ASSETS`               | Static Assets binding | The pages built by Astro                                                               |
-| `CONTACT_RATE_LIMITER` | Rate Limiting binding | Limits contact submissions, setup attempts, and passkey sign-ins per `ip_hash`         |
+| `CONTACT_RATE_LIMITER` | Rate Limiting binding | Rate limits per `ip_hash` (contact submissions, setup attempts, passkey sign-ins)      |
 | `TURNSTILE_SITE_KEY`   | Variable              | The public Turnstile site key, in `wrangler.jsonc`. Without it the contact API is off. |
 | `SETUP_TOKEN`          | Secret                | Required to create the first admin. At least 32 characters. Delete it after setup.     |
-| `ADMIN_EMAILS`         | Secret or variable    | Addresses that may become admins                                                       |
+| `ADMIN_EMAILS`         | Secret or variable    | Email addresses allowed to become admins                                               |
 | `BETTER_AUTH_SECRET`   | Secret                | Better Auth signing secret. At least 32 characters.                                    |
 | `IP_HASH_SECRET`       | Secret                | Key for `HMAC-SHA256(ip, IP_HASH_SECRET)`. At least 32 characters.                     |
-| `TURNSTILE_SECRET`     | Secret                | Turnstile siteverify. Without it the contact API is off.                               |
+| `TURNSTILE_SECRET`     | Secret                | The Turnstile secret key, used for siteverify. Without it the contact API is off.      |
 | `SLACK_WEBHOOK_URL`    | Secret, optional      | New-inquiry notification                                                               |
 | `ACCESS_AUD`           | Variable, optional    | Cloudflare Access application audience tag. Set together with `ACCESS_TEAM_DOMAIN`.    |
 | `ACCESS_TEAM_DOMAIN`   | Variable, optional    | Cloudflare Access team domain, such as `your-team.cloudflareaccess.com`.               |
 
-A secret shorter than 32 characters counts as missing, and the features that use it are turned off. Secrets are used only inside the Worker. They are never sent to the browser or written to D1.
+If `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, or `IP_HASH_SECRET` is shorter than 32 characters, it counts as missing, and the features that use it are turned off. Secrets are used only inside the Worker. They are never sent to the browser or written to D1.
 
 `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` work only over `https://` (except on `localhost`). See [Security model](/docs/security/#https).
 
 ## Styles and fonts [#styles-and-fonts]
 
-The site, the admin screen, and this documentation site load no web fonts. Text uses the fonts the visitor's device already has, for example Hiragino on macOS and iOS, and Yu Gothic or Meiryo on Windows.
+The website, the admin screen, and this documentation site load no web fonts. Text uses the fonts the visitor's device already has, for example Hiragino on macOS and iOS, and Yu Gothic or Meiryo on Windows.
 
-Each of them defines a system font stack once, as a CSS token. There are no font files and no font services, so the Content Security Policy lists no font hosts.
+Each of the three defines a system font stack once, as a CSS token. There are no font files and no font services, so the Content Security Policy lists no font hosts.
 
 The starter has its own design tokens (CSS variables). Its three theme colors come from `theme.primary`, `theme.background`, and `theme.foreground` in `site.config.ts`, and are set on `<html>` as CSS variables.
 

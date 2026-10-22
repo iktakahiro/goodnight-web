@@ -31,13 +31,13 @@ The setup endpoint `/api/setup` creates the first admin. It accepts a request on
 
 - the request comes from the site itself (the `Origin` header is checked),
 - the request uses `https://` (plain HTTP is allowed only on `localhost`),
-- the request includes the correct `SETUP_TOKEN` (compared in constant time), and
-- the email address is in `ADMIN_EMAILS` (upper and lower case do not matter).
+- the request includes the correct `SETUP_TOKEN` (compared in constant time, so the response time does not give the token away), and
+- the email address is in `ADMIN_EMAILS` (case-insensitive).
 
 Setup is also off in these cases:
 
 - **The rate limit cannot run.** Setup attempts are rate-limited. Without the Rate Limiting binding or `IP_HASH_SECRET`, setup is turned off.
-- **A setting is missing or a secret is too short.** `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. When a required setting is missing or too short, the setup screen names it.
+- **A setting is missing or a secret is too short.** `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. When a required setting is missing or too short, the setup screen shows its name.
 
 ## How setup closes
 
@@ -55,19 +55,19 @@ BEGIN
 END;
 ```
 
-The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session from setup is good only for registering the first passkey.
+The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and has a passkey. The session created during setup can only be used to register the first passkey.
 
 ## Sessions [#sessions]
 
 Someone else who had the token earlier could have run setup with the same address and kept the session. These rules make sure such a session never becomes an admin session:
 
 - **Running setup again clears old sessions.** When setup runs again for an address that already has a user, that user's earlier sessions are deleted.
-- **Only one first passkey wins.** Before the passkey is saved, the registration claims setup: one database statement writes `setup_closed_at` only if it is not there yet. If two first passkeys are registered at the same time, only one claim succeeds. The other registration gets 403.
+- **Only one passkey registration can claim setup.** Before the passkey is saved, the registration claims setup: one SQL statement writes `setup_closed_at` only if it is not there yet. If two first passkeys are registered at the same time, only one claim succeeds. The other registration gets 403.
 - **The claim deletes every session.** At this point, the only sessions are the ones setup created. The setup screen registers the passkey with `createSession`, so you get a new session, created after the passkey, and stay signed in.
 - **A failed save undoes the claim.** If the passkey cannot be saved after the claim, the claim is removed, so you can run setup again. The removal matches only that claim, and only while no passkey exists.
-- **Setup checks again at the end.** After setup creates its session, it checks that setup is still open. If a passkey registration claimed setup in the meantime, setup deletes that session and answers 403.
+- **Setup checks again at the end.** After setup creates its session, it checks that setup is still open. If a passkey registration claimed setup in the meantime, setup deletes that session and returns 403.
 - **No passkey registration after setup closes.** Once setup is closed, a user without a passkey cannot register one.
-- **Old sessions do not work.** The admin API rejects (401) a session created before the user's first passkey. Registering another passkey also needs a session from at or after the first passkey, so an old setup session cannot add one.
+- **Old sessions do not work.** The admin API rejects (401) a session created before the user's first passkey. A user who already has a passkey can register another one through the passkey API only from a session created at or after the first passkey, so an old setup session cannot add one. The admin screen has no page to add a passkey yet.
 
 Just before the first passkey is saved, the passkey registration hook stops if setup is closed, claims setup, and deletes every session:
 
@@ -116,4 +116,4 @@ A newly deployed site is public on the internet before its owner has signed in. 
 
 So setup requires both a secret that only the owner knows and an allowed address. Setup closes afterwards, so a leaked `SETUP_TOKEN` cannot create more admins later.
 
-If Cloudflare Access protects `/admin/*`, `/api/setup`, and `/api/auth/*`, only people who pass Access can reach setup at all. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token on `/api/setup` itself. See [Security model](/docs/security/#cloudflare-access).
+If Cloudflare Access protects `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`, only people who pass Access can reach setup at all. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token on `/api/setup` itself. See [Security model](/docs/security/#cloudflare-access).

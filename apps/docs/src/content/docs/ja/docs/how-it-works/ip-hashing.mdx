@@ -3,7 +3,7 @@ title: 生の IP アドレスを保存しない
 description: 訪問者の IP アドレスを保存せず、HMAC だけを残すしくみと理由を説明します。
 ---
 
-goodnight-web は、訪問者の IP アドレスを保存もログ出力もしません。残すのは `HMAC-SHA256(ip, IP_HASH_SECRET)` だけで、回数制限や同じ送信者の確認にはこれで足ります。
+goodnight-web は、訪問者の IP アドレスを保存もログ出力もしません。残すのは秘密の鍵を使ったハッシュ `HMAC-SHA256(ip, IP_HASH_SECRET)` だけで、回数制限や同じ送信者の確認にはこれで足ります。
 
 ## 何をするか
 
@@ -13,7 +13,7 @@ goodnight-web は、訪問者の IP アドレスを保存もログ出力もし�
 
 ## コードでは
 
-問い合わせ API は、`cf-connecting-ip` ヘッダーから IP アドレスを読み、ハッシュだけを残します。生の値を渡す先は、Turnstile の siteverify（`remoteip`）だけです。
+問い合わせ API は、`cf-connecting-ip` ヘッダーから IP アドレスを読み、ハッシュだけを残します。生の IP アドレスを渡す先は、Turnstile の検証 API（siteverify）の `remoteip` だけです。
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
 const ip = c.req.header('cf-connecting-ip');
@@ -58,4 +58,4 @@ if (!success) return apiError(c, 429, 'rate_limited');
 - **IP アドレスは個人情報です。** 個人を特定する手がかりになるので、保存すれば守るべき個人情報が増えます。
 - **ハッシュでも用は足ります。** 同じ IP アドレスからは必ず同じ `ip_hash` ができます。回数制限も、複数の問い合わせが同じ送信者から来たことの確認もできます。
 - **ただのハッシュでは足りません。** IP アドレスをそのまま SHA-256 にしただけでは、簡単に元に戻せます。IPv4 アドレスは約 43 億通りしかなく、すべて試せるからです。秘密の鍵を使う HMAC なら、鍵がなければ戻せません。鍵は Worker の中にとどまります。
-- **`IP_HASH_SECRET` は変えないでください。** 変えると、新しいハッシュが古いハッシュと一致しなくなります。
+- **`IP_HASH_SECRET` は変えないでください。** 変えると新しいハッシュが古いハッシュと一致しなくなり、新しい問い合わせが以前の問い合わせと同じ送信者から来たことを確かめられなくなります。

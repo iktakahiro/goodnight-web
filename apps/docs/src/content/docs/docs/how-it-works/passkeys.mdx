@@ -3,7 +3,7 @@ title: Passkey sign-in
 description: How admins sign in with passkeys through Better Auth, and why there are no passwords.
 ---
 
-Admins sign in at `/admin/login` with a passkey, through Better Auth. There is no email and password sign-in. This page explains how it works and why.
+Admins sign in at `/admin/login` with a passkey, which uses a fingerprint, face, or PIN instead of a password. Sign-in runs through the Better Auth library. There is no email and password sign-in. This page explains how it works and why.
 
 <AdminScreen
   name='sign-in'
@@ -28,13 +28,12 @@ Admins sign in at `/admin/login` with a passkey, through Better Auth. There is n
 - **`https://` only.** This covers sign-in, setup, the admin screen, and the admin API. Plain HTTP is allowed on `localhost` for `wrangler dev`. See [Security model](/docs/security/#https).
 - **Cloudflare Access can sit in front.** It covers `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. Passkey sign-in is still required with Access. See [Security model](/docs/security/#cloudflare-access).
 - **No sessions from before the passkey.** The admin API accepts only a session created at or after your first passkey: one from a passkey sign-in, or from registering the first passkey. See [First admin setup](/docs/how-it-works/first-admin/#sessions).
-- **The instance is reused.** The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate. Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. A new set of bindings gets a new instance.
 
 ## In the code
 
 Better Auth is configured with `emailAndPassword: { enabled: false }` and IP tracking turned off (`advanced.ipAddress.disableIpTracking`).
 
-The passkey plugin gets the request's hostname as its relying party ID and is set to require user verification. The plugin does not enforce user verification when it verifies a registration, so the registration hook checks it:
+The passkey plugin gets the request's hostname as its relying party ID (the domain the passkey is bound to) and is set to require user verification. The plugin does not enforce user verification when it verifies a registration, so the registration hook (`registration.afterVerification`) checks it:
 
 ```ts title="packages/server/src/features/auth/auth.ts"
 passkey({
@@ -56,7 +55,7 @@ passkey({
       }
 ```
 
-The instance is cached per isolate, keyed by the `env` object and the origin:
+The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate (a running instance of the Worker). Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. The cache is keyed by the `env` object and the origin, so a new set of bindings gets a new instance:
 
 ```ts title="packages/server/src/features/auth/auth.ts"
 // Building betterAuth() costs about 5 ms of CPU, close to the free plan's

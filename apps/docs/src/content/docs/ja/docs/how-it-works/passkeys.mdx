@@ -3,7 +3,7 @@ title: パスキーでのログイン
 description: 管理者が Better Auth のパスキーでログインするしくみと、パスワードを使わない理由を説明します。
 ---
 
-管理者は、`/admin/login` で Better Auth のパスキーを使ってログインします。メールとパスワードでのログインはありません。このページでは、そのしくみと理由を説明します。
+管理者は、`/admin/login` でパスキー（指紋や顔認証、PIN でログインするしくみ）を使ってログインします。認証には Better Auth というライブラリを使います。メールとパスワードでのログインはありません。このページでは、そのしくみと理由を説明します。
 
 <AdminScreen
   name='sign-in'
@@ -28,13 +28,12 @@ description: 管理者が Better Auth のパスキーでログインするしく
 - **`https://` でだけ動きます。** ログイン、セットアップ、管理画面、管理 API が対象です。`wrangler dev` のために、`localhost` では平文の HTTP も使えます。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
 - **Cloudflare Access を前に置けます。** `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` が対象です。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すれば、Worker も Access のトークンを確認します。Access を使っても、パスキーでのログインは必要です。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。
 - **パスキーより前のセッションは使えません。** 管理 API は、最初のパスキーより前に作られたセッションを受け付けません。受け付けるのは、パスキーでのログインか、最初のパスキーの登録で作られたセッションです。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/#sessions)を参照してください。
-- **インスタンスを使い回します。** Better Auth のインスタンスは、必要になったときに Worker の binding から作り、同じ isolate の後のリクエストでも使い回します。作るのに CPU を約 5 ms 使うので、毎回作ると無料プランの上限の半分を使ってしまいます。binding が変われば、新しいインスタンスを作ります。
 
 ## コードでは
 
 Better Auth は `emailAndPassword: { enabled: false }` で設定し、IP アドレスの記録も切っています（`advanced.ipAddress.disableIpTracking`）。
 
-パスキープラグインには、リクエストのホスト名を relying party ID として渡し、本人確認を必須と指定します。ただしプラグインは、登録の検証で本人確認を強制しません。そのため、登録のフックで確かめます。
+パスキープラグインには、リクエストのホスト名を relying party ID（パスキーが結びつくドメイン）として渡し、本人確認を必須と指定します。ただしプラグインは、登録の検証で本人確認を強制しません。そのため、登録のフック（`registration.afterVerification`）で確かめます。
 
 ```ts title="packages/server/src/features/auth/auth.ts"
 passkey({
@@ -56,7 +55,7 @@ passkey({
       }
 ```
 
-インスタンスは isolate ごとにキャッシュし、`env` オブジェクトとオリジンをキーにします。
+Better Auth のインスタンスは、必要になったときに Worker の binding から作り、同じ isolate（Worker の実行環境）の後のリクエストでも使い回します。作るのに CPU を約 5 ms 使うので、毎回作ると無料プランの上限の半分を使ってしまいます。キャッシュは `env` オブジェクトとオリジンをキーにするので、binding が変われば新しいインスタンスを作ります。
 
 ```ts title="packages/server/src/features/auth/auth.ts"
 // Building betterAuth() costs about 5 ms of CPU, close to the free plan's

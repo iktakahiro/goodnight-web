@@ -3,13 +3,13 @@ title: しくみの詳細
 description: goodnight-web の部品ごとに、何をするか、どう動くか、なぜそう作るかを説明します。
 ---
 
-goodnight-web の部品ごとに 1 ページずつ、何をするか、コードでどう動くか、なぜそう作るかを説明します。
+部品ごとに 1 ページずつ、動きの要点、実際のコードの抜粋、そう作った理由をまとめています。
 
-コードの抜粋は短く、リポジトリからそのまま写したものです。抜粋の上にファイルのパスがあるので、全体はそこで読めます。
+コードの抜粋は短く、リポジトリからそのまま写したものです。抜粋の上にファイルのパスがあるので、リポジトリでファイル全体を確認できます。
 
 - [問い合わせフォームの保護](/ja/docs/how-it-works/contact-protection/): サーバー側での Turnstile の検証、honeypot、ルールによるスパムスコア、Rate Limiting binding。
-- [パスキーでのログイン](/ja/docs/how-it-works/passkeys/): 管理者がパスワードではなくパスキーを使う理由。
+- [パスキーでのログイン](/ja/docs/how-it-works/passkeys/): Better Auth のパスキーでログインするしくみと、パスワードを使わない理由。
 - [最初の管理者の作成](/ja/docs/how-it-works/first-admin/): `SETUP_TOKEN` と `ADMIN_EMAILS` で、知らない人が最初の管理者になるのを防ぐしくみ。
 - [Cron を使わない古いデータの削除](/ja/docs/how-it-works/data-pruning/): 定期実行のジョブなしで保持期間を守るしくみ。
 - [Slack 通知](/ja/docs/how-it-works/notifications/): 応答の後に送る、個人情報を含まない短い通知。
-- [生の IP アドレスを保存しない](/ja/docs/how-it-works/ip-hashing/): IP アドレスの HMAC だけを保存する理由。
+- [生の IP アドレスを保存しない](/ja/docs/how-it-works/ip-hashing/): IP アドレスを保存せず、HMAC だけを残すしくみと理由。

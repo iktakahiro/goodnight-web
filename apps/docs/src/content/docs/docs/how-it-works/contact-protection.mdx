@@ -1,9 +1,9 @@
 ---
 title: Contact form protection
-description: The order in which the contact API checks a submission, and how doubtful submissions are flagged instead of dropped.
+description: The order in which the contact API checks a submission, and how suspicious submissions are flagged instead of dropped.
 ---
 
-This page explains how the contact API (`POST /api/contact`) checks and saves a submission. It stops junk, but a submission that is only doubtful is flagged and kept, not dropped.
+This page explains how the contact API (`POST /api/contact`) checks and saves a submission. It stops junk, but a submission that is only suspicious is flagged and kept, not dropped.
 
 ## The checks, in order
 
@@ -14,16 +14,16 @@ The API runs these checks from top to bottom. The cheap checks come first, so mo
 | `Origin` is the site's own origin, `Content-Type` is as expected, and the body is at most 32 KB | Rejected before the body is parsed                                                                  |
 | Turnstile siteverify: `success`, `hostname`, and `action` match                                 | 400, nothing saved                                                                                  |
 | Rate Limiting binding, keyed by `ip_hash` (for example 5 requests per 60 seconds)               | 429                                                                                                 |
-| zod validation of the fields against the current form definition                                | Invalid input or an unknown field is 400; a page with an old form version is 409                    |
-| Honeypot and spam score                                                                         | Never a failure: the submission is saved, flagged as suspected spam, and gets no Slack notification |
+| zod validation of the fields against the current form definition                                | Invalid input or an unknown field is 400; a submission from an old form version is 409              |
+| Honeypot (a field people cannot see) and spam score                                             | Never a failure: the submission is saved, flagged as suspected spam, and gets no Slack notification |
 
-When all checks pass, the submission is saved to D1. Only then does the API reply with 200.
+When all checks pass, the submission is saved to D1. Only then does the API return 200.
 
 ## Spam protection
 
-There are three layers. Turnstile keeps most bots out. The honeypot and the spam score do not refuse anything; they only flag a submission as **suspected spam**.
+There are three layers. Turnstile keeps most bots out. The honeypot and the spam score do not reject anything; they only flag a submission as **suspected spam**.
 
-A suspected spam submission is saved like any other. It gets no Slack notification, and the admin screen lists it apart, under the **Suspected spam** tab.
+A suspected spam submission is saved like any other. It gets no Slack notification, and the admin screen lists it separately, under the **Suspected spam** tab.
 
 <AdminScreen
   name='inquiry-spam'
@@ -33,7 +33,7 @@ A suspected spam submission is saved like any other. It gets no Slack notificati
 
 If it is a real inquiry, an admin opens it and chooses **Not spam**. An admin can also flag any inquiry with **Mark as spam**.
 
-### 1. Honeypot
+### Honeypot
 
 The form has a one-line text field that people cannot see. Bots that fill in every field fill in this one too.
 
@@ -62,7 +62,7 @@ The field is moved off screen and hidden from screen readers (`aria-hidden`). Th
 
 - **The name is `gnw_hp_x`.** It means nothing to browsers and password managers. A name such as `website` or `url` invites autofill, and an autofilled honeypot would flag a real person's inquiry.
 - **Autofill is turned off.** `autocomplete="off"` and the `data-*` attributes ask the common password managers (1Password, LastPass, Bitwarden, and others) to leave the field alone.
-- **The response does not change.** A submission with a filled honeypot still needs a valid Turnstile token, counts against the rate limit, and must pass validation, like any other. If it passes, it is saved with the reason `honeypot`. If not, the client gets the same error as without the honeypot, and nothing is saved. A bot cannot tell from the response that it hit the trap.
+- **The response does not change.** A submission with a filled honeypot still needs a valid Turnstile token, counts against the rate limit, and must pass validation, like any other. If it passes, it is saved with the reason `honeypot`. If not, the client gets the same error as the same request with an empty honeypot, and nothing is saved. A bot cannot tell from the response that it hit the trap.
 - **The value is not stored.** What was typed into the honeypot field is never saved.
 
 The server only notes whether the field is filled and carries on:
@@ -77,9 +77,9 @@ const honeypot =
   typeof honeypotValue === 'string' && honeypotValue.trim() !== '';
 ```
 
-### 2. Turnstile
+### Turnstile
 
-Cloudflare Turnstile runs in the page and gives the form a token. The Worker sends the token to siteverify and checks three things:
+Cloudflare Turnstile runs in the page and gives the form a token. The Worker sends the token to Turnstile's `siteverify` API and checks three things:
 
 - `success`
 - `hostname`: the site's own host
@@ -103,9 +103,9 @@ if (!turnstile.ok) {
 }
 ```
 
-By default, the only accepted hostname is the one the request came to. If you serve the form on more than one hostname, list them in the `contact.turnstileHostnames` option of `createGoodnightWorker()`.
+By default, the only accepted hostname is the hostname of the incoming request. If you serve the form on more than one hostname, list them in the `contact.turnstileHostnames` option of `createGoodnightWorker()`.
 
-`verifyTurnstile()` treats a network error, a non-200 answer, or an unexpected body as a failure. Then it checks the three fields:
+`verifyTurnstile()` treats a network error, a non-200 response, or an unexpected body as a failure. Then it checks the three fields:
 
 ```ts title="packages/server/src/features/contact/turnstile.ts"
 const result = body as Record<string, unknown>;
@@ -122,11 +122,11 @@ if (result.action !== expected.action) {
 return { ok: true };
 ```
 
-Without Turnstile, the form is off. If `TURNSTILE_SECRET` or `TURNSTILE_SITE_KEY` is missing, the contact API answers 503 and the form says "The contact form is not available yet".
+Without Turnstile, the form is off. If `TURNSTILE_SECRET` or `TURNSTILE_SITE_KEY` is missing, the contact API returns 503 and the form says "The contact form is not available yet".
 
-The same happens when `IP_HASH_SECRET` or the Rate Limiting binding is missing, because the rate limit cannot run without either. If Turnstile is set up, the admin screen's notice names the missing settings. See [Set up Turnstile](/docs/setup/turnstile/).
+The same happens when `IP_HASH_SECRET` or the Rate Limiting binding is missing, because the rate limit cannot run if either one is missing. If Turnstile is set up, the admin screen's notice names the missing settings. See [Set up Turnstile](/docs/setup/turnstile/).
 
-### 3. Rule-based spam score
+### Rule-based spam score
 
 After validation, `scoreSubmission()` in `spam-score.ts` adds points with a few fixed rules. The rules look at field types, not field names, so they keep working when you change the form.
 
@@ -155,7 +155,7 @@ return { score, reasons };
 
 `url` fields are meant to hold links, so they are not counted. A score of 3 or more (`SPAM_SUSPECT_THRESHOLD`) flags the submission as suspected spam.
 
-One link in a message is not enough. Any one of these is:
+A single link in a message does not reach 3. Any one of these does:
 
 - three or more links across the `textarea` fields,
 - a link in a one-line field such as the name,
@@ -170,11 +170,11 @@ const spamReasons = honeypot ? ['honeypot', ...spam.reasons] : spam.reasons;
 
 ## Why it is built this way
 
-- **Doubtful submissions are flagged, not dropped.** A missed inquiry costs more than a little spam. A real person can trip a rule (a message with three links, a password manager that fills a hidden field), so suspected spam is saved and kept apart, and the admin decides.
-- **Suspected spam is listed apart.** Mixed into the normal list, spam would bury real inquiries and inflate the unread count. The unread count and the Slack notification cover only inquiries that are not suspected spam. See [Customizing the contact form](/docs/contact-form/).
+- **Suspicious submissions are flagged, not dropped.** A missed inquiry costs more than a little spam. A real person can trip a rule (a message with three links, a password manager that fills a hidden field), so suspected spam is saved and kept separate, and the admin decides.
+- **Suspected spam is listed separately.** Mixed into the normal list, spam would bury real inquiries and inflate the unread count. The unread count and the Slack notification cover only inquiries that are not suspected spam. See [Customizing the contact form](/docs/contact-form/).
 - **The honeypot is handled after Turnstile.** Saving a honeypot hit before Turnstile would let a bot write to D1 without passing it. Because Turnstile, the rate limit, and validation come first, a bot can store no more than the rate limit allows, and every stored row is validated.
 - **Fields are checked against the definition stored in D1.** Admins edit the form fields in the admin screen, and the definition is stored in D1. On every submission, the server builds the zod schema from that definition (see [Customizing the contact form](/docs/contact-form/)).
-  - Only the current field ids are accepted, so a hand-made request cannot add fields.
+  - Only the current field IDs are accepted, so a crafted request cannot add fields.
   - Required fields, lengths, formats, and choice values are checked.
   - The stored values of one inquiry are limited to 16 KB.
 - **The rate limit uses Cloudflare's binding.** The Rate Limiting binding counts across Worker instances and works on the free plan. Better Auth's built-in in-memory limiter does not count across instances, so it is not used for this.
