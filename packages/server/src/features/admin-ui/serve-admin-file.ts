@@ -4,6 +4,21 @@ import { adminFiles } from './admin-files.gen.ts';
 const INDEX = '/admin/index.html';
 const HAS_EXTENSION = /\.[a-z0-9]+$/i;
 
+// Decoded binary files, kept for the life of the isolate.
+const decoded = new WeakMap<AdminFile, Uint8Array<ArrayBuffer>>();
+
+const fileBody = (file: AdminFile): string | Uint8Array<ArrayBuffer> => {
+  if (file.encoding !== 'base64') return file.body;
+  let bytes = decoded.get(file);
+  if (!bytes) {
+    const binary = atob(file.body);
+    bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    decoded.set(file, bytes);
+  }
+  return bytes;
+};
+
 /**
  * Serves an embedded admin UI file.
  *
@@ -13,6 +28,7 @@ const HAS_EXTENSION = /\.[a-z0-9]+$/i;
  *   as immutable; everything else is `no-cache`.
  * - `If-None-Match` with the current ETag returns 304.
  * - A missing file with an extension returns 404.
+ * - Binary files (`encoding: 'base64'`) are decoded and sent as bytes.
  */
 export const serveAdminFile = (
   request: Request,
@@ -38,7 +54,7 @@ export const serveAdminFile = (
   if (request.headers.get('if-none-match') === file.etag) {
     return new Response(null, { status: 304, headers });
   }
-  return new Response(request.method === 'HEAD' ? null : file.body, {
+  return new Response(request.method === 'HEAD' ? null : fileBody(file), {
     headers,
   });
 };

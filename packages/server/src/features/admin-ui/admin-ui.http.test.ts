@@ -15,6 +15,12 @@ const files = {
     etag: '"j"',
     body: 'js',
   },
+  '/admin/favicon.ico': {
+    type: 'image/x-icon',
+    etag: '"f"',
+    body: btoa(String.fromCharCode(0, 0, 1, 0, 255)),
+    encoding: 'base64' as const,
+  },
 };
 const serve = (path: string, headers: Record<string, string> = {}) =>
   serveAdminFile(new Request(`https://example.com${path}`, { headers }), files);
@@ -38,6 +44,15 @@ describe('serveAdminFile', () => {
     expect(
       serve('/admin/assets/app-abc.js', { 'if-none-match': '"j"' }).status,
     ).toBe(304);
+  });
+
+  test('decodes base64 files and sends the bytes', async () => {
+    const response = serve('/admin/favicon.ico');
+    expect(response.headers.get('content-type')).toBe('image/x-icon');
+    expect(response.headers.get('cache-control')).toBe('no-cache');
+    expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([
+      0, 0, 1, 0, 255,
+    ]);
   });
 
   test('returns 404 for a missing file', () => {
@@ -108,6 +123,19 @@ describe('embedded admin UI build', () => {
     ].map((match) => match[1] ?? '');
     expect(assets.length).toBeGreaterThanOrEqual(2);
     for (const path of assets) expect(adminFiles[path]).toBeDefined();
+  });
+
+  test('index.html links the favicons and the touch icon', () => {
+    const index = adminFiles['/admin/index.html']?.body ?? '';
+    for (const [path, type] of [
+      ['/admin/favicon.svg', 'image/svg+xml'],
+      ['/admin/favicon.ico', 'image/x-icon'],
+      ['/admin/apple-touch-icon.png', 'image/png'],
+    ] as const) {
+      expect(index).toContain(`href="${path}"`);
+      expect(adminFiles[path]?.type).toBe(type);
+    }
+    expect(adminFiles['/admin/favicon.ico']?.encoding).toBe('base64');
   });
 
   test('works under the admin CSP: no inline scripts or styles', () => {

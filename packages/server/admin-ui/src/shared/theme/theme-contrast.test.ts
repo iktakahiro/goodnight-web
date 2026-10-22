@@ -72,7 +72,12 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['ring', 'card', UI],
   ['ring', 'background', UI],
   ['primary', 'accent', TEXT],
-  ['logo-moon', 'logo-tile', UI],
+  // The logo on the page background: the mark as a graphic, the wordmark as
+  // text. The eyes are cut-outs in the pillow or background color.
+  ['logo-mark', 'background', UI],
+  ['logo-mark', 'logo-eyes', UI],
+  ['logo-wordmark', 'background', TEXT],
+  ['logo-accent', 'background', TEXT],
   // The unread count in the selected list tab swaps the primary colors.
   ['primary', 'primary-foreground', TEXT],
   // The inquiry table: text and the unread dot on the opaque header and row

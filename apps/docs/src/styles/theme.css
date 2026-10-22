@@ -65,12 +65,15 @@
 }
 .site-logo {
   display: block;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: auto;
+  height: 2.5rem;
 }
-.site-name {
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.dark .site-logo-light,
+.site-logo-dark {
+  display: none;
+}
+.dark .site-logo-dark {
+  display: block;
 }
 .skip-link {
   position: fixed;

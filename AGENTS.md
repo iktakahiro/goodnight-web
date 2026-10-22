@@ -42,6 +42,9 @@ The planned layout. Some workspaces do not exist yet. See
   on a published exact version once copied out.
 - `apps/docs`: the user-facing documentation site (Fumadocs and TanStack Start,
   prerendered and served by Workers Static Assets).
+- `brand/`: the logo, favicon, and app icon files. `bun run brand:build`
+  regenerates them, and the copies in the admin UI and the docs site, from
+  `brand/scripts/logo.ts`. Do not edit the generated files by hand.
 - `docs/`: contributor and maintainer documentation. Record design decisions
   in [docs/decisions/](docs/decisions/README.md).
 

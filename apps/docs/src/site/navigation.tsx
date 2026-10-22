@@ -1,5 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import logoMark from '../assets/logo-mark.svg';
+import logoDark from '../assets/logo-lockup-dark.svg';
+import logoLight from '../assets/logo-lockup-light.svg';
 import { i18n, localeFromPath } from './i18n';
 
 /** Returns the landing page path for the locale of a page slug. */
@@ -17,14 +18,21 @@ export function layoutOptions(slug: string): BaseLayoutProps {
     nav: {
       title: (
         <span className='site-brand'>
+          {/* theme.css shows one of the two lockups for the light or dark theme. */}
           <img
-            className='site-logo'
-            src={logoMark}
-            width={28}
-            height={28}
-            alt=''
+            className='site-logo site-logo-light'
+            src={logoLight}
+            width={162}
+            height={40}
+            alt='goodnight-web'
           />
-          <span className='site-name'>goodnight-web</span>
+          <img
+            className='site-logo site-logo-dark'
+            src={logoDark}
+            width={162}
+            height={40}
+            alt='goodnight-web'
+          />
         </span>
       ),
       url: homePath(slug),

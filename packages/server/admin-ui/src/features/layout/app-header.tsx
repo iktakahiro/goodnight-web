@@ -10,7 +10,7 @@ import { formatNumber } from '../../shared/i18n/format.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { cn } from '../../shared/ui/cn.ts';
 import { LanguageSwitch } from './language-switch.tsx';
-import { LogoMark } from './logo-mark.tsx';
+import { LogoLockup, LogoMark } from './logo-mark.tsx';
 import { ThemeSwitch } from './theme-switch.tsx';
 
 const NavLink = ({
@@ -61,14 +61,14 @@ export const AppHeader = () => {
           to='/'
           className='-ml-1 flex items-center gap-2.5 rounded-xl px-1 py-1 outline-none focus-visible:ring-3 focus-visible:ring-ring'
         >
-          <LogoMark className='size-9' />
-          <span className='hidden flex-col leading-tight lg:flex'>
-            <span className='text-[0.95rem] font-semibold'>
-              {t('app.name')}
-            </span>
-            <span className='text-xs text-muted-foreground'>
-              {t('app.adminLabel')}
-            </span>
+          <LogoMark className='size-9 lg:hidden' />
+          <span className='sr-only lg:hidden'>{t('app.name')}</span>
+          <LogoLockup
+            label={t('app.name')}
+            className='hidden h-10 w-auto lg:block'
+          />
+          <span className='hidden border-l border-border pl-2.5 text-sm text-muted-foreground lg:inline'>
+            {t('app.adminLabel')}
           </span>
         </Link>
 

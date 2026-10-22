@@ -61,13 +61,16 @@ for await (const file of new Bun.Glob('**/*.html').scan(`${root}/dist`)) {
         alternates.push(element.getAttribute('href') ?? '');
       },
     })
-    .on('script[src], link[rel="stylesheet"], img[src]', {
-      element(element) {
-        assets.push(
-          element.getAttribute('src') ?? element.getAttribute('href') ?? '',
-        );
+    .on(
+      'script[src], link[rel="stylesheet"], link[rel="icon"], link[rel="apple-touch-icon"], link[rel="manifest"], img[src]',
+      {
+        element(element) {
+          assets.push(
+            element.getAttribute('src') ?? element.getAttribute('href') ?? '',
+          );
+        },
       },
-    })
+    )
     .transform(new Response(html))
     .text();
   const pathname = `${base}${file === 'index.html' ? '' : file.replace(/index\.html$/u, '')}`;

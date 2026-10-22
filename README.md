@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/goodnight-web-lockup-dark.svg">
+  <img src="brand/goodnight-web-lockup-light.svg" alt="goodnight web" width="360">
+</picture>
+
 # goodnight-web
 
 goodnight-web is a template for a company website with a blog and a contact
@@ -32,6 +37,7 @@ Everything user-facing will be available in Japanese and English.
 | `templates/starter`          | The Astro site that users copy and edit                                    |
 | `apps/docs`                  | Documentation site                                                         |
 | `docs`                       | Developer documentation                                                    |
+| `brand`                      | Logo, favicon, and app icon files and their build script                   |
 
 See [docs/architecture.md](docs/architecture.md) for details.
 

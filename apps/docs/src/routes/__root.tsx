@@ -22,7 +22,13 @@ export const Route = createRootRoute({
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
     ],
     links: [
+      {
+        rel: 'icon',
+        href: sitePath('favicon.ico'),
+        sizes: '16x16 32x32 48x48',
+      },
       { rel: 'icon', href: sitePath('favicon.svg'), type: 'image/svg+xml' },
+      { rel: 'apple-touch-icon', href: sitePath('apple-touch-icon.png') },
       { rel: 'manifest', href: sitePath('site.webmanifest') },
     ],
   }),
