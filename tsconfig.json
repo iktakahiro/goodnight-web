@@ -1,5 +1,5 @@
 {
   "extends": "@goodnight-web/typescript-config/base.json",
   "compilerOptions": { "types": ["bun"] },
-  "include": ["*.config.ts"]
+  "include": ["*.config.ts", "scripts/**/*.ts"]
 }
