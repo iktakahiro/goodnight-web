@@ -45,6 +45,7 @@ describe('pruneIfDue', () => {
     expect(await pruneIfDue(d1, NOW)).toEqual({
       ran: true,
       deleted: 1,
+      verificationsDeleted: 0,
       retentionDays: 180,
     });
     expect(ids()).toEqual(['edge', 'new']);
@@ -95,5 +96,26 @@ describe('pruneIfDue', () => {
     sqlite.exec("DELETE FROM settings WHERE key = 'last_cleanup_at'");
     expect((await pruneIfDue(d1, NOW)).ran).toBe(true);
     expect((await pruneIfDue(d1, NOW + 1)).ran).toBe(false);
+  });
+
+  test('deletes expired verification rows (passkey challenges)', async () => {
+    const { d1, sqlite } = await setup();
+    const addVerification = (id: string, expiresAt: number) =>
+      sqlite
+        .query(
+          `INSERT INTO verification (id, identifier, value, expires_at,
+            created_at, updated_at) VALUES (?1, ?1, 'challenge', ?2, ?3, ?3)`,
+        )
+        .run(id, expiresAt, NOW - DAY);
+    addVerification('expired', NOW - 1);
+    addVerification('long-expired', NOW - 30 * DAY);
+    addVerification('live', NOW + 5 * 60 * 1000);
+    expect(await pruneIfDue(d1, NOW)).toMatchObject({
+      ran: true,
+      verificationsDeleted: 2,
+    });
+    expect(sqlite.query('SELECT id FROM verification').all()).toEqual([
+      { id: 'live' },
+    ]);
   });
 });

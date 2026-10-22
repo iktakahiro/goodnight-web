@@ -1,7 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { eq, lt, lte, sql } from 'drizzle-orm';
 import { getDatabase } from '../../db/database.ts';
-import { settings, submissions } from '../../db/schema.ts';
+import { settings, submissions, verification } from '../../db/schema.ts';
 
 /** Retention period when `settings.retention_days` is missing or invalid. */
 export const DEFAULT_RETENTION_DAYS = 180;
@@ -14,7 +14,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Result of {@link pruneIfDue}. */
 export type PruneResult =
   | { ran: false }
-  | { ran: true; deleted: number; retentionDays: number };
+  | {
+      ran: true;
+      /** Submissions deleted. */
+      deleted: number;
+      /** Expired Better Auth `verification` rows deleted. */
+      verificationsDeleted: number;
+      retentionDays: number;
+    };
 
 /** Reads `settings.retention_days`, clamped to 1–3650 days. */
 export const getRetentionDays = async (db: D1Database): Promise<number> => {
@@ -30,9 +37,16 @@ export const getRetentionDays = async (db: D1Database): Promise<number> => {
 };
 
 /**
- * Deletes submissions older than the retention period, at most once per
- * {@link PRUNE_INTERVAL_MS}. There is no Cron Trigger: the contact API and the
- * admin list call this inside `ctx.waitUntil`.
+ * Deletes submissions older than the retention period and expired Better
+ * Auth `verification` rows, at most once per {@link PRUNE_INTERVAL_MS}. There
+ * is no Cron Trigger: the contact API and the admin list call this inside
+ * `ctx.waitUntil`.
+ *
+ * Each passkey sign-in attempt writes a challenge to `verification`. Better
+ * Auth deletes a challenge when it is used, but an abandoned one stays, so
+ * expired rows are deleted here. The table stays small (challenges expire
+ * after a few minutes and the sign-in endpoints are rate-limited), so the
+ * delete needs no index on `expires_at`.
  *
  * The run is claimed with one conditional upsert of
  * `settings.last_cleanup_at`, so concurrent requests do not both prune.
@@ -58,5 +72,13 @@ export const pruneIfDue = async (
   const result = await orm
     .delete(submissions)
     .where(lt(submissions.createdAt, now - retentionDays * DAY_MS));
-  return { ran: true, deleted: result.meta.changes, retentionDays };
+  const verifications = await orm
+    .delete(verification)
+    .where(lt(verification.expiresAt, new Date(now)));
+  return {
+    ran: true,
+    deleted: result.meta.changes,
+    verificationsDeleted: verifications.meta.changes,
+    retentionDays,
+  };
 };
