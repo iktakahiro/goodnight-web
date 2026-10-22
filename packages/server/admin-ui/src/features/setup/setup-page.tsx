@@ -1,12 +1,10 @@
+import CircleCheck from '@gravity-ui/icons/CircleCheck';
+import CircleExclamation from '@gravity-ui/icons/CircleExclamation';
+import Fingerprint from '@gravity-ui/icons/Fingerprint';
+import Key from '@gravity-ui/icons/Key';
+import ShieldCheck from '@gravity-ui/icons/ShieldCheck';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { Link, useNavigate } from '@tanstack/react-router';
-import {
-  CircleAlert,
-  CircleCheck,
-  Fingerprint,
-  KeyRound,
-  ShieldCheck,
-} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   setupInputSchema,
@@ -233,7 +231,7 @@ const TokenStep = ({ onDone }: { onDone: () => void }) => {
         <Notice
           tone='error'
           role='alert'
-          icon={<CircleAlert aria-hidden='true' />}
+          icon={<CircleExclamation aria-hidden='true' />}
         >
           <p>{formError}</p>
         </Notice>
@@ -284,7 +282,7 @@ const PasskeyStep = ({ onDone }: { onDone: () => void }) => {
         <Notice
           tone='error'
           role='alert'
-          icon={<CircleAlert aria-hidden='true' />}
+          icon={<CircleExclamation aria-hidden='true' />}
         >
           <p>{t('setup.passkeyFailed')}</p>
         </Notice>
@@ -351,7 +349,7 @@ export const SetupPage = () => {
               {closed ? (
                 <CircleCheck aria-hidden='true' className='size-6' />
               ) : (
-                <CircleAlert aria-hidden='true' className='size-6' />
+                <CircleExclamation aria-hidden='true' className='size-6' />
               )}
             </div>
             <CardTitle>
@@ -407,7 +405,7 @@ export const SetupPage = () => {
                   className='size-5 text-primary'
                 />
               ) : (
-                <KeyRound aria-hidden='true' className='size-5 text-primary' />
+                <Key aria-hidden='true' className='size-5 text-primary' />
               )}
               {step.name === 'token'
                 ? t('admin.setup.title')

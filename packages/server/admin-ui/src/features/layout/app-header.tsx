@@ -1,5 +1,9 @@
+import ArrowRightFromSquare from '@gravity-ui/icons/ArrowRightFromSquare';
+import Envelope from '@gravity-ui/icons/Envelope';
+import ListCheck from '@gravity-ui/icons/ListCheck';
+import Tray from '@gravity-ui/icons/Tray';
 import { Link, useLocation } from '@tanstack/react-router';
-import { Inbox, ListChecks, LogOut, Mail, type LucideIcon } from 'lucide-react';
+import type { ComponentType, SVGProps } from 'react';
 import { useAdminSession } from '../auth/admin-session.tsx';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { formatNumber } from '../../shared/i18n/format.ts';
@@ -16,7 +20,7 @@ const NavLink = ({
   active,
 }: {
   to: '/' | '/form';
-  icon: LucideIcon;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   label: string;
   active: boolean;
 }) => (
@@ -71,13 +75,13 @@ export const AppHeader = () => {
         <nav aria-label={t('nav.label')} className='flex items-center gap-0.5'>
           <NavLink
             to='/'
-            icon={Inbox}
+            icon={Tray}
             label={t('nav.inquiries')}
             active={!onForm}
           />
           <NavLink
             to='/form'
-            icon={ListChecks}
+            icon={ListCheck}
             label={t('nav.form')}
             active={onForm}
           />
@@ -98,7 +102,7 @@ export const AppHeader = () => {
                 : 'border-border bg-card text-muted-foreground hover:bg-muted',
             )}
           >
-            <Mail aria-hidden='true' className='size-4' />
+            <Envelope aria-hidden='true' className='size-4' />
             <span aria-hidden='true'>
               {unreadCount === null
                 ? '…'
@@ -116,7 +120,7 @@ export const AppHeader = () => {
             title={t('header.signedInAs', { email: admin.email })}
             className='px-3'
           >
-            <LogOut aria-hidden='true' />
+            <ArrowRightFromSquare aria-hidden='true' />
             <span className='sr-only sm:not-sr-only'>{t('admin.signOut')}</span>
           </Button>
         </div>

@@ -1,6 +1,7 @@
+import Key from '@gravity-ui/icons/Key';
+import Sparkles from '@gravity-ui/icons/Sparkles';
 import { useForm } from '@tanstack/react-form';
 import { Link, getRouteApi, useRouter } from '@tanstack/react-router';
-import { KeyRound, Sparkles } from 'lucide-react';
 import { useEffect, useEffectEvent, useState } from 'react';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { safeNextPath, toRouterHref } from '../../shared/router/admin-paths.ts';
@@ -105,7 +106,7 @@ export const LoginPage = () => {
       <Card>
         <CardHeader className='items-center text-center'>
           <div className='mb-2 flex size-14 items-center justify-center rounded-full bg-accent text-primary'>
-            <KeyRound aria-hidden='true' className='size-6' />
+            <Key aria-hidden='true' className='size-6' />
           </div>
           <CardTitle>
             <span className='sr-only'>{t('app.name')} </span>
@@ -143,7 +144,7 @@ export const LoginPage = () => {
               <Notice
                 tone='error'
                 role='alert'
-                icon={<KeyRound aria-hidden='true' />}
+                icon={<Key aria-hidden='true' />}
               >
                 <p>
                   {failed === 'rate_limited'
@@ -155,7 +156,7 @@ export const LoginPage = () => {
             <form.Subscribe selector={(state) => state.isSubmitting}>
               {(busy) => (
                 <Button type='submit' size='lg' disabled={busy}>
-                  {busy ? <Spinner /> : <KeyRound aria-hidden='true' />}
+                  {busy ? <Spinner /> : <Key aria-hidden='true' />}
                   {busy ? t('login.signingIn') : t('admin.signIn')}
                 </Button>
               )}

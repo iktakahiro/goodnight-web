@@ -1,15 +1,13 @@
+import Archive from '@gravity-ui/icons/Archive';
+import ArrowRotateLeft from '@gravity-ui/icons/ArrowRotateLeft';
+import ArrowUturnCcwLeft from '@gravity-ui/icons/ArrowUturnCcwLeft';
+import CircleExclamation from '@gravity-ui/icons/CircleExclamation';
+import Envelope from '@gravity-ui/icons/Envelope';
+import FloppyDisk from '@gravity-ui/icons/FloppyDisk';
+import Lock from '@gravity-ui/icons/Lock';
+import Plus from '@gravity-ui/icons/Plus';
+import SquareCheck from '@gravity-ui/icons/SquareCheck';
 import { useForm, useStore } from '@tanstack/react-form';
-import {
-  Archive,
-  CircleAlert,
-  Lock,
-  Mail,
-  Plus,
-  RotateCcw,
-  Save,
-  SquareCheck,
-  Undo2,
-} from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { FORM_LIMITS } from '../../../../src/features/contact-form/form-definition.ts';
 import type { AdminFormState } from '../../../../src/features/contact-form/form-admin-routes.ts';
@@ -292,7 +290,7 @@ const FormEditor = ({
               form.reset(toEditorValues(current.definition));
             }}
           >
-            <Undo2 aria-hidden='true' />
+            <ArrowUturnCcwLeft aria-hidden='true' />
             <span className='sr-only sm:not-sr-only'>{t('form.discard')}</span>
           </Button>
           <Button
@@ -301,7 +299,7 @@ const FormEditor = ({
             disabled={!dirty || submitting}
             data-testid='form-save'
           >
-            {submitting ? <Spinner /> : <Save aria-hidden='true' />}
+            {submitting ? <Spinner /> : <FloppyDisk aria-hidden='true' />}
             {submitting
               ? t('form.saving')
               : t('form.save', { version: current.version + 1 })}
@@ -313,12 +311,12 @@ const FormEditor = ({
         <Notice
           tone='error'
           role='alert'
-          icon={<CircleAlert aria-hidden='true' />}
+          icon={<CircleExclamation aria-hidden='true' />}
           title={t('error.form_conflict')}
         >
           <div>
             <Button variant='outline' size='sm' onClick={onReload}>
-              <RotateCcw aria-hidden='true' />
+              <ArrowRotateLeft aria-hidden='true' />
               {t('form.reload')}
             </Button>
           </div>
@@ -328,7 +326,7 @@ const FormEditor = ({
         <Notice
           tone='error'
           role='alert'
-          icon={<CircleAlert aria-hidden='true' />}
+          icon={<CircleExclamation aria-hidden='true' />}
         >
           {t('form.invalid')}
         </Notice>
@@ -353,7 +351,7 @@ const FormEditor = ({
             </div>
             <ol className='flex flex-col gap-3'>
               <FixedRow
-                icon={<Mail aria-hidden='true' />}
+                icon={<Envelope aria-hidden='true' />}
                 title={t('field.email')}
                 note={t('form.emailNote')}
               />
@@ -464,7 +462,7 @@ const FormEditor = ({
                         aria-label={t('form.putBackLabel', { label })}
                         onClick={() => add(toEditorField(field))}
                       >
-                        <RotateCcw aria-hidden='true' />
+                        <ArrowRotateLeft aria-hidden='true' />
                         {t('form.putBack')}
                       </Button>
                     </li>

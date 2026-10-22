@@ -1,4 +1,6 @@
-import { Eye, History, RotateCcw } from 'lucide-react';
+import ArrowRotateLeft from '@gravity-ui/icons/ArrowRotateLeft';
+import ClockArrowRotateLeft from '@gravity-ui/icons/ClockArrowRotateLeft';
+import Eye from '@gravity-ui/icons/Eye';
 import { useState } from 'react';
 import type { FormVersionSummary } from '../../../../src/features/contact-form/form-store.ts';
 import { ApiError } from '../../shared/api/api-client.ts';
@@ -102,7 +104,7 @@ export const FormHistory = ({
     <Card className='flex flex-col gap-4 p-5'>
       <div className='flex flex-col gap-1'>
         <h2 className='flex items-center gap-2 text-base font-semibold'>
-          <History
+          <ClockArrowRotateLeft
             aria-hidden='true'
             className='size-4 text-muted-foreground'
           />
@@ -169,7 +171,7 @@ export const FormHistory = ({
                       setRestoring(entry.version);
                     }}
                   >
-                    <RotateCcw aria-hidden='true' />
+                    <ArrowRotateLeft aria-hidden='true' />
                     {t('form.restore')}
                   </Button>
                 )}
@@ -228,7 +230,7 @@ export const FormHistory = ({
               {t('form.cancel')}
             </AlertDialogClose>
             <Button onClick={() => void restore()} disabled={busy}>
-              {busy ? <Spinner /> : <RotateCcw aria-hidden='true' />}
+              {busy ? <Spinner /> : <ArrowRotateLeft aria-hidden='true' />}
               {t('form.restore')}
             </Button>
           </div>

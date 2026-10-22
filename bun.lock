@@ -53,6 +53,7 @@
         "@base-ui/react": "1.9.0",
         "@cloudflare/workers-types": "5.20261019.1",
         "@goodnight-web/typescript-config": "workspace:*",
+        "@gravity-ui/icons": "2.23.0",
         "@tailwindcss/vite": "4.3.3",
         "@tanstack/react-form": "1.33.5",
         "@tanstack/react-router": "1.170.45",
@@ -65,7 +66,6 @@
         "class-variance-authority": "0.7.1",
         "clsx": "2.1.1",
         "drizzle-kit": "0.31.11",
-        "lucide-react": "1.60.0",
         "playwright": "1.64.1",
         "react": "19.3.1",
         "react-dom": "19.3.1",
@@ -380,6 +380,8 @@
     "@goodnight-web/server": ["@goodnight-web/server@workspace:packages/server"],
 
     "@goodnight-web/typescript-config": ["@goodnight-web/typescript-config@workspace:packages/typescript-config"],
+
+    "@gravity-ui/icons": ["@gravity-ui/icons@2.23.0", "", { "dependencies": { "tslib": "^2.8.1" }, "peerDependencies": { "react": "*" }, "optionalPeers": ["react"] }, "sha512-xy/upFefm889FJkfQ2/4QRH6t4Xdv1VVdtv7hRznGqz3bJsS+h2IHDctABbjjHC5qO032NWWul4wQ0c2vShE5A=="],
 
     "@hexagon/base64": ["@hexagon/base64@1.1.28", "", {}, "sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw=="],
 

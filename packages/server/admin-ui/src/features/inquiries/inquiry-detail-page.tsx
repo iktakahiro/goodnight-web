@@ -1,24 +1,22 @@
+import Archive from '@gravity-ui/icons/Archive';
+import ArrowLeft from '@gravity-ui/icons/ArrowLeft';
+import ArrowShapeTurnUpLeft from '@gravity-ui/icons/ArrowShapeTurnUpLeft';
+import Calendar from '@gravity-ui/icons/Calendar';
+import Envelope from '@gravity-ui/icons/Envelope';
+import EnvelopeOpen from '@gravity-ui/icons/EnvelopeOpen';
+import FileText from '@gravity-ui/icons/FileText';
+import Globe from '@gravity-ui/icons/Globe';
+import ListCheck from '@gravity-ui/icons/ListCheck';
+import PlanetEarth from '@gravity-ui/icons/PlanetEarth';
+import ShieldCheck from '@gravity-ui/icons/ShieldCheck';
+import ShieldExclamation from '@gravity-ui/icons/ShieldExclamation';
+import TrashBin from '@gravity-ui/icons/TrashBin';
 import {
   Link,
   useCanGoBack,
   useNavigate,
   useRouter,
 } from '@tanstack/react-router';
-import {
-  Archive,
-  ArrowLeft,
-  CalendarClock,
-  FileText,
-  Globe,
-  Languages,
-  ListChecks,
-  Mail,
-  MailOpen,
-  Reply,
-  ShieldAlert,
-  ShieldCheck,
-  Trash2,
-} from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import type { AdminSubmission } from '../../../../src/features/admin-api/admin-routes.ts';
 import type { AdminFieldEntry } from '../../../../src/features/admin-api/admin-view.ts';
@@ -156,7 +154,11 @@ const ReadControl = ({
       failed={t('detail.statusFailed')}
       onChanged={onChanged}
       icon={
-        unread ? <MailOpen aria-hidden='true' /> : <Mail aria-hidden='true' />
+        unread ? (
+          <EnvelopeOpen aria-hidden='true' />
+        ) : (
+          <Envelope aria-hidden='true' />
+        )
       }
       label={unread ? t('list.markRead') : t('list.markUnread')}
       testId='read-toggle'
@@ -184,7 +186,7 @@ const SpamControl = ({
         flagged ? (
           <ShieldCheck aria-hidden='true' />
         ) : (
-          <ShieldAlert aria-hidden='true' />
+          <ShieldExclamation aria-hidden='true' />
         )
       }
       label={flagged ? t('detail.notSpam') : t('detail.markSpam')}
@@ -294,13 +296,13 @@ const DeleteControl = ({ inquiry }: { inquiry: AdminSubmission }) => {
       <AlertDialogTrigger
         render={<Button variant='destructive-outline' className='w-full' />}
       >
-        <Trash2 aria-hidden='true' />
+        <TrashBin aria-hidden='true' />
         {t('admin.delete')}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <div className='flex gap-4'>
           <div className='flex size-11 shrink-0 items-center justify-center rounded-full bg-destructive-soft text-destructive'>
-            <Trash2 aria-hidden='true' className='size-5' />
+            <TrashBin aria-hidden='true' className='size-5' />
           </div>
           <div className='flex flex-col gap-1.5'>
             <AlertDialogTitle>{t('detail.deleteTitle')}</AlertDialogTitle>
@@ -431,7 +433,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
               {inquiryTitle(item)}
             </h1>
             <p className='flex items-center gap-1.5 text-sm text-muted-foreground'>
-              <CalendarClock aria-hidden='true' className='size-4' />
+              <Calendar aria-hidden='true' className='size-4' />
               <span className='sr-only'>{t('detail.receivedAt')}: </span>
               <time dateTime={new Date(item.createdAt).toISOString()}>
                 {received}
@@ -481,7 +483,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
             </h2>
             <dl className='mt-1 grid divide-border/60 sm:grid-cols-2 sm:gap-x-6'>
               <InfoRow
-                icon={<Mail aria-hidden='true' />}
+                icon={<Envelope aria-hidden='true' />}
                 label={t('field.email')}
               >
                 <a
@@ -493,7 +495,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                 </a>
               </InfoRow>
               <InfoRow
-                icon={<ListChecks aria-hidden='true' />}
+                icon={<ListCheck aria-hidden='true' />}
                 label={t('detail.formVersion')}
               >
                 <span data-testid='inquiry-form-version'>
@@ -502,7 +504,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
               </InfoRow>
               {item.locale ? (
                 <InfoRow
-                  icon={<Languages aria-hidden='true' />}
+                  icon={<Globe aria-hidden='true' />}
                   label={t('detail.locale')}
                 >
                   {t(`language.${item.locale}`)}
@@ -518,7 +520,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
               ) : null}
               {item.country ? (
                 <InfoRow
-                  icon={<Globe aria-hidden='true' />}
+                  icon={<PlanetEarth aria-hidden='true' />}
                   label={t('detail.country')}
                 >
                   {item.country}
@@ -539,7 +541,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                 className: 'w-full',
               })}
             >
-              <Reply aria-hidden='true' />
+              <ArrowShapeTurnUpLeft aria-hidden='true' />
               {t('detail.reply')}
             </a>
             <DeleteControl inquiry={item} />
@@ -547,7 +549,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
           {item.suspectedSpam || item.spamScore > 0 ? (
             <Notice
               tone={item.suspectedSpam ? 'warning' : 'info'}
-              icon={<ShieldAlert aria-hidden='true' />}
+              icon={<ShieldExclamation aria-hidden='true' />}
               title={
                 item.suspectedSpam
                   ? t('spam.badge')

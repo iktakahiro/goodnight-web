@@ -1,4 +1,4 @@
-import { Languages } from 'lucide-react';
+import Globe from '@gravity-ui/icons/Globe';
 import { LOCALES } from '../../../../src/shared/messages.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { isLocale } from '../../shared/i18n/locale.ts';
@@ -26,7 +26,7 @@ export const LanguageSwitch = ({ className }: { className?: string }) => {
           className,
         )}
       >
-        <Languages aria-hidden='true' />
+        <Globe aria-hidden='true' />
         <span>{t(`language.${locale}`)}</span>
       </MenuTrigger>
       <MenuContent>

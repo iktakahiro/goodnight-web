@@ -1,5 +1,6 @@
 import { Select as BaseSelect } from '@base-ui/react/select';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import Check from '@gravity-ui/icons/Check';
+import ChevronsExpandVertical from '@gravity-ui/icons/ChevronsExpandVertical';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from './cn.ts';
 
@@ -32,7 +33,7 @@ export const SelectTrigger = ({
   >
     {children}
     <BaseSelect.Icon className='text-muted-foreground'>
-      <ChevronsUpDown aria-hidden='true' className='size-4' />
+      <ChevronsExpandVertical aria-hidden='true' className='size-4' />
     </BaseSelect.Icon>
   </BaseSelect.Trigger>
 );

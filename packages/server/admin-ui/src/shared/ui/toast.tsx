@@ -1,5 +1,5 @@
 import { Toast as BaseToast } from '@base-ui/react/toast';
-import { X } from 'lucide-react';
+import Xmark from '@gravity-ui/icons/Xmark';
 import type { ReactNode } from 'react';
 
 /** Shared toast manager, so any screen can show a toast. */
@@ -31,7 +31,7 @@ const ToastList = ({ closeLabel }: { closeLabel: string }) => {
         aria-label={closeLabel}
         className='flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring'
       >
-        <X aria-hidden='true' className='size-4' />
+        <Xmark aria-hidden='true' className='size-4' />
       </BaseToast.Close>
     </BaseToast.Root>
   ));
