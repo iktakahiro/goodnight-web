@@ -379,12 +379,15 @@ export const InquiryListPage = () => {
   ) {
     setCounts({ unread: data.unreadCount, spam: data.suspectedSpamCount });
   }
-  const replaceItem = (next: AdminSubmissionSummary) => {
+  // The row changes at once; the page is then loaded again in the
+  // background, so the view, totals, and counts follow without a skeleton.
+  const itemChanged = (next: AdminSubmissionSummary) => {
     if (!data) return;
     list.setData({
       ...data,
       items: data.items.map((item) => (item.id === next.id ? next : item)),
     });
+    list.refresh();
   };
 
   const go = (next: Partial<ListQuery>) =>
@@ -458,7 +461,7 @@ export const InquiryListPage = () => {
               <StatusBadge status={item.status} />
               {item.suspectedSpam ? <SuspectedSpamBadge /> : null}
             </span>
-            <ReadToggle item={item} onChanged={replaceItem} />
+            <ReadToggle item={item} onChanged={itemChanged} />
           </span>
         );
       default: {

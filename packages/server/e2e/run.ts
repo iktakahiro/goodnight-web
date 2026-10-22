@@ -12,7 +12,8 @@
 // setup with empty, wrong, and right input -> passkey registration (CDP
 // virtual authenticator) -> sign-out -> passkey sign-in -> list (URL search
 // parameters, not-found) -> detail (marks read) -> back to unread from the
-// detail and the list -> email search -> a honeypot submission in the
+// detail -> read and unread from the list, with the view, total, and counts
+// following without a reload -> email search -> a honeypot submission in the
 // suspected spam view, with its badge and reasons, cleared and set again ->
 // Slack-style deep link while signed out -> language switch ->
 // delete with confirmation -> the form editor: add a field and remove one,
@@ -450,16 +451,59 @@ const main = async () => {
         .locator('[data-status="unread"]')
         .waitFor();
     });
-    await step('the list row marks it read', async () => {
-      const row = page
+    await step('a row marked read leaves the unread view', async () => {
+      await page.goto(`${base}/admin?view=unread`);
+      await page.getByTestId('view-count-unread').getByText('1').waitFor();
+      await page
         .getByTestId('inquiry-row')
-        .filter({ hasText: 'E2E Visitor' });
-      await row
+        .filter({ hasText: 'E2E Visitor' })
         .getByRole('button', { name: ui('en', 'list.markRead') })
         .click();
-      await row.locator('[data-status="read"]').waitFor();
-      await page.waitForURL(`${base}/admin`);
+      await page.getByText(ui('en', 'list.empty.unread')).waitFor();
+      await page.getByText(ui('en', 'list.total', { count: 0 })).waitFor();
+      await page
+        .getByTestId('view-count-unread')
+        .waitFor({ state: 'detached' });
+      await page
+        .getByTestId('unread-count')
+        .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
+        .waitFor();
     });
+    await step(
+      'the list toggle updates the counts without a reload',
+      async () => {
+        await page.goto(`${base}/admin`);
+        const row = page
+          .getByTestId('inquiry-row')
+          .filter({ hasText: 'E2E Visitor' });
+        await row.locator('[data-status="read"]').waitFor();
+        // Records whether the table was ever replaced by the loading skeleton.
+        await page.evaluate(() => {
+          const flags = window as unknown as { listEmptied?: boolean };
+          flags.listEmptied = false;
+          new MutationObserver(() => {
+            if (!document.querySelector('[data-testid="inquiry-row"]')) {
+              flags.listEmptied = true;
+            }
+          }).observe(document.body, { childList: true, subtree: true });
+        });
+        await row
+          .getByRole('button', { name: ui('en', 'list.markUnread') })
+          .click();
+        await page.getByTestId('view-count-unread').getByText('1').waitFor();
+        await row
+          .getByRole('button', { name: ui('en', 'list.markRead') })
+          .click();
+        await page
+          .getByTestId('view-count-unread')
+          .waitFor({ state: 'detached' });
+        await row.locator('[data-status="read"]').waitFor();
+        const emptied = await page.evaluate(
+          () => (window as unknown as { listEmptied?: boolean }).listEmptied,
+        );
+        if (emptied !== false) throw new Error('the list flickered');
+      },
+    );
     const afterRow = await query(
       `SELECT status FROM submissions WHERE id = '${id}'`,
     );
