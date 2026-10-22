@@ -1,5 +1,6 @@
 import { BellOff, ExternalLink, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
+import { MIN_SECRET_LENGTH } from '../../../../src/shared/secret-length.ts';
 import { useAdminSession } from '../auth/admin-session.tsx';
 import { docsUrl } from '../../shared/docs-links.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
@@ -10,7 +11,8 @@ import { Notice } from '../../shared/ui/notice.tsx';
  *
  * - Turnstile not configured: the contact form refuses submissions (fail
  *   closed). Links to the Turnstile setup page in the documentation.
- * - Another setting the contact API needs is missing: lists the names.
+ * - Another setting the contact API needs is missing or too short: lists
+ *   the names.
  * - Slack not configured: a quiet note, because Slack is optional. Shown
  *   only where `showSlack` is set (the list).
  */
@@ -61,6 +63,14 @@ export const SetupNotices = ({
           title={t('notice.contactTitle')}
         >
           <p>{t('notice.contactBody', { names: otherMissing.join(', ') })}</p>
+          {status.contactTooShort.length > 0 ? (
+            <p>
+              {t('notice.contactTooShort', {
+                names: status.contactTooShort.join(', '),
+                min: MIN_SECRET_LENGTH,
+              })}
+            </p>
+          ) : null}
         </Notice>
       ) : null}
       {showSlackNote ? (

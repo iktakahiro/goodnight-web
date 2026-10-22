@@ -17,6 +17,12 @@ import { isSetupClosed } from './setup-state.ts';
  * not reachable under `/api/auth/*` and only `POST /api/setup` calls it, after
  * the token, origin, and rate-limit checks. It checks the allowlist and the
  * closed state again here.
+ *
+ * Every earlier session of a reused user is deleted first, so a session from
+ * an earlier setup run (perhaps by someone else who had the token) cannot
+ * outlive this one. Registering the first passkey then deletes every session
+ * ({@link closeSetupSessions}), and `requireAdmin` accepts only sessions
+ * created after the user's first passkey.
  */
 export const createSetupPlugin = (env: GoodnightEnv) =>
   ({
@@ -41,8 +47,10 @@ export const createSetupPlugin = (env: GoodnightEnv) =>
             throw new APIError('FORBIDDEN', { message: 'setup closed' });
           }
           const adapter = ctx.context.internalAdapter;
+          const existing = (await adapter.findUserByEmail(email))?.user;
+          if (existing) await adapter.deleteUserSessions(existing.id);
           const user =
-            (await adapter.findUserByEmail(email))?.user ??
+            existing ??
             (await adapter.createUser(
               { email, name: ctx.body.name, emailVerified: true },
               { method: 'goodnight-setup' },

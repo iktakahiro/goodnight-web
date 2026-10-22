@@ -15,13 +15,13 @@ export const wranglerConfig = join(packageDir, 'e2e/wrangler.jsonc');
 const wrangler = join(packageDir, 'node_modules/.bin/wrangler');
 
 /** Secrets for the test Worker. Test values only. */
-export const SETUP_TOKEN = 'e2e-setup-token-0123456789';
+export const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdefghij';
 export const ADMIN_EMAIL = 'admin@example.com';
 export const testVars: Readonly<Record<string, string>> = {
   SETUP_TOKEN,
   ADMIN_EMAILS: ADMIN_EMAIL,
   BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
-  IP_HASH_SECRET: 'e2e-ip-hash-secret',
+  IP_HASH_SECRET: 'e2e-ip-hash-secret-0123456789abcdef',
   TURNSTILE_SECRET: 'e2e-turnstile-secret',
 };
 

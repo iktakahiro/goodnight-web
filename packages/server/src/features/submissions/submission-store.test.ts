@@ -4,6 +4,7 @@ import {
   getSubmission,
   insertSubmission,
   listSubmissions,
+  submissionBatches,
   updateStatus,
   type NewSubmission,
 } from './submission-store.ts';
@@ -127,5 +128,63 @@ describe('submission store', () => {
       status: 'new',
       readAt: 1000,
     });
+  });
+});
+
+describe('submissionBatches', () => {
+  const collect = async (
+    batches: AsyncGenerator<{ id: string }[]>,
+  ): Promise<string[][]> => {
+    const out: string[][] = [];
+    for await (const batch of batches) out.push(batch.map((s) => s.id));
+    return out;
+  };
+
+  test('reads every row newest first in bounded queries', async () => {
+    const { d1, statements } = createRecordingD1();
+    // Rows 2 to 4 share a created_at, so the cursor has to break ties by id.
+    const times = [1, 2, 2, 2, 3, 4, 5];
+    for (const [i, time] of times.entries()) {
+      await insertSubmission(
+        d1,
+        submission(`id${i}`, { createdAt: 1_700_000_000_000 + time }),
+      );
+    }
+    statements.length = 0;
+    const batches = await collect(submissionBatches(d1, undefined, 3));
+    expect(batches).toEqual([
+      ['id6', 'id5', 'id4'],
+      ['id3', 'id2', 'id1'],
+      ['id0'],
+    ]);
+    expect(statements).toHaveLength(3);
+    for (const statement of statements) {
+      expect(statement.sql).toMatch(/ limit \?$/);
+      expect(statement.params.at(-1)).toBe(3);
+    }
+  });
+
+  test('filters by status and binds it', async () => {
+    const { d1, statements } = createRecordingD1();
+    await insertSubmission(d1, submission('a', { status: 'spam' }));
+    await insertSubmission(d1, submission('b'));
+    statements.length = 0;
+    const batches = await collect(
+      submissionBatches(d1, INJECTION as SubmissionStatus),
+    );
+    expect(batches).toEqual([]);
+    expect(statements[0]?.sql).not.toContain(INJECTION);
+    expect(await collect(submissionBatches(d1, 'spam'))).toEqual([['a']]);
+  });
+
+  test('stops after a full last batch with one more empty query', async () => {
+    const { d1, statements } = createRecordingD1();
+    await insertSubmission(d1, submission('a'));
+    await insertSubmission(d1, submission('b', { createdAt: 1 }));
+    statements.length = 0;
+    expect(await collect(submissionBatches(d1, undefined, 2))).toEqual([
+      ['a', 'b'],
+    ]);
+    expect(statements).toHaveLength(2);
   });
 });

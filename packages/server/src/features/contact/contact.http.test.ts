@@ -92,28 +92,49 @@ describe('POST /api/contact', () => {
     expect(worker.rateLimitKeys).toEqual([expected]);
   });
 
-  test('a filled honeypot is stored as held and answered with success', async () => {
+  test('a filled honeypot stores nothing and is answered with success', async () => {
     const worker = createTestWorker();
-    const response = await post(
-      worker,
-      validBody({ website: 'https://spam.example', turnstileToken: undefined }),
-    );
+    const logs = captureConsole();
+    let response: Response;
+    let logged: string;
+    try {
+      response = await post(
+        worker,
+        validBody({
+          website: 'https://spam.example',
+          turnstileToken: undefined,
+          message: '=HYPERLINK("https://evil.example")',
+        }),
+      );
+      logged = logs.text();
+    } finally {
+      logs.restore();
+    }
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    const [row] = rows(worker);
-    expect(row?.status).toBe('held');
-    expect(JSON.parse(String(row?.spam_reasons))).toEqual(['honeypot']);
+    expect(rows(worker)).toHaveLength(0);
+    const dump = dumpDatabase(worker.sqlite);
+    expect(dump).not.toContain('hanako@example.org');
+    expect(dump).not.toContain('HYPERLINK');
+    expect(logged).toContain('honeypot');
+    expect(logged).not.toContain('hanako@example.org');
     expect(external.turnstileCalls()).toHaveLength(0);
     expect(external.slackCalls()).toHaveLength(0);
   });
 
-  test('a honeypot flood over the rate limit is not stored', async () => {
+  test('honeypot hits count against the rate limit', async () => {
     const worker = createTestWorker({ rateLimit: 2 });
     for (let i = 0; i < 4; i++) {
       const response = await post(worker, validBody({ website: 'x' }));
       expect(response.status).toBe(200);
     }
-    expect(rows(worker)).toHaveLength(2);
+    const ipHash = await hmacSha256Hex(SECRETS.IP_HASH_SECRET, CLIENT_IP);
+    expect(worker.rateLimitKeys).toEqual(Array(4).fill(ipHash));
+    expect(rows(worker)).toHaveLength(0);
+    // The same address is now over the limit for a real submission too.
+    const real = await post(worker, validBody());
+    expect(real.status).toBe(429);
+    expect(rows(worker)).toHaveLength(0);
   });
 
   test('a failed Turnstile check returns 400 and stores nothing', async () => {

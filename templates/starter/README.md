@@ -43,14 +43,14 @@ Set these as Worker secrets in the Cloudflare dashboard (or in the deploy
 form). Never write them in a file in this repository. `.dev.vars.example`
 lists them with notes.
 
-| Name                 | Required | Purpose                                                                                     |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------- |
-| `SETUP_TOKEN`        | yes      | A long random string. You enter it once at `/admin` to create the first admin.              |
-| `ADMIN_EMAILS`       | yes      | Email addresses that may become admins, separated by commas.                                |
-| `BETTER_AUTH_SECRET` | yes      | A long random string (32 characters or more) that signs admin sessions.                     |
-| `IP_HASH_SECRET`     | yes      | A long random string used to hash IP addresses. Raw IP addresses are never stored.          |
-| `TURNSTILE_SECRET`   | yes      | The Turnstile secret key. Without it, the contact form does not accept inquiries.           |
-| `SLACK_WEBHOOK_URL`  | no       | A Slack incoming webhook for new-inquiry notices. Notices contain no names or message text. |
+| Name                 | Required | Purpose                                                                                               |
+| -------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `SETUP_TOKEN`        | yes      | A random string (32 characters or more). You enter it once at `/admin` to create the first admin.     |
+| `ADMIN_EMAILS`       | yes      | Email addresses that may become admins, separated by commas.                                          |
+| `BETTER_AUTH_SECRET` | yes      | A long random string (32 characters or more) that signs admin sessions.                               |
+| `IP_HASH_SECRET`     | yes      | A random string (32 characters or more) used to hash IP addresses. Raw IP addresses are never stored. |
+| `TURNSTILE_SECRET`   | yes      | The Turnstile secret key. Without it, the contact form does not accept inquiries.                     |
+| `SLACK_WEBHOOK_URL`  | no       | A Slack incoming webhook for new-inquiry notices. Notices contain no names or message text.           |
 
 ## Turnstile
 

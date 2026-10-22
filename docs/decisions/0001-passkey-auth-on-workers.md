@@ -152,7 +152,9 @@ parameter, which ends up in URLs and logs.
   `@better-auth/utils/password.node.mjs` (scrypt for passwords, which we do not
   use).
 - **Leftover rows.** An unfinished ceremony leaves a row in `verification`
-  until it expires.
+  after it expires; Better Auth never deletes it on the paths we use.
+  (Update, 2026-10-22: the hourly `pruneIfDue()` now deletes expired
+  `verification` rows.)
 
 ### Bundle size
 

@@ -4,8 +4,9 @@ import * as z from 'zod';
 export const CONTACT_TURNSTILE_ACTION = 'contact';
 
 /**
- * Name of the hidden honeypot field. Real visitors leave it empty; a filled
- * value marks the submission as held without telling the sender.
+ * Name of the hidden honeypot field. Real visitors leave it empty. When it is
+ * filled, the API answers with success, counts the request against the rate
+ * limit, and stores nothing.
  */
 export const CONTACT_HONEYPOT_FIELD = 'website';
 

@@ -9,9 +9,16 @@
 #
 # A feature whose secret is missing is turned off: for example, the contact
 # form does not accept messages until TURNSTILE_SECRET and the public
-# TURNSTILE_SITE_KEY (in wrangler.jsonc) are set.
+# TURNSTILE_SITE_KEY (in wrangler.jsonc) are set. SETUP_TOKEN,
+# BETTER_AUTH_SECRET, and IP_HASH_SECRET must be at least 32 characters; a
+# shorter value turns its features off in the same way, and the admin screen
+# says which one is too short.
+#
+# The admin screen, setup, and sign-in work only over https://, except on
+# localhost and 127.0.0.1 for `wrangler dev`.
 
-# A long random string. You enter it once at /admin to create the first admin.
+# A random string of 32 characters or more. You enter it once at /admin to
+# create the first admin. Delete it after setup is done.
 # Create one with: openssl rand -base64 32
 SETUP_TOKEN=
 
@@ -23,8 +30,9 @@ ADMIN_EMAILS=
 # Create one with: openssl rand -base64 32
 BETTER_AUTH_SECRET=
 
-# A long random string. IP addresses are stored only as an HMAC made with this
-# key, never as they are. Create one with: openssl rand -base64 32
+# A random string of 32 characters or more. IP addresses are stored only as an
+# HMAC made with this key, never as they are.
+# Create one with: openssl rand -base64 32
 IP_HASH_SECRET=
 
 # The Turnstile secret key (Cloudflare dashboard > Turnstile). It pairs with
@@ -35,3 +43,12 @@ TURNSTILE_SECRET=
 # gets "1 new inquiry", the topic, and a link to the admin screen; never the
 # name, email address, or message. Leave it empty for no notifications.
 SLACK_WEBHOOK_URL=
+
+# Optional. Cloudflare Access in front of /admin, /api/admin, /api/setup, and
+# /api/auth. With both set, the Worker also checks the Access token
+# (Cf-Access-Jwt-Assertion) on those paths. Set both or neither; with only one
+# set, those paths answer 503. ACCESS_AUD is the application's "Application
+# Audience (AUD) Tag"; ACCESS_TEAM_DOMAIN looks like
+# your-team.cloudflareaccess.com.
+# ACCESS_AUD=
+# ACCESS_TEAM_DOMAIN=

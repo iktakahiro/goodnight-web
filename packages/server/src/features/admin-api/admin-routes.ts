@@ -3,24 +3,25 @@ import packageJson from '../../../package.json' with { type: 'json' };
 import type { HonoEnv } from '../../hono-env.ts';
 import type { LocalizedLabel } from '../../options.ts';
 import { apiError } from '../../shared/api-error.ts';
+import { secretState } from '../../shared/secret-length.ts';
 import { getContactAvailability } from '../contact/contact-availability.ts';
 import { isSlackWebhookUrl } from '../notify/slack.ts';
 import { getRetentionDays, pruneIfDue } from '../retention/prune.ts';
 import { isSubmissionStatus } from '../submissions/submission-status.ts';
 import {
-  allSubmissions,
   countUnread,
   deleteSubmission,
   getSubmission,
   listSubmissions,
   markRead,
+  submissionBatches,
   updateStatus,
   type Submission,
 } from '../submissions/submission-store.ts';
 import { requireAdmin } from '../auth/require-admin.ts';
 import { safeErrorMessage } from '../../shared/log-error.ts';
 import { exportQuerySchema, listQuerySchema } from './admin-query.ts';
-import { toCsv } from './csv.ts';
+import { CSV_BOM, csvLine } from './csv.ts';
 
 const EXCERPT_LENGTH = 120;
 
@@ -66,8 +67,17 @@ export interface AdminStatus {
   turnstileConfigured: boolean;
   /** The contact API accepts submissions (every required setting is set). */
   contactAvailable: boolean;
-  /** Names of missing settings that keep the contact API closed. */
+  /**
+   * Names of missing settings that keep the contact API closed. A secret that
+   * is set but too short is listed here and in `contactTooShort`.
+   */
   contactMissing: string[];
+  /**
+   * Names of secrets that are set but shorter than `MIN_SECRET_LENGTH`
+   * characters (`IP_HASH_SECRET`). The contact API stays closed until they
+   * are replaced.
+   */
+  contactTooShort: string[];
   /** `SLACK_WEBHOOK_URL` is set to a Slack incoming webhook URL. */
   slackConfigured: boolean;
   retentionDays: number;
@@ -79,9 +89,41 @@ export interface AdminStatus {
   categories: AdminCategory[];
 }
 
-const toAdminSubmission = ({ ipHash: _ipHash, ...rest }: Submission) => rest;
-
 const isoDate = (ms: number) => new Date(ms).toISOString();
+
+const CSV_HEADER = [
+  'id',
+  'created_at',
+  'status',
+  'name',
+  'email',
+  'company',
+  'phone',
+  'category',
+  'message',
+  'page_path',
+  'country',
+  'spam_score',
+  'spam_reasons',
+] as const;
+
+const csvRow = (s: Submission) => [
+  s.id,
+  isoDate(s.createdAt),
+  s.status,
+  s.name,
+  s.email,
+  s.company,
+  s.phone,
+  s.category,
+  s.body,
+  s.pagePath,
+  s.country,
+  s.spamScore,
+  s.spamReasons.join(' '),
+];
+
+const toAdminSubmission = ({ ipHash: _ipHash, ...rest }: Submission) => rest;
 
 /**
  * Routes under `/api/admin`. Every route requires an admin session with a
@@ -95,7 +137,8 @@ const isoDate = (ms: number) => new Date(ms).toISOString();
  * - `GET /submissions/:id`: one submission; marks a `new` one as read.
  * - `PATCH /submissions/:id` with `{ status }`: changes the status.
  * - `DELETE /submissions/:id`: deletes it.
- * - `GET /submissions.csv?status=`: CSV export.
+ * - `GET /submissions.csv?status=`: CSV export, streamed in batches of
+ *   rows.
  */
 export const adminRoutes = new Hono<HonoEnv>()
   .use('*', requireAdmin)
@@ -108,6 +151,10 @@ export const adminRoutes = new Hono<HonoEnv>()
       contact.ipHashSecret ? null : 'IP_HASH_SECRET',
       contact.rateLimiter ? null : 'CONTACT_RATE_LIMITER',
     ].filter((name): name is string => name !== null);
+    const contactTooShort =
+      secretState(c.env.IP_HASH_SECRET) === 'too_short'
+        ? ['IP_HASH_SECRET']
+        : [];
     const [retentionDays, unreadCount] = await Promise.all([
       getRetentionDays(c.env.DB),
       countUnread(c.env.DB),
@@ -117,6 +164,7 @@ export const adminRoutes = new Hono<HonoEnv>()
       turnstileConfigured: contact.turnstileSecret && contact.turnstileSiteKey,
       contactAvailable: contact.available,
       contactMissing,
+      contactTooShort,
       slackConfigured: isSlackWebhookUrl(c.env.SLACK_WEBHOOK_URL),
       retentionDays,
       unreadCount,
@@ -162,44 +210,38 @@ export const adminRoutes = new Hono<HonoEnv>()
     };
     return c.json(body);
   })
-  .get('/submissions.csv', async (c) => {
+  .get('/submissions.csv', (c) => {
     const query = exportQuerySchema.safeParse(c.req.query());
     if (!query.success) return apiError(c, 400, 'invalid_input');
-    const rows = await allSubmissions(c.env.DB, query.data.status);
-    const csv = toCsv(
-      [
-        'id',
-        'created_at',
-        'status',
-        'name',
-        'email',
-        'company',
-        'phone',
-        'category',
-        'message',
-        'page_path',
-        'country',
-        'spam_score',
-        'spam_reasons',
-      ],
-      rows.map((s) => [
-        s.id,
-        isoDate(s.createdAt),
-        s.status,
-        s.name,
-        s.email,
-        s.company,
-        s.phone,
-        s.category,
-        s.body,
-        s.pagePath,
-        s.country,
-        s.spamScore,
-        s.spamReasons.join(' '),
-      ]),
-    );
+    const batches = submissionBatches(c.env.DB, query.data.status);
+    const encoder = new TextEncoder();
+    // Streamed one batch at a time, so a large table never sits in memory
+    // as one string. A failed query ends the download with an error.
+    const body = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        controller.enqueue(encoder.encode(CSV_BOM + csvLine(CSV_HEADER)));
+      },
+      pull: async (controller) => {
+        try {
+          const next = await batches.next();
+          if (next.done) {
+            controller.close();
+            return;
+          }
+          controller.enqueue(
+            encoder.encode(next.value.map(csvRow).map(csvLine).join('')),
+          );
+        } catch (error) {
+          console.error('csv export failed:', safeErrorMessage(error));
+          controller.error(error);
+        }
+      },
+      cancel: async () => {
+        await batches.return(undefined);
+      },
+    });
     const date = isoDate(Date.now()).slice(0, 10).replace(/-/g, '');
-    return c.body(csv, 200, {
+    return c.body(body, 200, {
       'content-type': 'text/csv; charset=utf-8',
       'content-disposition': `attachment; filename="inquiries-${date}.csv"`,
     });

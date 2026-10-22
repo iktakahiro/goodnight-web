@@ -73,6 +73,24 @@ describe('/api/auth passkey sign-in', () => {
   );
 });
 
+describe('abandoned passkey challenges', () => {
+  test('are deleted by the next prune once expired', async () => {
+    const worker = createTestWorker({ rateLimit: 10 });
+    const cookie = await signInAsAdmin(worker);
+    for (let i = 0; i < 3; i++) await worker.fetch(OPTIONS_PATH);
+    expect(verificationCount(worker)).toBe(3);
+    worker.sqlite.exec(
+      `UPDATE verification SET expires_at = ${Date.now() - 1000}`,
+    );
+    worker.sqlite.exec("DELETE FROM settings WHERE key = 'last_cleanup_at'");
+    const list = await worker.fetch('/api/admin/submissions', {
+      headers: { cookie },
+    });
+    expect(list.status).toBe(200);
+    expect(verificationCount(worker)).toBe(0);
+  });
+});
+
 describe('/api/auth database errors', () => {
   const failingRequest = async (
     worker: TestWorker,

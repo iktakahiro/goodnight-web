@@ -57,13 +57,13 @@ const debugDir = process.env.E2E_DEBUG_DIR;
 const TEST_SITE_KEY = '1x00000000000000000000AA';
 const TEST_SECRET = '1x0000000000000000000000000000000AA';
 
-const SETUP_TOKEN = 'e2e-setup-token-0123456789';
+const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdefghij';
 const ADMIN_EMAIL = 'admin@example.com';
 const baseVars = {
   SETUP_TOKEN,
   ADMIN_EMAILS: `${ADMIN_EMAIL},colleague@example.com`,
   BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
-  IP_HASH_SECRET: 'e2e-ip-hash-secret',
+  IP_HASH_SECRET: 'e2e-ip-hash-secret-0123456789abcdef',
   SLACK_WEBHOOK_URL: '',
 };
 const noTurnstile = { TURNSTILE_SITE_KEY: '', TURNSTILE_SECRET: '' };

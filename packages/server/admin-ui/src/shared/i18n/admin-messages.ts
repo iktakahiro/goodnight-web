@@ -68,6 +68,8 @@ const en = {
   'setup.closedLead':
     'An admin already exists. Sign in with your passkey instead.',
   'setup.unavailableTitle': 'Setup is not configured',
+  'setup.problemMissing': '{name} is not set.',
+  'setup.problemTooShort': '{name} is shorter than {min} characters.',
   'setup.goToLogin': 'Go to sign-in',
 
   'list.title': 'Inquiries',
@@ -113,6 +115,8 @@ const en = {
   'notice.contactTitle': 'The contact form is not accepting messages',
   'notice.contactBody':
     'Required settings are missing: {names}. The contact form refuses every submission until they are set.',
+  'notice.contactTooShort':
+    '{names} is set but shorter than {min} characters. Replace it with a longer random value.',
   'notice.slack':
     'Slack notifications are off (optional). Set SLACK_WEBHOOK_URL to be notified in Slack when a new inquiry arrives. Notifications contain no personal data.',
   'notice.slackLink': 'About notifications',
@@ -188,6 +192,8 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'setup.closedLead':
     '管理者はすでに登録されています。パスキーでログインしてください。',
   'setup.unavailableTitle': 'セットアップに必要な設定がありません',
+  'setup.problemMissing': '{name} が設定されていません。',
+  'setup.problemTooShort': '{name} が {min} 文字より短いです。',
   'setup.goToLogin': 'ログイン画面へ',
 
   'list.title': 'お問い合わせ',
@@ -233,6 +239,8 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'notice.contactTitle': 'お問い合わせフォームは受け付けを停止しています',
   'notice.contactBody':
     '必要な設定がありません: {names}。設定されるまで、フォームからの送信はすべて受け付けません。',
+  'notice.contactTooShort':
+    '{names} は設定されていますが、{min} 文字より短いです。より長いランダムな値に置き換えてください。',
   'notice.slack':
     'Slack への通知はオフです（任意）。SLACK_WEBHOOK_URL を設定すると、新しいお問い合わせが届いたときに Slack へ通知します。通知に個人情報は含まれません。',
   'notice.slackLink': '通知について',
