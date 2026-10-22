@@ -15,11 +15,11 @@ export const starterRepositoryUrl =
 export const deployToCloudflareUrl = `https://deploy.workers.cloudflare.com/?url=${starterRepositoryUrl}`;
 
 /**
- * The Deploy to Cloudflare link, drawn with the site's button shape (radius,
- * height, padding, and type) in Cloudflare orange. The cloud mark is taken
- * unchanged from the official button (images/third-party/cloudflare-mark.svg).
- * On the orange primary button it sits on a white tile, because the orange
- * mark would disappear into the orange fill.
+ * The Deploy to Cloudflare link in the official button's colors (black fill,
+ * Cloudflare orange border, white text) and the site's button shape. The
+ * cloud mark is taken unchanged from the official button
+ * (images/third-party/cloudflare-mark.svg). Both variants look the same; the
+ * variant only keeps the call sites readable.
  */
 export function DeployButton({
   variant = 'primary',

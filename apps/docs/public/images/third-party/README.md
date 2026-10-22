@@ -14,6 +14,6 @@ Keep the Astro logo at least 24 px tall with clear space around it, and do not
 recolor or redraw any of these files. Replace a file with a newer official
 version instead of editing it.
 
-The Deploy to Cloudflare buttons on the top page use the site's button shape
-in Cloudflare orange (`#f6821f`, from the official button) with the cloud mark
-on the left. Elsewhere the top page names Cloudflare products as text only.
+The Deploy to Cloudflare buttons on the top page use the official button's
+colors (black fill, `#f6821f` border, white text) in the site's button shape,
+with the cloud mark on the left. Elsewhere the top page names Cloudflare products as text only.
