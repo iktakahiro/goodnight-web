@@ -49,7 +49,7 @@ export const LoginPage = () => {
   const { search } = useLocation();
   const next = safeNextPath(search.get('next'));
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<'failed' | 'rate_limited' | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
 
   useEffect(() => {
@@ -81,11 +81,12 @@ export const LoginPage = () => {
 
   const signIn = async () => {
     setBusy(true);
-    setFailed(false);
+    setFailed(null);
     const result = await authClient.signIn.passkey();
     setBusy(false);
     if (result.error) {
-      setFailed(true);
+      // Sign-in requests are rate-limited per ip_hash (429).
+      setFailed(result.error.status === 429 ? 'rate_limited' : 'failed');
       return;
     }
     navigate(next, { replace: true });
@@ -122,7 +123,11 @@ export const LoginPage = () => {
               role='alert'
               icon={<KeyRound aria-hidden='true' />}
             >
-              <p>{t('login.failed')}</p>
+              <p>
+                {failed === 'rate_limited'
+                  ? t('error.rate_limited')
+                  : t('login.failed')}
+              </p>
             </Notice>
           ) : null}
           <Button size='lg' onClick={() => void signIn()} disabled={busy}>
