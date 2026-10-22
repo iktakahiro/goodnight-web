@@ -13,8 +13,11 @@
 // virtual authenticator) -> sign-out -> passkey sign-in -> list (URL search
 // parameters, not-found) -> detail -> status
 // change -> Slack-style deep link while signed out -> language switch ->
-// delete with confirmation. Also checks the API rules the UI relies on, and
-// that the UI runs under the admin CSP without violations.
+// delete with confirmation -> the form editor: add a field and remove one,
+// save version 2, submit with the new field, see it in the list (column
+// toggle) and the detail, see an old submission with its own labels, and
+// restore version 1. Also checks the API rules the UI relies on, and that
+// the UI runs under the admin CSP without violations.
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Page } from 'playwright';
@@ -30,7 +33,6 @@ import {
   testVars,
   ui,
 } from './support.ts';
-import { e2eCategories } from './categories.ts';
 
 const stateDir = join(packageDir, '.wrangler/e2e-state');
 const port = Number(process.env.E2E_PORT ?? '8790');
@@ -98,14 +100,36 @@ const gnw = <K extends keyof Gnw>(
     [name, args] as const,
   ) as Promise<Awaited<ReturnType<Gnw[K]>>>;
 
-const [sales] = e2eCategories;
+/** The public form, as `GET /api/contact/form` returns it. */
+interface PublicForm {
+  available: boolean;
+  version: number;
+  fields: {
+    id: string;
+    label: { ja: string; en: string };
+    options?: { value: string; label: { ja: string; en: string } }[];
+  }[];
+}
 
-const contactBody = (token: string, name: string) => ({
-  name,
+// An option of the built-in category field (migrations/0004).
+const SALES = 'sales';
+
+const contactBody = (
+  token: string,
+  name: string,
+  extra: Record<string, string> = {},
+  formVersion = 1,
+) => ({
   email: 'visitor@example.org',
-  category: sales.value,
-  message: 'Hello from the end-to-end test.\nSecond line.',
+  fields: {
+    f_name: name,
+    f_category: SALES,
+    f_message: 'Hello from the end-to-end test.\nSecond line.',
+    ...extra,
+  },
   consent: true,
+  formVersion,
+  locale: 'en',
   turnstileToken: token,
   elapsedMs: 15_000,
   pagePath: '/contact',
@@ -163,12 +187,21 @@ const main = async () => {
     await openTestPage();
 
     // Contact form API.
-    const config = await gnw(page, 'call', '/api/contact/config');
+    const formResponse = await gnw(page, 'call', '/api/contact/form');
+    const publicForm = formResponse.body as PublicForm;
     check(
-      'contact config is available',
-      (config.body as { available?: boolean }).available === true,
-      config,
+      'the public form is available as version 1',
+      publicForm.available === true &&
+        publicForm.version === 1 &&
+        publicForm.fields.some((field) => field.id === 'f_name'),
+      formResponse,
     );
+    const salesLabel = publicForm.fields
+      .find((field) => field.id === 'f_category')
+      ?.options?.find((option) => option.value === SALES)?.label ?? {
+      ja: SALES,
+      en: SALES,
+    };
     const sent = await gnw(
       page,
       'submitContact',
@@ -186,13 +219,14 @@ const main = async () => {
       rejected,
     );
     const stored = await query(
-      'SELECT id, name, status, ip_hash FROM submissions ORDER BY created_at',
+      "SELECT id, json_extract(fields, '$.f_name') AS name, status, ip_hash, form_version FROM submissions ORDER BY created_at",
     );
     check(
       'exactly one row is in D1 with status new',
       stored.length === 1 &&
         stored[0]?.name === 'E2E Visitor' &&
-        stored[0]?.status === 'new',
+        stored[0]?.status === 'new' &&
+        stored[0]?.form_version === 1,
       stored,
     );
     check(
@@ -310,7 +344,6 @@ const main = async () => {
         hasText: 'E2E Visitor',
       });
       await row.getByText(ui('en', 'status.new')).waitFor();
-      await row.getByText(sales.label.en, { exact: true }).waitFor();
       await row.getByText('Hello from the end-to-end test.').waitFor();
     });
 
@@ -449,7 +482,7 @@ const main = async () => {
       await page
         .getByRole('button', { name: ui('ja', 'app.backToList') })
         .waitFor();
-      await page.getByText(sales.label.ja).first().waitFor();
+      await page.getByText(salesLabel.ja).first().waitFor();
     });
 
     await step('delete asks for confirmation, then removes it', async () => {
@@ -466,6 +499,201 @@ const main = async () => {
     });
     const remaining = await query('SELECT COUNT(*) AS n FROM submissions');
     check('the row is deleted', remaining[0]?.n === 0, remaining);
+
+    // The form editor (the UI is in Japanese now). A version 1 submission
+    // first, to check later that it keeps its own labels.
+    await openTestPage();
+    const v1 = await gnw(
+      page,
+      'submitContact',
+      contactBody('e2e-pass', 'V1 Visitor', { f_company: 'Old Company' }),
+    );
+    check('a version 1 submission with a company succeeds', v1.ok, v1);
+    const companyLabel =
+      publicForm.fields.find((field) => field.id === 'f_company')?.label.ja ??
+      'f_company';
+
+    await step('the header links to the form editor', async () => {
+      await page.goto(`${base}/admin`);
+      await page.getByTestId('nav-form').click();
+      await page.waitForURL(`${base}/admin/form`);
+      await page
+        .getByRole('heading', { name: ui('ja', 'form.title'), level: 1 })
+        .waitFor();
+      await page.getByText(ui('ja', 'form.emailNote')).waitFor();
+    });
+    await step('add a field and fill in its labels', async () => {
+      await page.getByTestId('form-add-field').click();
+      await page.getByLabel(ui('ja', 'form.labelJa')).last().fill('ご予算');
+      await page.getByLabel(ui('ja', 'form.labelEn')).last().fill('Budget');
+      await page.getByTestId('form-preview').getByText('ご予算').waitFor();
+      await page
+        .getByTestId('form-dirty')
+        .getByText(ui('ja', 'form.unsaved'))
+        .waitFor();
+    });
+    await step('remove the company field; it moves to archived', async () => {
+      await page
+        .getByTestId('form-field-card')
+        .filter({ hasText: companyLabel })
+        .getByRole('button', { name: companyLabel })
+        .first()
+        .click();
+      await page
+        .getByRole('button', {
+          name: ui('ja', 'form.removeLabel', { label: companyLabel }),
+        })
+        .click();
+      await page.getByTestId('form-archived').getByText(companyLabel).waitFor();
+    });
+    await step('save creates version 2', async () => {
+      await page.getByTestId('form-save').click();
+      await page.getByText(ui('ja', 'form.saved', { version: 2 })).waitFor();
+      await page
+        .getByTestId('form-history')
+        .getByText(ui('ja', 'form.version', { version: 2 }))
+        .waitFor();
+    });
+    const versions = await query(
+      'SELECT version, created_by FROM form_definitions ORDER BY version',
+    );
+    check(
+      'version 2 is stored with the admin who saved it',
+      versions.length === 2 && versions[1]?.created_by === ADMIN_EMAIL,
+      versions,
+    );
+
+    await openTestPage();
+    // The public form is cached for 30 seconds; skip the browser cache like
+    // the starter does after `form_outdated`.
+    const v2Form = (
+      await gnw(page, 'call', '/api/contact/form', { cache: 'no-cache' })
+    ).body as PublicForm;
+    const budget = v2Form.fields.find((field) => field.label.en === 'Budget');
+    check(
+      'the public form serves version 2 with the new field',
+      v2Form.version === 2 &&
+        budget !== undefined &&
+        /^f_[a-z0-9]+$/.test(budget.id) &&
+        !v2Form.fields.some((field) => field.id === 'f_company'),
+      v2Form,
+    );
+    const budgetId = budget?.id ?? 'f_missing';
+    const v2 = await gnw(
+      page,
+      'submitContact',
+      contactBody('e2e-pass', 'V2 Visitor', { [budgetId]: '500万円' }, 2),
+    );
+    check('a submission with the new field succeeds', v2.ok, v2);
+    const outdated = await gnw(
+      page,
+      'submitContact',
+      contactBody('e2e-pass', 'Late Visitor', {}, 1),
+    );
+    check(
+      'a submission for the old version is refused as outdated',
+      outdated.code === 'form_outdated',
+      outdated,
+    );
+    const v2Rows = await query(
+      `SELECT id, form_version, json_extract(fields, '$.${budgetId}') AS budget FROM submissions WHERE json_extract(fields, '$.f_name') = 'V2 Visitor'`,
+    );
+    check(
+      'the new value is stored under the field id with version 2',
+      v2Rows.length === 1 &&
+        v2Rows[0]?.form_version === 2 &&
+        v2Rows[0]?.budget === '500万円',
+      v2Rows,
+    );
+    const csvEn = await gnw(page, 'call', '/api/admin/submissions.csv?lang=en');
+    check(
+      'the CSV has a column for the new field and the archived one',
+      csvEn.status === 200 &&
+        String(csvEn.body).includes('"Budget"') &&
+        String(csvEn.body).includes('(v1)') &&
+        String(csvEn.body).includes('500万円'),
+      String(csvEn.body).split('\r\n')[0],
+    );
+
+    await step('the new field can be shown as a list column', async () => {
+      await page.goto(`${base}/admin`);
+      const row = page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V2 Visitor' });
+      await row.waitFor();
+      if (await row.getByText('500万円').count()) {
+        throw new Error('the new field is shown although showInList is off');
+      }
+      await page.getByTestId('columns-menu').click();
+      await page.getByRole('menuitemcheckbox', { name: 'ご予算' }).click();
+      await page.keyboard.press('Escape');
+      await row.getByText('500万円').waitFor();
+      await page.reload();
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V2 Visitor' })
+        .getByText('500万円')
+        .waitFor();
+    });
+    await step('the detail shows the new field with its label', async () => {
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V2 Visitor' })
+        .click();
+      await page.getByRole('heading', { name: 'V2 Visitor' }).waitFor();
+      const answer = page.locator(`[data-field-id="${budgetId}"]`);
+      await answer.getByText('ご予算').waitFor();
+      await answer.getByText('500万円').waitFor();
+    });
+    await step('an old submission keeps its own labels', async () => {
+      await page.goto(`${base}/admin`);
+      await page
+        .getByTestId('inquiry-row')
+        .filter({ hasText: 'V1 Visitor' })
+        .click();
+      await page.getByRole('heading', { name: 'V1 Visitor' }).waitFor();
+      await page
+        .getByText(ui('ja', 'detail.oldVersion', { version: 1 }))
+        .waitFor();
+      const company = page.locator('[data-field-id="f_company"]');
+      await company.getByText(companyLabel).waitFor();
+      await company.getByText('Old Company').waitFor();
+      await company
+        .getByText(ui('ja', 'detail.archivedField', { version: 1 }))
+        .waitFor();
+    });
+    await step('restoring version 1 saves it as version 3', async () => {
+      await page.goto(`${base}/admin/form`);
+      await page
+        .getByRole('button', {
+          name: ui('ja', 'form.restoreLabel', { version: 1 }),
+        })
+        .click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog
+        .getByText(ui('ja', 'form.restoreTitle', { version: 1 }))
+        .waitFor();
+      await dialog
+        .getByRole('button', { name: ui('ja', 'form.restore'), exact: true })
+        .click();
+      await page
+        .getByText(ui('ja', 'form.restored', { version: 1, next: 3 }))
+        .waitFor();
+      await page.getByTestId('form-archived').getByText('ご予算').waitFor();
+    });
+    await openTestPage();
+    // The public form is cached for 30 seconds; skip the browser cache like
+    // the starter does after `form_outdated`.
+    const v3Form = (
+      await gnw(page, 'call', '/api/contact/form', { cache: 'no-cache' })
+    ).body as PublicForm;
+    check(
+      'version 3 has the company field back with its id, and no budget',
+      v3Form.version === 3 &&
+        v3Form.fields.some((field) => field.id === 'f_company') &&
+        !v3Form.fields.some((field) => field.id === budgetId),
+      v3Form,
+    );
 
     const sessions = await query('SELECT ip_address FROM session');
     check(
