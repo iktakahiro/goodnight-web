@@ -372,14 +372,12 @@ export const adminRoutes = new Hono<HonoEnv>()
   })
   .get('/submissions/:id', async (c) => {
     const id = c.req.param('id');
-    const submission = await getSubmission(c.env.DB, id);
+    const found = await getSubmission(c.env.DB, id);
+    const submission =
+      found?.status === 'unread'
+        ? await markRead(c.env.DB, id, Date.now())
+        : found;
     if (!submission) return apiError(c, 404, 'not_found');
-    if (submission.status === 'unread') {
-      const now = Date.now();
-      await markRead(c.env.DB, id, now);
-      submission.status = 'read';
-      submission.readAt = now;
-    }
     return c.json(await toAdminSubmission(c, submission));
   })
   .patch('/submissions/:id', async (c) => {

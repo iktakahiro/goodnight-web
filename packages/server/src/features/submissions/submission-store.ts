@@ -269,16 +269,26 @@ export const getSubmission = async (
   return row ? fromRow(row) : null;
 };
 
-/** Marks an `unread` submission as `read` and sets `read_at`. */
+/**
+ * Marks an `unread` submission as `read` and sets `read_at`. A submission
+ * that is already read keeps its `read_at`.
+ *
+ * @returns The submission as stored after the update, or `null` when it does
+ *   not exist.
+ */
 export const markRead = async (
   db: D1Database,
   id: string,
   now: number,
-): Promise<void> => {
-  await getDatabase(db)
+): Promise<Submission | null> => {
+  const [updated] = await getDatabase(db)
     .update(submissions)
     .set({ status: 'read', readAt: now })
-    .where(and(eq(submissions.id, id), eq(submissions.status, 'unread')));
+    .where(and(eq(submissions.id, id), eq(submissions.status, 'unread')))
+    .returning();
+  // No row changed: it was already read (or another request read it first),
+  // or it is gone.
+  return updated ? fromRow(updated) : getSubmission(db, id);
 };
 
 /** Changes an admin can make to a submission. Leave out what stays. */

@@ -160,6 +160,18 @@ describe('submission store', () => {
     });
   });
 
+  test('markRead returns the stored row and keeps an earlier read_at', async () => {
+    const { d1 } = createRecordingD1();
+    await insertSubmission(d1, submission('a'));
+    const first = await markRead(d1, 'a', 1000);
+    expect(first).toMatchObject({ id: 'a', status: 'read', readAt: 1000 });
+    expect(first).toEqual(await getSubmission(d1, 'a'));
+    const again = await markRead(d1, 'a', 2000);
+    expect(again).toMatchObject({ status: 'read', readAt: 1000 });
+    expect(again).toEqual(await getSubmission(d1, 'a'));
+    expect(await markRead(d1, 'missing', 3000)).toBeNull();
+  });
+
   test('sets and clears the suspected spam flag without touching the status', async () => {
     const { d1 } = createRecordingD1();
     await insertSubmission(d1, submission('a'));

@@ -13,7 +13,9 @@ import {
 import { testSubmission } from '../../testing/submissions.ts';
 import {
   EXPORT_BATCH_SIZE,
+  getSubmission,
   insertSubmission,
+  updateSubmission,
 } from '../submissions/submission-store.ts';
 import type { SubmissionStatus } from '../submissions/submission-status.ts';
 
@@ -365,6 +367,29 @@ describe('admin API with an admin session', () => {
     const list = await (await get('/api/admin/submissions')).json();
     expect(list.unreadCount).toBe(0);
     expect((await get('/api/admin/submissions/missing')).status).toBe(404);
+  });
+
+  test('the detail view returns the stored state', async () => {
+    await seed(worker, 'abc');
+    const detail = await (await get('/api/admin/submissions/abc')).json();
+    const stored = await getSubmission(worker.env.DB, 'abc');
+    expect(stored).toMatchObject({ status: 'read' });
+    expect(detail).toMatchObject({
+      status: stored?.status,
+      readAt: stored?.readAt,
+      suspectedSpam: stored?.suspectedSpam,
+    });
+  });
+
+  test('the detail view keeps the read time of a read submission', async () => {
+    await seed(worker, 'abc');
+    await updateSubmission(worker.env.DB, 'abc', { status: 'read' }, 1234);
+    const detail = await (await get('/api/admin/submissions/abc')).json();
+    expect(detail).toMatchObject({ status: 'read', readAt: 1234 });
+    expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
+      status: 'read',
+      readAt: 1234,
+    });
   });
 
   test('sets the status back to unread and to read', async () => {
