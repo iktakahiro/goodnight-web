@@ -1,17 +1,16 @@
 ---
 /**
- * The contact form. The browser script asks the Worker
- * (`GET /api/contact/config`) whether the form is available. If it is, the
- * script shows the form with the Turnstile widget; if not (for example,
- * Turnstile is not set up yet), it shows that the form is not available yet.
+ * The contact form. The fields come from the admin screen (Form page), not
+ * from this file: the browser script reads them from the Worker
+ * (`GET /api/contact/form`) and renders them into `[data-contact-fields]`.
+ * While it loads, a skeleton is shown. When the form is not available (for
+ * example, Turnstile is not set up yet), or it cannot be loaded, the script
+ * shows a notice with the email address and phone number instead.
  *
- * Field names (`name`, `email`, `company`, `phone`, `category`, `message`,
- * `consent`, and the honeypot `website`) are read by the server. Keep them as
- * they are when you change the layout or the labels.
+ * The email field, the privacy consent, the hidden honeypot, and the
+ * Turnstile widget are fixed. Keep the `data-*` attributes: the script reads
+ * them. You may change the texts below, the layout, and the styles.
  */
-import { CONTACT_FIELD_LIMITS } from '@goodnight-web/server/contact';
-import FormField from '../../components/ui/form-field.astro';
-import { controlClass } from '../../components/ui/input-styles';
 import { localizePath } from '../../i18n/locales';
 import { siteConfig, type Locale } from '../../../site.config';
 
@@ -25,17 +24,9 @@ const text = {
   ja: {
     required: '必須',
     optional: '任意',
-    name: 'お名前',
-    namePlaceholder: '山田 太郎',
     email: 'メールアドレス',
     emailHint: 'ご返信はこのアドレスにお送りします。',
-    company: '会社名・団体名',
-    phone: '電話番号',
-    phoneHint: 'お電話でのご連絡をご希望の場合にご記入ください。',
-    category: 'お問い合わせの種類',
-    categoryPlaceholder: '選択してください',
-    body: 'お問い合わせ内容',
-    bodyHint: '5,000文字まで入力できます。',
+    selectPlaceholder: '選択してください',
     loading: 'フォームを読み込んでいます…',
     noscript:
       'このフォームを使うには JavaScript を有効にしてください。メールまたはお電話でもご連絡いただけます。',
@@ -48,9 +39,15 @@ const text = {
     unavailableTitle: 'お問い合わせフォームは準備中です',
     unavailableBody:
       '現在、このフォームからはお問い合わせを受け付けていません。恐れ入りますが、メールまたはお電話でご連絡ください。',
+    failedTitle: 'フォームを読み込めませんでした',
+    failedBody:
+      '通信のエラーでお問い合わせフォームを表示できませんでした。ページを再読み込みしてお試しいただくか、メールまたはお電話でご連絡ください。',
+    reload: 'ページを再読み込み',
     success:
       'お問い合わせを受け付けました。内容を確認のうえ、担当者よりご連絡します。',
     invalid: '赤く表示された項目をご確認のうえ、もう一度送信してください。',
+    outdated:
+      '入力中にフォームの項目が更新されました。入力内容は残しています。項目をご確認のうえ、もう一度「送信する」を押してください。',
     verify:
       '送信ボタンの上にある確認（Turnstile）が終わるまでお待ちください。終わったら、もう一度「送信する」を押してください。',
     turnstile:
@@ -68,17 +65,9 @@ const text = {
   en: {
     required: 'Required',
     optional: 'Optional',
-    name: 'Name',
-    namePlaceholder: 'Taro Yamada',
     email: 'Email',
     emailHint: 'We will reply to this address.',
-    company: 'Company or organization',
-    phone: 'Phone',
-    phoneHint: 'Fill this in if you would like us to call you.',
-    category: 'Category',
-    categoryPlaceholder: 'Select a category',
-    body: 'Message',
-    bodyHint: 'Up to 5,000 characters.',
+    selectPlaceholder: 'Select one',
     loading: 'Loading the form…',
     noscript:
       'This form needs JavaScript. You can also contact us by email or phone.',
@@ -91,9 +80,15 @@ const text = {
     unavailableTitle: 'The contact form is not available yet',
     unavailableBody:
       'This form is not accepting inquiries at the moment. Please contact us by email or phone instead.',
+    failedTitle: 'The form could not be loaded',
+    failedBody:
+      'A connection error kept the contact form from loading. Reload the page to try again, or contact us by email or phone.',
+    reload: 'Reload the page',
     success:
       'Thank you. We have received your inquiry and will get back to you.',
     invalid: 'Please check the fields marked in red, then send again.',
+    outdated:
+      'The form was updated while you were filling it in. What you typed is still there. Please check the fields, then press "Send" again.',
     verify:
       'Please wait until the check (Turnstile) above the Send button is complete, then press "Send" again.',
     turnstile:
@@ -111,193 +106,116 @@ const text = {
 }[locale];
 
 const { company } = siteConfig;
-const limits = CONTACT_FIELD_LIMITS;
+
+// Texts the browser script needs to render the fields and the errors.
+const scriptTexts = {
+  required: text.required,
+  optional: text.optional,
+  selectPlaceholder: text.selectPlaceholder,
+  emailLabel: text.email,
+  emailHint: text.emailHint,
+  emailPlaceholder: 'name@example.com',
+  fieldRequired: text.fieldRequired,
+  fieldInvalid: text.fieldInvalid,
+  fieldTooLong: text.fieldTooLong,
+};
+
+const notices = [
+  {
+    name: 'unavailable',
+    title: text.unavailableTitle,
+    body: text.unavailableBody,
+    reload: false,
+  },
+  {
+    name: 'failed',
+    title: text.failedTitle,
+    body: text.failedBody,
+    reload: true,
+  },
+] as const;
 ---
 
-<div
-  data-contact
-  data-locale={locale}
-  data-message-required={text.fieldRequired}
-  data-message-invalid={text.fieldInvalid}
-  data-message-too-long={text.fieldTooLong}
->
-  <p data-contact-loading class='text-muted' aria-live='polite'>
-    {text.loading}
-  </p>
+<div data-contact data-locale={locale}>
+  <script
+    type='application/json'
+    data-contact-texts
+    set:html={JSON.stringify(scriptTexts).replace(/</g, '\\u003c')}
+  />
+
+  <div data-contact-loading aria-busy='true'>
+    <p class='sr-only' role='status'>{text.loading}</p>
+    <div class='animate-pulse space-y-7' aria-hidden='true'>
+      {
+        [0, 1, 2].map(() => (
+          <div class='space-y-2'>
+            <div class='h-4 w-32 rounded-full bg-primary-ring/40' />
+            <div class='h-12 rounded-xl bg-primary-soft' />
+          </div>
+        ))
+      }
+      <div class='space-y-2'>
+        <div class='h-4 w-40 rounded-full bg-primary-ring/40' />
+        <div class='h-40 rounded-xl bg-primary-soft' />
+      </div>
+      <div class='h-13 w-40 rounded-full bg-primary-ring/40'></div>
+    </div>
+  </div>
   <noscript>
     <p class='rounded-xl bg-primary-softer p-4 font-bold'>{text.noscript}</p>
   </noscript>
 
-  <div
-    data-contact-unavailable
-    role='status'
-    tabindex='-1'
-    class='rounded-card border border-primary-ring/50 bg-primary-softer p-6 sm:p-8'
-    hidden
-  >
-    <h2 class='text-lg font-bold'>{text.unavailableTitle}</h2>
-    <p class='mt-2 text-muted'>{text.unavailableBody}</p>
-    <dl class='mt-4 grid gap-1 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4'>
-      <dt class='font-bold'>{text.contactEmail}</dt>
-      <dd><a href={`mailto:${company.email}`}>{company.email}</a></dd>
-      {
-        company.phone && (
-          <>
-            <dt class='font-bold'>{text.contactPhone}</dt>
-            <dd>
-              <a href={`tel:${company.phone}`}>{company.phone}</a>
-            </dd>
-          </>
-        )
-      }
-    </dl>
-  </div>
+  {
+    notices.map((notice) => (
+      <div
+        data-contact-notice={notice.name}
+        role='status'
+        tabindex='-1'
+        class='rounded-card border border-primary-ring/50 bg-primary-softer p-6 outline-none sm:p-8'
+        hidden
+      >
+        <h2 class='text-lg font-bold'>{notice.title}</h2>
+        <p class='mt-2 text-muted'>{notice.body}</p>
+        <dl class='mt-4 grid gap-1 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4'>
+          <dt class='font-bold'>{text.contactEmail}</dt>
+          <dd>
+            <a href={`mailto:${company.email}`}>{company.email}</a>
+          </dd>
+          {company.phone && (
+            <>
+              <dt class='font-bold'>{text.contactPhone}</dt>
+              <dd>
+                <a href={`tel:${company.phone}`}>{company.phone}</a>
+              </dd>
+            </>
+          )}
+        </dl>
+        {notice.reload && (
+          <button
+            type='button'
+            data-contact-reload
+            class='mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-primary-ring bg-card px-6 text-sm font-bold text-primary-strong transition-colors hover:bg-primary-soft'
+          >
+            {text.reload}
+          </button>
+        )}
+      </div>
+    ))
+  }
 
   <div
     data-contact-sent
     role='status'
     tabindex='-1'
-    class='rounded-card bg-success-soft p-6 font-bold text-success sm:p-8'
+    class='rounded-card bg-success-soft p-6 font-bold text-success outline-none sm:p-8'
     hidden
   >
     {text.success}
   </div>
 
   <form data-contact-form novalidate class='space-y-6' hidden>
-    <FormField
-      id='contact-name'
-      label={text.name}
-      required
-      requiredText={text.required}
-      optionalText={text.optional}
-    >
-      <input
-        id='contact-name'
-        name='name'
-        type='text'
-        autocomplete='name'
-        required
-        maxlength={limits.name}
-        placeholder={text.namePlaceholder}
-        class={controlClass}
-      />
-    </FormField>
-
-    <FormField
-      id='contact-email'
-      label={text.email}
-      required
-      requiredText={text.required}
-      optionalText={text.optional}
-      hint={text.emailHint}
-    >
-      <input
-        id='contact-email'
-        name='email'
-        type='email'
-        autocomplete='email'
-        inputmode='email'
-        required
-        maxlength={limits.email}
-        placeholder='name@example.com'
-        aria-describedby='contact-email-hint'
-        class={controlClass}
-      />
-    </FormField>
-
-    <div class='grid gap-6 sm:grid-cols-2'>
-      <FormField
-        id='contact-company'
-        label={text.company}
-        requiredText={text.required}
-        optionalText={text.optional}
-      >
-        <input
-          id='contact-company'
-          name='company'
-          type='text'
-          autocomplete='organization'
-          maxlength={limits.company}
-          class={controlClass}
-        />
-      </FormField>
-
-      <FormField
-        id='contact-phone'
-        label={text.phone}
-        requiredText={text.required}
-        optionalText={text.optional}
-        hint={text.phoneHint}
-      >
-        <input
-          id='contact-phone'
-          name='phone'
-          type='tel'
-          autocomplete='tel'
-          inputmode='tel'
-          maxlength={limits.phone}
-          pattern='[0-9０-９+()\- ]*'
-          placeholder='03-0000-0000'
-          aria-describedby='contact-phone-hint'
-          class={controlClass}
-        />
-      </FormField>
-    </div>
-
-    <FormField
-      id='contact-category'
-      label={text.category}
-      required
-      requiredText={text.required}
-      optionalText={text.optional}
-    >
-      <div class='relative'>
-        <select
-          id='contact-category'
-          name='category'
-          required
-          class:list={[controlClass, 'appearance-none pr-12']}
-        >
-          <option value=''>{text.categoryPlaceholder}</option>
-          {
-            siteConfig.contactCategories.map((category) => (
-              <option value={category.value}>{category.label[locale]}</option>
-            ))
-          }
-        </select>
-        <svg
-          aria-hidden='true'
-          viewBox='0 0 24 24'
-          class='pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-muted'
-          fill='none'
-          stroke='currentColor'
-          stroke-width='2'
-          stroke-linecap='round'
-          stroke-linejoin='round'
-        >
-          <path d='m6 9 6 6 6-6'></path>
-        </svg>
-      </div>
-    </FormField>
-
-    <FormField
-      id='contact-message'
-      label={text.body}
-      required
-      requiredText={text.required}
-      optionalText={text.optional}
-      hint={text.bodyHint}
-    >
-      <textarea
-        id='contact-message'
-        name='message'
-        required
-        rows='8'
-        maxlength={limits.message}
-        aria-describedby='contact-message-hint'
-        class:list={[controlClass, 'min-h-48 resize-y leading-relaxed']}
-      ></textarea>
-    </FormField>
+    {/* The script renders the email field and the form's fields here. */}
+    <div data-contact-fields class='space-y-6'></div>
 
     {/* Honeypot: hidden from people, filled in by some bots. */}
     <div
@@ -307,7 +225,7 @@ const limits = CONTACT_FIELD_LIMITS;
       <label for='contact-website'>{text.honeypot}</label>
       <input
         id='contact-website'
-        name='website'
+        data-contact-honeypot
         type='text'
         tabindex='-1'
         autocomplete='off'
@@ -359,6 +277,7 @@ const limits = CONTACT_FIELD_LIMITS;
         (
           [
             ['invalid', text.invalid],
+            ['outdated', text.outdated],
             ['verify', text.verify],
             ['turnstile', text.turnstile],
             ['rate-limited', text.rateLimited],

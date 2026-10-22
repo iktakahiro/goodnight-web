@@ -12,9 +12,14 @@ Yunagi Works Co., Ltd. ("we") handles your personal information as described bel
 
 Through the contact form we collect:
 
-- Your name, email address, company or organization (optional), phone number (optional), and the category and content of your inquiry
+- Your email address
+- What you enter in the fields shown on the form (at present: your name, company or organization (optional), phone number (optional), and the category and content of your inquiry)
 - The date and time you agreed to this privacy policy
 - The page you sent the form from, your browser type (user agent), and your country (estimated from the connection)
+
+We may change the fields of the form. When we do, we update this section too.
+
+<!-- The form fields are edited in the admin screen ("Form" page). When you change them, also rewrite the "at present: ..." part above. -->
 
 To prevent spam and abuse, we store a value calculated from your IP address. It is made with a one-way calculation that uses a secret key (HMAC-SHA256), and it cannot be turned back into the IP address. We do not store the IP address itself in our database.
 
@@ -40,7 +45,7 @@ The contact form uses Cloudflare Turnstile, provided by Cloudflare, Inc., to sto
 
 ## 5. Internal notifications
 
-We may post a notice of a new inquiry to our internal chat tool. The notice contains only the number of inquiries and the category. It does not contain your name, email address, message, or other personal information.
+We may post a notice of a new inquiry to our internal chat tool. The notice contains only the fact that a new inquiry arrived, the time we received it, and a link to our admin screen. It does not contain your name, email address, message, other personal information, or anything you entered in the form.
 
 ## 6. Retention and deletion
 
