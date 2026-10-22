@@ -113,7 +113,11 @@ admin API and UI, security headers, and migrations. They follow semver.
 **`templates/starter`** is the part users own: Astro pages, Markdown content in
 Content Collections (ja and en), `site.config.ts`, styles, a `src/worker.ts`
 of about three lines that calls `createGoodnightWorker()`, `wrangler.jsonc`,
-and `AGENTS.md` / `CLAUDE.md` that tell AI tools which files to edit.
+and `AGENTS.md` / `CLAUDE.md` that tell AI tools which files to edit. It also
+ships GitHub files: a Dependabot config, an Update check workflow that marks
+official `@goodnight-web/*` update pull requests, and a Visibility check
+workflow that fails while the repository is public. See
+[starter.md](starter.md).
 
 In this repository the starter depends on `@goodnight-web/server` through
 `workspace:*`. When the starter is copied out for users (planned for M2), that
@@ -125,7 +129,9 @@ dependency is replaced with the published exact version.
    it fixes a vulnerability).
 2. The starter ships a `.github/dependabot.yml` that groups `@goodnight-web/*`
    updates with a cooldown. Dependabot opens one pull request in the user's
-   repository. Security updates are not delayed by the cooldown.
+   repository. Security updates are not delayed by the cooldown. The
+   starter's Update check workflow comments whether the pull request is an
+   official update, and the starter's README tells users to merge only those.
 3. The user's CI or Workers Builds builds the pull request and shows a preview.
 4. The user merges the pull request. The deploy script runs
    `wrangler d1 migrations apply DB --remote && wrangler deploy`, so migrations
