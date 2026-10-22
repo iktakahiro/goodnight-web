@@ -100,9 +100,13 @@ export const getFormVersion = async (
   return parsed;
 };
 
+// D1 refuses a statement with more than 100 bound parameters.
+const VERSIONS_PER_QUERY = 100;
+
 /**
  * Returns the given versions, by number. Versions that do not exist are left
- * out. Reads the missing ones in one query.
+ * out. Reads the missing ones in queries of at most 100 versions each, the
+ * D1 limit on bound parameters.
  */
 export const getFormVersions = async (
   db: D1Database,
@@ -111,11 +115,16 @@ export const getFormVersions = async (
   const cache = cacheFor(db);
   const wanted = [...new Set(versions)];
   const missing = wanted.filter((version) => !cache.has(version));
-  if (missing.length > 0) {
+  for (let start = 0; start < missing.length; start += VERSIONS_PER_QUERY) {
     const rows = await getDatabase(db)
       .select()
       .from(formDefinitions)
-      .where(inArray(formDefinitions.version, missing));
+      .where(
+        inArray(
+          formDefinitions.version,
+          missing.slice(start, start + VERSIONS_PER_QUERY),
+        ),
+      );
     for (const row of rows) cache.set(row.version, toVersion(row));
   }
   const found = new Map<number, FormVersion>();

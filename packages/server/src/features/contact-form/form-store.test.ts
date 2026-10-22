@@ -76,6 +76,27 @@ describe('form store', () => {
     expect(await getFormVersion(d1, 99)).toBeNull();
   });
 
+  test('reads more than 100 uncached versions within the D1 parameter limit', async () => {
+    const { d1, sqlite, statements } = createRecordingD1();
+    // Inserted directly, so none of them is in the cache.
+    const insert = sqlite.prepare(
+      'INSERT INTO form_definitions (version, definition, created_at) VALUES (?, ?, 0)',
+    );
+    const stored = JSON.stringify(definition('A'));
+    sqlite.transaction(() => {
+      for (let version = 2; version <= 251; version++) {
+        insert.run(version, stored);
+      }
+    })();
+    const wanted = Array.from({ length: 251 }, (_, index) => index + 1);
+    const found = await getFormVersions(d1, wanted);
+    expect([...found.keys()]).toEqual(wanted);
+    expect(statements).toHaveLength(3);
+    for (const statement of statements) {
+      expect(statement.params.length).toBeLessThanOrEqual(100);
+    }
+  });
+
   test('history is newest first and bounded', async () => {
     const { d1 } = createTestD1();
     for (let base = 1; base <= FORM_HISTORY_LIMIT + 2; base++) {
