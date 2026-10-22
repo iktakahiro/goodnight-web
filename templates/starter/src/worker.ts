@@ -6,5 +6,5 @@ import { siteConfig } from '../site.config';
 
 export default createGoodnightWorker({
   locale: siteConfig.defaultLocale,
-  contact: { categories: siteConfig.contactCategories.map((c) => c.value) },
+  contact: { categories: siteConfig.contactCategories },
 });

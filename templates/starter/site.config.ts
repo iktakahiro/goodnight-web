@@ -36,6 +36,7 @@ export interface ContactCategory {
    * them on), and the optional Slack notification shows this value.
    */
   value: string;
+  /** Shown in the contact form and, for each stored inquiry, in the admin screen. */
   label: Localized;
 }
 
