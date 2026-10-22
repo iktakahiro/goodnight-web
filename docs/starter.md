@@ -120,8 +120,14 @@ hidden marker `<!-- goodnight-web:update-check -->` and the
   `package-lock.json`, `bun.lock`, or `pnpm-lock.yaml`, all with status
   `modified`; `package.json` is one of them; and every changed
   `package.json` line is an `@goodnight-web/*` entry set to a version
-  number. If GitHub leaves out the `package.json` diff, the pull request is
-  not official.
+  number.
+- The check fails closed. The pull request is not official when the file
+  list may be incomplete (its length differs from the event's
+  `changed_files`, or it reaches the API limit of 3000 files), when the
+  file list cannot be read (the comment is set to the warning and the job
+  fails), or when the `package.json` diff is missing, malformed, cut short
+  within a hunk, or does not add up to the file's `additions` and
+  `deletions` (a left-out hunk).
 - Lockfile contents are not checked (decision by the dev lead, 2026-10-22).
   A new `@goodnight-web/server` version can change its own dependencies (for
   example `hono`), and those changes appear only in the lockfile. The

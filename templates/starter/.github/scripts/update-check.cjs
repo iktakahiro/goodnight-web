@@ -28,6 +28,12 @@ const LOCKFILES = ['package-lock.json', 'bun.lock', 'pnpm-lock.yaml'];
 /** Every file an official update may change. Paths are from the repository root. */
 const ALLOWED_FILES = ['package.json', ...LOCKFILES];
 
+/**
+ * The most files the "List pull request files" API returns. A list of this
+ * length may be cut short.
+ */
+const MAX_LISTED_FILES = 3000;
+
 // An exact or caret/tilde semver version, as Dependabot writes it.
 const VERSION_SPEC =
   /^[\^~]?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -36,6 +42,7 @@ const VERSION_SPEC =
  * @typedef {object} PullRequestInfo
  * The fields of `github.event.pull_request` this script reads.
  * @property {number} number
+ * @property {number} [changed_files] The number of changed files GitHub reports for the pull request.
  * @property {{ login: string, type: string } | null} user
  * @property {{ sha: string, repo: { full_name: string } | null }} head
  * @property {{ repo: { full_name: string } }} base
@@ -47,6 +54,8 @@ const VERSION_SPEC =
  * @property {string} filename
  * @property {string} status `added`, `removed`, `modified`, `renamed`, ...
  * @property {string} [patch] The unified diff. GitHub omits it for large diffs.
+ * @property {number} [additions] The number of added lines in the whole diff.
+ * @property {number} [deletions] The number of removed lines in the whole diff.
  */
 
 /**
@@ -71,8 +80,11 @@ const VERSION_SPEC =
  * those show up only in the lockfile. Which top-level packages the site uses
  * is decided by `package.json`, and that diff is checked line by line.
  *
- * When `package.json` cannot be checked (for example, GitHub did not include
- * its diff), the update is not official.
+ * When the check may have missed a change, the update is not official: when
+ * the file list may be incomplete (it does not match `changed_files`, or it
+ * has {@link MAX_LISTED_FILES} entries), or when the `package.json` diff is
+ * missing, malformed, cut short within a hunk, or does not add up to the
+ * file's `additions` and `deletions` (for example, a hunk was left out).
  *
  * @param {PullRequestInfo} pullRequest
  * @param {ChangedFile[]} files
@@ -98,6 +110,16 @@ function classifyUpdate(pullRequest, files) {
     );
   }
 
+  if (
+    typeof pullRequest.changed_files !== 'number' ||
+    files.length !== pullRequest.changed_files ||
+    files.length >= MAX_LISTED_FILES
+  ) {
+    reasons.push(
+      `the list of changed files may be incomplete: listed ${files.length}, expected ${pullRequest.changed_files ?? 'unknown'}`,
+    );
+  }
+
   let officialChanges = 0;
   for (const file of files) {
     if (!ALLOWED_FILES.includes(file.filename)) {
@@ -115,7 +137,12 @@ function classifyUpdate(pullRequest, files) {
       reasons.push('the diff of package.json is not available');
       continue;
     }
-    for (const change of packageJsonChanges(file.patch)) {
+    const hunks = parseHunks(file.patch);
+    if (hunks === null || !matchesTotals(hunks, file)) {
+      reasons.push('the diff of package.json is incomplete');
+      continue;
+    }
+    for (const change of packageJsonChanges(hunks)) {
       if (change.name === null) {
         reasons.push(
           `package.json: change outside a dependency entry: ${change.line}`,
@@ -154,32 +181,66 @@ function classifyUpdate(pullRequest, files) {
  * @property {string} text
  */
 
+const HUNK_HEADER = /^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/;
+
 /**
- * Splits a unified diff into hunks of lines.
+ * Splits a unified diff into hunks of lines. Each hunk must have exactly the
+ * old and new line counts of its `@@` header.
  *
  * @param {string} patch
- * @returns {PatchLine[][]}
+ * @returns {PatchLine[][] | null} Null when the diff is malformed or a hunk is cut short.
  */
 function parseHunks(patch) {
   /** @type {PatchLine[][]} */
   const hunks = [];
   /** @type {PatchLine[] | null} */
   let current = null;
-  for (const raw of patch.split('\n')) {
-    if (raw.startsWith('@@')) {
+  let oldLeft = 0;
+  let newLeft = 0;
+  const lines = (patch.endsWith('\n') ? patch.slice(0, -1) : patch).split('\n');
+  for (const raw of lines) {
+    if (raw.startsWith('\\') && current !== null) continue;
+    if (oldLeft === 0 && newLeft === 0) {
+      const header = HUNK_HEADER.exec(raw);
+      if (!header) return null;
+      oldLeft = Number(header[1] ?? '1');
+      newLeft = Number(header[2] ?? '1');
       current = [];
       hunks.push(current);
       continue;
     }
-    if (current === null || raw.startsWith('\\')) continue;
-    const kind = raw[0];
-    if (kind === '+' || kind === '-' || kind === ' ') {
-      current.push({ kind, text: raw.slice(1) });
-    } else if (raw === '') {
-      current.push({ kind: ' ', text: '' });
+    const kind = raw === '' ? ' ' : raw[0];
+    if (kind === ' ' && oldLeft > 0 && newLeft > 0) {
+      oldLeft -= 1;
+      newLeft -= 1;
+    } else if (kind === '-' && oldLeft > 0) {
+      oldLeft -= 1;
+    } else if (kind === '+' && newLeft > 0) {
+      newLeft -= 1;
+    } else {
+      return null;
     }
+    /** @type {PatchLine[]} */ (current).push({ kind, text: raw.slice(1) });
   }
+  if (hunks.length === 0 || oldLeft !== 0 || newLeft !== 0) return null;
   return hunks;
+}
+
+/**
+ * True when the hunks add and remove as many lines as GitHub reports for the
+ * whole file. A hunk that GitHub left out makes the counts differ.
+ *
+ * @param {PatchLine[][]} hunks
+ * @param {ChangedFile} file
+ */
+function matchesTotals(hunks, file) {
+  let additions = 0;
+  let deletions = 0;
+  for (const { kind } of hunks.flat()) {
+    if (kind === '+') additions += 1;
+    if (kind === '-') deletions += 1;
+  }
+  return additions === file.additions && deletions === file.deletions;
 }
 
 /** @param {string} text */
@@ -191,13 +252,13 @@ function isPunctuationOnly(text) {
  * Changed lines of a `package.json` diff. A line counts as an official change
  * only when it is a `"@goodnight-web/<name>": "<version>"` entry.
  *
- * @param {string} patch
+ * @param {PatchLine[][]} hunks
  * @returns {LineChange[]}
  */
-function packageJsonChanges(patch) {
+function packageJsonChanges(hunks) {
   /** @type {LineChange[]} */
   const changes = [];
-  for (const hunk of parseHunks(patch)) {
+  for (const hunk of hunks) {
     for (const { kind, text } of hunk) {
       if (kind === ' ' || isPunctuationOnly(text)) continue;
       const line = text.trim();
@@ -285,9 +346,13 @@ function buildComment(result, headSha) {
  * Entry point for actions/github-script: classifies the pull request of the
  * event and creates or updates the single marker comment.
  *
+ * When the changed files cannot be listed, the comment is set to the warning
+ * so that an earlier "official" comment does not stay, and the error is
+ * thrown again.
+ *
  * @param {Toolkit} toolkit
  * @returns {Promise<Classification>}
- * @throws {Error} When the event has no pull request.
+ * @throws {Error} When the event has no pull request, or when an API call fails.
  */
 async function run({ github, context, core }) {
   if (!context.payload.pull_request)
@@ -298,15 +363,27 @@ async function run({ github, context, core }) {
   const { owner, repo } = context.repo;
   const issueNumber = pullRequest.number;
 
-  const files = /** @type {ChangedFile[]} */ (
-    await github.paginate(github.rest.pulls.listFiles, {
-      owner,
-      repo,
-      pull_number: issueNumber,
-      per_page: 100,
-    })
-  );
-  const result = classifyUpdate(pullRequest, files);
+  /** @type {Classification} */
+  let result;
+  /** @type {unknown} */
+  let listError = null;
+  try {
+    const files = /** @type {ChangedFile[]} */ (
+      await github.paginate(github.rest.pulls.listFiles, {
+        owner,
+        repo,
+        pull_number: issueNumber,
+        per_page: 100,
+      })
+    );
+    result = classifyUpdate(pullRequest, files);
+  } catch (error) {
+    listError = error;
+    result = {
+      official: false,
+      reasons: ['the list of changed files could not be read'],
+    };
+  }
   const body = buildComment(result, pullRequest.head.sha);
 
   const comments =
@@ -342,6 +419,7 @@ async function run({ github, context, core }) {
     });
   }
 
+  if (listError !== null) throw listError;
   core.info(
     result.official
       ? 'Official goodnight-web update.'
