@@ -1,37 +1,16 @@
 import { describe, expect, test } from 'bun:test';
-import { detailPath, loginPath, matchRoute, safeNextPath } from './routes.ts';
+import {
+  adminBasepathRewrite,
+  safeNextPath,
+  toAdminPath,
+  toRouterHref,
+} from './admin-paths.ts';
 
-describe('matchRoute', () => {
-  test.each([
-    ['/admin', { name: 'list' }],
-    ['/admin/', { name: 'list' }],
-    ['/admin/login', { name: 'login' }],
-    ['/admin/setup/', { name: 'setup' }],
-    ['/admin/inquiries/01JABCDEF', { name: 'detail', id: '01JABCDEF' }],
-    ['/admin/inquiries/a%20b', { name: 'detail', id: 'a b' }],
-    ['/admin/inquiries/%E0%A4%A', { name: 'not-found' }],
-    ['/admin/inquiries', { name: 'not-found' }],
-    ['/admin/inquiries/a/b', { name: 'not-found' }],
-    ['/admin/nope', { name: 'not-found' }],
-  ])('%s', (path, expected) => {
-    expect(matchRoute(path)).toEqual(expected as ReturnType<typeof matchRoute>);
-  });
-
-  test('detailPath round-trips through matchRoute', () => {
-    expect(matchRoute(detailPath('x/y?z'))).toEqual({
-      name: 'detail',
-      id: 'x/y?z',
-    });
-  });
-});
-
-describe('next parameter', () => {
+describe('safeNextPath', () => {
   test('keeps admin paths, including the Slack deep link', () => {
-    expect(loginPath('/admin/inquiries/01J')).toBe(
-      '/admin/login?next=%2Fadmin%2Finquiries%2F01J',
-    );
     expect(safeNextPath('/admin/inquiries/01J')).toBe('/admin/inquiries/01J');
     expect(safeNextPath('/admin?status=new')).toBe('/admin?status=new');
+    expect(safeNextPath('/admin')).toBe('/admin');
   });
 
   test('refuses other sites and non-admin paths', () => {
@@ -42,10 +21,46 @@ describe('next parameter', () => {
       '/admin\\@evil.example',
       '/',
       null,
+      undefined,
+      42,
     ]) {
       expect(safeNextPath(value)).toBe('/admin');
     }
-    expect(loginPath('https://evil.example')).toBe('/admin/login');
-    expect(loginPath('/admin/login')).toBe('/admin/login');
+  });
+});
+
+describe('router hrefs', () => {
+  test.each([
+    ['/', '/admin'],
+    ['/?status=new&page=2', '/admin?status=new&page=2'],
+    ['/inquiries/01J', '/admin/inquiries/01J'],
+    ['/login?next=x', '/admin/login?next=x'],
+  ])('%s <-> %s', (href, adminPath) => {
+    expect(toAdminPath(href)).toBe(adminPath);
+    expect(toRouterHref(adminPath)).toBe(href);
+  });
+});
+
+describe('adminBasepathRewrite', () => {
+  const input = (path: string) =>
+    adminBasepathRewrite.input({ url: new URL(path, 'https://example.com') })
+      .pathname;
+  const output = (path: string) =>
+    adminBasepathRewrite.output({ url: new URL(path, 'https://example.com') })
+      .pathname;
+
+  test('strips the basepath, with or without a trailing slash', () => {
+    expect(input('/admin')).toBe('/');
+    expect(input('/admin/')).toBe('/');
+    expect(input('/admin/inquiries/01J')).toBe('/inquiries/01J');
+  });
+
+  test('leaves other paths alone', () => {
+    expect(input('/administrator')).toBe('/administrator');
+  });
+
+  test('writes the list as /admin, without a trailing slash', () => {
+    expect(output('/')).toBe('/admin');
+    expect(output('/inquiries/01J')).toBe('/admin/inquiries/01J');
   });
 });

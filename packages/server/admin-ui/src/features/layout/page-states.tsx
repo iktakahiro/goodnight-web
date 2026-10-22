@@ -1,7 +1,7 @@
+import { Link } from '@tanstack/react-router';
 import { CircleAlert, Compass, ShieldX } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
-import { Link } from '../../shared/router/router.tsx';
 import { Button, buttonVariants } from '../../shared/ui/button.tsx';
 import { Card } from '../../shared/ui/card.tsx';
 import { Spinner } from '../../shared/ui/spinner.tsx';
@@ -102,7 +102,7 @@ export const NotFoundPage = () => {
       icon={<Compass aria-hidden='true' />}
       title={t('app.notFound.title')}
       action={
-        <Link href='/admin' className={buttonVariants({ variant: 'outline' })}>
+        <Link to='/' className={buttonVariants({ variant: 'outline' })}>
           {t('app.backToList')}
         </Link>
       }

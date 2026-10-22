@@ -67,6 +67,7 @@ const en = {
 
   'list.title': 'Inquiries',
   'list.total': '{count} in total',
+  'list.sortNewest': 'Newest first',
   'list.filterLabel': 'Filter by status',
   'list.filter.all': 'All',
   'list.emptyFiltered': 'No inquiries with this status.',
@@ -181,6 +182,7 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
 
   'list.title': 'お問い合わせ',
   'list.total': '全 {count} 件',
+  'list.sortNewest': '新しい順',
   'list.filterLabel': '状態で絞り込む',
   'list.filter.all': 'すべて',
   'list.emptyFiltered': 'この状態のお問い合わせはありません。',

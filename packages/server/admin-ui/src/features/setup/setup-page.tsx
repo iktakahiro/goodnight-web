@@ -1,4 +1,5 @@
-import { Form } from '@base-ui/react/form';
+import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { Link, useNavigate } from '@tanstack/react-router';
 import {
   CircleAlert,
   CircleCheck,
@@ -6,11 +7,15 @@ import {
   KeyRound,
   ShieldCheck,
 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  setupInputSchema,
+  type SetupInput,
+} from '../../../../src/features/setup/setup-schema.ts';
 import { ApiError, apiFetch } from '../../shared/api/api-client.ts';
 import { errorMessage } from '../../shared/api/error-message.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
-import { Link, navigate } from '../../shared/router/router.tsx';
+import { fieldErrorMessage } from '../../shared/form/field-error.ts';
 import { Button, buttonVariants } from '../../shared/ui/button.tsx';
 import {
   Card,
@@ -85,87 +90,143 @@ const StepIndicator = ({ current }: { current: 1 | 2 | 3 }) => {
   );
 };
 
-const formString = (value: unknown): string =>
-  typeof value === 'string' ? value.trim() : '';
+type SetupFieldName = 'token' | 'email';
+
+const EMPTY_SETUP_INPUT: SetupInput = { token: '', email: '', name: '' };
 
 /** Step 1: `SETUP_TOKEN`, an address in `ADMIN_EMAILS`, and a name. */
 const TokenStep = ({ onDone }: { onDone: () => void }) => {
   const { t } = useI18n();
-  const [busy, setBusy] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{
-    token?: string;
-    email?: string;
-  }>({});
+  // Errors from the API that belong to one field, cleared when it changes.
+  const [serverErrors, setServerErrors] = useState<
+    Partial<Record<SetupFieldName, string>>
+  >({});
   const [formError, setFormError] = useState<string | null>(null);
+  const clearServerError = (name: SetupFieldName) =>
+    setServerErrors((errors) =>
+      errors[name] ? { ...errors, [name]: undefined } : errors,
+    );
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    if (!form.checkValidity()) return;
-    const data = new FormData(form);
-    setBusy(true);
-    setFieldErrors({});
-    setFormError(null);
-    try {
-      await apiFetch('/api/setup', {
-        method: 'POST',
-        body: JSON.stringify({
-          token: formString(data.get('token')),
-          email: formString(data.get('email')),
-          name: formString(data.get('name')) || undefined,
-        }),
-      });
-      onDone();
-    } catch (error) {
-      const apiError =
-        error instanceof ApiError
-          ? error
-          : new ApiError(0, 'server_error', 'unexpected error');
-      const message = errorMessage(t, apiError);
-      if (apiError.code === 'invalid_setup_token') {
-        setFieldErrors({ token: message });
-      } else if (apiError.code === 'email_not_allowed') {
-        setFieldErrors({ email: message });
-      } else {
-        setFormError(message);
+  const form = useForm({
+    defaultValues: EMPTY_SETUP_INPUT,
+    // Check on submit, then again on every change until the input is valid.
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: setupInputSchema },
+    onSubmit: async ({ value }) => {
+      setServerErrors({});
+      setFormError(null);
+      try {
+        await apiFetch('/api/setup', {
+          method: 'POST',
+          body: JSON.stringify({
+            token: value.token.trim(),
+            email: value.email.trim(),
+            name: value.name?.trim() || undefined,
+          }),
+        });
+        onDone();
+      } catch (error) {
+        const apiError =
+          error instanceof ApiError
+            ? error
+            : new ApiError(0, 'server_error', 'unexpected error');
+        const message = errorMessage(t, apiError);
+        if (apiError.code === 'invalid_setup_token') {
+          setServerErrors({ token: message });
+        } else if (apiError.code === 'email_not_allowed') {
+          setServerErrors({ email: message });
+        } else {
+          setFormError(message);
+        }
       }
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+  });
 
   return (
-    <Form
-      onInput={() => {
-        if (fieldErrors.token || fieldErrors.email) setFieldErrors({});
+    <form
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        void form.handleSubmit();
       }}
-      onSubmit={(event) => void submit(event)}
       className='flex flex-col gap-5'
     >
-      <Field name='token' invalid={fieldErrors.token ? true : undefined}>
-        <FieldLabel>{t('admin.setup.token')}</FieldLabel>
-        <Input type='password' required autoComplete='off' spellCheck={false} />
-        <FieldDescription>{t('setup.tokenHint')}</FieldDescription>
-        <FieldError match='valueMissing'>{t('field.required')}</FieldError>
-        {fieldErrors.token ? (
-          <FieldError match>{fieldErrors.token}</FieldError>
-        ) : null}
-      </Field>
-      <Field name='email' invalid={fieldErrors.email ? true : undefined}>
-        <FieldLabel>{t('admin.setup.email')}</FieldLabel>
-        <Input type='email' required autoComplete='email' spellCheck={false} />
-        <FieldDescription>{t('setup.emailHint')}</FieldDescription>
-        <FieldError match='valueMissing'>{t('field.required')}</FieldError>
-        <FieldError match='typeMismatch'>{t('field.invalid')}</FieldError>
-        {fieldErrors.email ? (
-          <FieldError match>{fieldErrors.email}</FieldError>
-        ) : null}
-      </Field>
-      <Field name='name'>
-        <FieldLabel>{t('admin.setup.name')}</FieldLabel>
-        <Input type='text' autoComplete='name' maxLength={100} />
-        <FieldDescription>{t('setup.nameHint')}</FieldDescription>
-      </Field>
+      <form.Field
+        name='token'
+        listeners={{ onChange: () => clearServerError('token') }}
+      >
+        {(field) => {
+          const error =
+            serverErrors.token ??
+            fieldErrorMessage(t, field.state.value, field.state.meta.errors);
+          return (
+            <Field name={field.name} invalid={error !== null}>
+              <FieldLabel>{t('admin.setup.token')}</FieldLabel>
+              <Input
+                type='password'
+                required
+                autoComplete='off'
+                spellCheck={false}
+                value={field.state.value}
+                onChange={(event) => field.handleChange(event.target.value)}
+                onBlur={field.handleBlur}
+              />
+              <FieldDescription>{t('setup.tokenHint')}</FieldDescription>
+              {error ? <FieldError match>{error}</FieldError> : null}
+            </Field>
+          );
+        }}
+      </form.Field>
+      <form.Field
+        name='email'
+        listeners={{ onChange: () => clearServerError('email') }}
+      >
+        {(field) => {
+          const error =
+            serverErrors.email ??
+            fieldErrorMessage(t, field.state.value, field.state.meta.errors);
+          return (
+            <Field name={field.name} invalid={error !== null}>
+              <FieldLabel>{t('admin.setup.email')}</FieldLabel>
+              <Input
+                type='email'
+                required
+                autoComplete='email'
+                spellCheck={false}
+                value={field.state.value}
+                onChange={(event) => field.handleChange(event.target.value)}
+                onBlur={field.handleBlur}
+              />
+              <FieldDescription>{t('setup.emailHint')}</FieldDescription>
+              {error ? <FieldError match>{error}</FieldError> : null}
+            </Field>
+          );
+        }}
+      </form.Field>
+      <form.Field name='name'>
+        {(field) => {
+          const error = fieldErrorMessage(
+            t,
+            field.state.value,
+            field.state.meta.errors,
+          );
+          return (
+            <Field name={field.name} invalid={error !== null}>
+              <FieldLabel>{t('admin.setup.name')}</FieldLabel>
+              <Input
+                type='text'
+                autoComplete='name'
+                maxLength={100}
+                value={field.state.value ?? ''}
+                onChange={(event) => field.handleChange(event.target.value)}
+                onBlur={field.handleBlur}
+              />
+              <FieldDescription>{t('setup.nameHint')}</FieldDescription>
+              {error ? <FieldError match>{error}</FieldError> : null}
+            </Field>
+          );
+        }}
+      </form.Field>
       {formError ? (
         <Notice
           tone='error'
@@ -175,11 +236,15 @@ const TokenStep = ({ onDone }: { onDone: () => void }) => {
           <p>{formError}</p>
         </Notice>
       ) : null}
-      <Button type='submit' size='lg' disabled={busy} className='mt-1'>
-        {busy ? <Spinner /> : null}
-        {busy ? t('setup.checking') : t('setup.continue')}
-      </Button>
-    </Form>
+      <form.Subscribe selector={(state) => state.isSubmitting}>
+        {(busy) => (
+          <Button type='submit' size='lg' disabled={busy} className='mt-1'>
+            {busy ? <Spinner /> : null}
+            {busy ? t('setup.checking') : t('setup.continue')}
+          </Button>
+        )}
+      </form.Subscribe>
+    </form>
   );
 };
 
@@ -234,6 +299,7 @@ const PasskeyStep = ({ onDone }: { onDone: () => void }) => {
  */
 export const SetupPage = () => {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [step, setStep] = useState<Step>({ name: 'loading' });
 
   useEffect(() => {
@@ -291,7 +357,7 @@ export const SetupPage = () => {
           <CardContent className='flex justify-center'>
             {closed ? (
               <Link
-                href={step.signedIn ? '/admin' : '/admin/login'}
+                to={step.signedIn ? '/' : '/login'}
                 className={buttonVariants({ variant: 'primary' })}
               >
                 {step.signedIn ? t('setup.goToList') : t('setup.goToLogin')}
@@ -342,7 +408,7 @@ export const SetupPage = () => {
               </p>
               <Button
                 size='lg'
-                onClick={() => navigate('/admin', { replace: true })}
+                onClick={() => void navigate({ to: '/', replace: true })}
               >
                 {t('setup.goToList')}
               </Button>
