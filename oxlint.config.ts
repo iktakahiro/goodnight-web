@@ -16,6 +16,9 @@ export default defineConfig({
     '**/*.gen.ts',
     '**/worker-configuration.d.ts',
     'packages/server/e2e/public/app.js',
+    // Vendored agent skills are kept byte-for-byte with upstream.
+    '.agents/skills/**',
+    '.claude/skills/**',
   ],
   rules: {
     'typescript/no-explicit-any': 'error',
