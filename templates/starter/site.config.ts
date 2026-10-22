@@ -40,9 +40,15 @@ export interface ContactCategory {
   label: Localized;
 }
 
-/** Colors used across the site. Use 6-digit hex values such as `#7c5fd3`. */
+/**
+ * The site's main colors. Use 6-digit hex values such as `#2f6b4e`.
+ * src/styles/global.css mixes the lighter and darker shades from them.
+ */
 export interface ThemeColors {
-  /** Buttons, links, and highlights. White text must stay readable on it. */
+  /**
+   * Buttons, links, highlights, and the keyboard focus outline. White text
+   * must stay readable on it (contrast ratio 4.5:1 or more).
+   */
   primary: string;
   /** Page background. */
   background: string;
@@ -165,10 +171,11 @@ export const siteConfig: SiteConfig = {
     { path: '/contact/', label: { ja: 'お問い合わせ', en: 'Contact' } },
   ],
 
+  // A calm workshop green on a warm off-white.
   theme: {
-    primary: '#7357c8',
-    background: '#fcfbff',
-    foreground: '#2f2a40',
+    primary: '#2f6b4e',
+    background: '#fbfaf5',
+    foreground: '#253229',
   },
 
   contactCategories: [

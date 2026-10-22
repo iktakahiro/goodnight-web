@@ -80,7 +80,8 @@ Setup closes once the first admin exists.
 
 ## Edit the site
 
-- Company details, menu, and colors: `site.config.ts`
+- Company details, menu, and colors: `site.config.ts`. See
+  [Change the site colors](#change-the-site-colors).
 - Pages: `src/pages/`
 - News and blog posts: `src/content/news/` and `src/content/blog/`
 - Privacy policy: `src/content/pages/`. It is a template, not legal advice.
@@ -88,6 +89,30 @@ Setup closes once the first admin exists.
 
 Keep the Japanese and English versions in step. If you edit with an AI tool,
 it reads [AGENTS.md](AGENTS.md) for the rules.
+
+### Change the site colors
+
+The sample site uses a green theme. To use your own colors, change the three
+values in `theme` in `site.config.ts`:
+
+| Key          | Used for                                                   |
+| ------------ | ---------------------------------------------------------- |
+| `primary`    | Buttons, links, highlights, and the keyboard focus outline |
+| `background` | Page background                                            |
+| `foreground` | Main text                                                  |
+
+The lighter and darker shades (for example the light tint behind badges and
+the darker color of links) are mixed from these three in
+`src/styles/global.css`. That file also sets the colors that do not follow
+them: error (`--color-danger`), success (`--color-success`), and the soft
+shapes on the home page (`--color-decor-wood`, `--color-decor-leaf`).
+
+Keep the text readable. White text on `primary`, and `foreground` text on
+`background`, need a contrast ratio of at least 4.5:1 (WCAG AA). Check your
+colors with a contrast checker.
+
+These colors apply only to your site. The admin screen (`/admin`) comes with
+`@goodnight-web/server` and keeps its own theme.
 
 Check your changes before you push:
 

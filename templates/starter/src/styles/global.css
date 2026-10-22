@@ -1,15 +1,23 @@
 @import 'tailwindcss';
 
 /*
- * Theme colors. The values in site.config.ts (theme) are set on <html> as
- * --site-primary, --site-background, and --site-foreground. The lighter and
- * darker shades below are mixed from them, so changing three colors in
- * site.config.ts updates the whole site.
+ * Theme colors. The site owns these colors; the admin screen has its own
+ * fixed theme and does not use them.
+ *
+ * The three main colors come from site.config.ts (theme) and are set on
+ * <html> as --site-primary, --site-background, and --site-foreground. The
+ * values below are only the fallback. The lighter and darker shades in
+ * @theme are mixed from them, so changing three colors in site.config.ts
+ * updates the whole site. Colors that do not follow the main three (error,
+ * success, and the home page decorations) are set directly in @theme.
+ *
+ * Keep text readable: white on --site-primary, and --site-foreground on
+ * --site-background, need a contrast ratio of at least 4.5:1 (WCAG AA).
  */
 :root {
-  --site-primary: #7357c8;
-  --site-background: #fcfbff;
-  --site-foreground: #2f2a40;
+  --site-primary: #2f6b4e;
+  --site-background: #fbfaf5;
+  --site-foreground: #253229;
 }
 
 @theme inline {
@@ -19,21 +27,33 @@
 
   --color-background: var(--site-background);
   --color-foreground: var(--site-foreground);
-  --color-muted: color-mix(in oklab, var(--site-foreground) 68%, white);
+  --color-muted: color-mix(in oklab, var(--site-foreground) 74%, white);
   --color-border: color-mix(in oklab, var(--site-primary) 16%, white);
+  /* Form field borders: dark enough to see the field (3:1). */
+  --color-control-border: color-mix(
+    in oklab,
+    var(--site-foreground) 52%,
+    white
+  );
   --color-card: #ffffff;
 
   --color-primary: var(--site-primary);
   --color-primary-strong: color-mix(in oklab, var(--site-primary) 82%, black);
   --color-primary-foreground: #ffffff;
-  --color-primary-soft: color-mix(in oklab, var(--site-primary) 9%, white);
-  --color-primary-softer: color-mix(in oklab, var(--site-primary) 5%, white);
+  --color-primary-soft: color-mix(in oklab, var(--site-primary) 11%, white);
+  --color-primary-softer: color-mix(in oklab, var(--site-primary) 6%, white);
   --color-primary-ring: color-mix(in oklab, var(--site-primary) 45%, white);
+  /* Keyboard focus outline: the full primary color (3:1 on the page). */
+  --color-focus: var(--site-primary);
 
-  --color-danger: #b4235a;
-  --color-danger-soft: #fdf0f4;
-  --color-success: #23775a;
-  --color-success-soft: #eef8f3;
+  --color-danger: #b0322a;
+  --color-danger-soft: #fdf1ee;
+  --color-success: #1f6b43;
+  --color-success-soft: #edf6ef;
+
+  /* Soft shapes on the home page: light wood and young leaf. */
+  --color-decor-wood: #f1e3cb;
+  --color-decor-leaf: #dcebd6;
 
   --radius-card: 1.25rem;
 }
@@ -81,7 +101,7 @@
   }
 
   :focus-visible {
-    outline: 3px solid var(--color-primary-ring);
+    outline: 3px solid var(--color-focus);
     outline-offset: 2px;
   }
 
