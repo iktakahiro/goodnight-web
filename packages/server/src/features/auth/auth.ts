@@ -5,19 +5,19 @@ import { APIError } from 'better-auth/api';
 import { getDatabase } from '../../db/database.ts';
 import * as schema from '../../db/schema.ts';
 import { redactQueryText, safeErrorMessage } from '../../shared/log-error.ts';
+import { isLongEnough } from '../../shared/secret-length.ts';
 import type { GoodnightEnv } from '../../env.ts';
+import { beforePasskeySaved } from '../setup/first-passkey.ts';
 import { createSetupPlugin } from '../setup/setup-plugin.ts';
 import { AUTH_BASE_PATH } from './auth-paths.ts';
 
-/** Shortest accepted `BETTER_AUTH_SECRET`, in characters. */
-export const MIN_AUTH_SECRET_LENGTH = 32;
-
 /**
- * Returns whether sign-in can run. Without a strong enough
- * `BETTER_AUTH_SECRET`, auth and the admin API answer 503 (fail closed).
+ * Returns whether sign-in can run. Without a `BETTER_AUTH_SECRET` of at
+ * least `MIN_SECRET_LENGTH` characters, auth and the admin API answer 503
+ * (fail closed).
  */
 export const isAuthConfigured = (env: GoodnightEnv): boolean =>
-  (env.BETTER_AUTH_SECRET?.length ?? 0) >= MIN_AUTH_SECRET_LENGTH;
+  isLongEnough(env.BETTER_AUTH_SECRET);
 
 const buildAuth = (env: GoodnightEnv, origin: string) =>
   betterAuth({
@@ -72,12 +72,13 @@ const buildAuth = (env: GoodnightEnv, origin: string) =>
         // The plugin verifies with requireUserVerification: false, so enforce
         // user verification (PIN or biometrics) here.
         registration: {
-          afterVerification: async ({ verification }) => {
+          afterVerification: async ({ verification, user }) => {
             if (!verification.registrationInfo?.userVerified) {
               throw new APIError('UNAUTHORIZED', {
                 message: 'user verification required',
               });
             }
+            await beforePasskeySaved(env.DB, user.id);
           },
         },
         authentication: {
@@ -108,7 +109,8 @@ const cache = new WeakMap<GoodnightEnv, Map<string, GoodnightAuth>>();
  * first use in the isolate.
  *
  * Passkeys only: email and password sign-in is disabled. Passkey registration
- * and sign-in require user verification. IP tracking is off.
+ * and sign-in require user verification. IP tracking is off. The first
+ * passkey deletes every session and closes setup (`beforePasskeySaved`).
  *
  * Call {@link isAuthConfigured} first; this function does not check the
  * secret.
