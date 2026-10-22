@@ -301,6 +301,29 @@ describe('POST /api/contact', () => {
     expect(rows(worker)).toHaveLength(0);
   });
 
+  test('accepts every key the contact form sends', async () => {
+    const worker = createTestWorker();
+    const response = await post(worker, validBody({ website: '' }));
+    expect(response.status).toBe(200);
+    expect(rows(worker)).toHaveLength(1);
+  });
+
+  test.each([
+    ['an unknown key', '{"isAdmin":true}'],
+    ['a misspelled key', '{"formversion":1}'],
+    ['__proto__', '{"__proto__":{"status":"done"}}'],
+    ['constructor', '{"constructor":{"prototype":{}}}'],
+  ])('rejects %s at the top level and stores nothing', async (_name, extra) => {
+    const worker = createTestWorker();
+    const body = `${JSON.stringify(validBody()).slice(0, -1)},${extra.slice(1)}`;
+    const response = await post(worker, body);
+    expect(response.status).toBe(400);
+    const { error } = await response.json();
+    expect(error.code).toBe('invalid_input');
+    expect(error.fields ?? {}).toEqual({});
+    expect(rows(worker)).toHaveLength(0);
+  });
+
   test('rejects an option value that the field does not have', async () => {
     const worker = createTestWorker();
     for (const category of ['営業', 'Business proposal', 'other ', 'nope']) {

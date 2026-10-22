@@ -44,6 +44,17 @@ describe('contactRequestSchema', () => {
     expect(Object.keys(parsed.fields)).toEqual(['__proto__']);
   });
 
+  test('rejects unknown top-level keys', () => {
+    const result = contactRequestSchema.safeParse({ ...base, extra: 1 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.code).toBe('unrecognized_keys');
+      expect(contactFieldErrors(result.error, { ...base, extra: 1 })).toEqual(
+        {},
+      );
+    }
+  });
+
   test('accepts only ja and en as locale', () => {
     expect(
       contactRequestSchema.safeParse({ ...base, locale: 'ja' }).success,

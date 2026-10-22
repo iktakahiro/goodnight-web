@@ -40,10 +40,10 @@ export const CONTACT_FIELD_LIMITS = {
  *   Used for the spam score.
  * - `pagePath`: the path of the page that holds the form.
  *
- * The email is cleaned before the check: control characters are removed and
- * whitespace is trimmed.
+ * Any other top-level key is rejected. The email is cleaned before the
+ * check: control characters are removed and whitespace is trimmed.
  */
-export const contactRequestSchema = z.object({
+export const contactRequestSchema = z.strictObject({
   email: z
     .string()
     .transform(singleLine)
@@ -108,7 +108,8 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 /**
  * Turns zod errors into one error code per field. Fixed fields use their
  * name (`email`, `consent`); form fields use their id. Unknown keys in
- * `fields` are reported as `fields: invalid`.
+ * `fields` are reported as `fields: invalid`. Unknown top-level keys get no
+ * entry, so a key the client chose is never echoed back.
  *
  * @param error - From {@link contactRequestSchema}, or from the field values
  *   schema with `prefix` set to `fields`.
