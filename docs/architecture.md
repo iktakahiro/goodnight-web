@@ -273,6 +273,11 @@ The UI does not use TanStack Start; the Worker serves the static build.
   only token classes. `theme-contrast.test.ts` reads that file and checks
   WCAG AA for the main pairs in both modes (4.5:1 text, 3:1 control borders
   and focus rings).
+- **Fonts.** No web fonts. `--font-sans` and `--font-mono` in
+  `admin-ui/src/styles.css` are system font stacks, so the admin UI
+  requests no font files and the CSP needs no font host or `font-src`.
+  The docs site (`apps/docs/src/styles/theme.css`) and the starter
+  (`src/styles/global.css`) define the same stacks in their own tokens.
 - **Light and dark mode.** The default follows `prefers-color-scheme`. The
   header switch (system, light, dark) saves the choice in `localStorage`
   (`goodnight-web.admin.theme`). To avoid a flash of the wrong colors,

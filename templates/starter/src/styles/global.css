@@ -21,9 +21,13 @@
 }
 
 @theme inline {
+  /* Fonts: the visitor's system fonts. The site loads no web fonts. */
   --font-sans:
-    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
-    'BIZ UDPGothic', Meiryo, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans',
+    'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', Meiryo,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
   --color-background: var(--site-background);
   --color-foreground: var(--site-foreground);

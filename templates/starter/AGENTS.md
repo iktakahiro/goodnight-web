@@ -21,7 +21,7 @@ Cloudflare Worker with one D1 database.
   privacy policy (`pages/`). Each language has its own folder (`ja/`, `en/`).
 - `src/components/`, `src/layouts/`, `src/features/`: the look of the site,
   including the contact form layout and labels.
-- `src/styles/`: CSS. See "Site colors" below.
+- `src/styles/`: CSS. See "Site colors" and "Fonts" below.
 - `public/`: images, the favicon, and other files served as they are.
 
 ## Site colors
@@ -45,6 +45,18 @@ these colors and you cannot change it here.
   the result with a contrast checker before you finish.
 - Use the color names (`bg-primary`, `text-muted`, `border-border`) in
   classes, not hex values, so a color change in one place reaches every page.
+
+## Fonts
+
+The site uses the fonts installed on the visitor's device and loads no web
+fonts. The font stacks are defined once, in `src/styles/global.css`
+(`@theme inline`): `--font-sans` for all text and `--font-mono` for code.
+Change them there, and use the `font-sans` and `font-mono` classes instead of
+writing `font-family` in components.
+
+Do not add web fonts (font packages, font files in `public/`, or links to a
+font service) unless the site owner asks for them. A font service receives a
+request from every visitor, and the privacy policy would need to mention it.
 
 ## What you must not change
 

@@ -82,6 +82,7 @@ Setup closes once the first admin exists.
 
 - Company details, menu, and colors: `site.config.ts`. See
   [Change the site colors](#change-the-site-colors).
+- Fonts: `src/styles/global.css`. See [Fonts](#fonts).
 - Pages: `src/pages/`
 - News and blog posts: `src/content/news/` and `src/content/blog/`
 - Privacy policy: `src/content/pages/`. It is a template, not legal advice.
@@ -113,6 +114,13 @@ colors with a contrast checker.
 
 These colors apply only to your site. The admin screen (`/admin`) comes with
 `@goodnight-web/server` and keeps its own theme.
+
+### Fonts
+
+The site loads no web fonts. It uses the fonts installed on the visitor's
+device. The font lists are `--font-sans` (all text) and `--font-mono` (code)
+in `src/styles/global.css`; change them there to change the fonts on every
+page. If you add a web font service, mention it in the privacy policy.
 
 Check your changes before you push:
 

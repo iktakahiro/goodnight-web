@@ -10,11 +10,13 @@
  * checks the WCAG AA contrast of the main pairs in both modes.
  */
 @theme static {
+  /* System font stacks: the admin UI loads no web fonts. */
   --font-sans:
     system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans',
-    'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Zen Kaku Gothic New',
-    'Yu Gothic UI', Meiryo, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', Meiryo,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
   --color-background: #f5f6fb;
   --color-foreground: #1b1f3f;

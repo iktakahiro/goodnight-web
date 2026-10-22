@@ -3,11 +3,13 @@
 @import 'fumadocs-ui/css/preset.css';
 
 @theme {
+  /* System font stacks: the docs site loads no web fonts. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic',
-    Meiryo, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans',
+    'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', Meiryo,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 /* The project palette: deep navy-violet on light, soft backgrounds. The admin
