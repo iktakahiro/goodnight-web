@@ -48,7 +48,7 @@ const stepIcons = [Globe, Send, Database, Inbox] as const;
 
 /**
  * The top page architecture: a visitor, the four steps inside your own
- * Cloudflare account, you, and the GitHub repository. A violet line runs
+ * Cloudflare account, you, and the GitHub repository. A glowing line runs
  * across the steps once when they scroll into view. Brand names are text in
  * elements with `data-brand`, so that they can become logos later.
  */
@@ -76,6 +76,16 @@ export function LandingArchitecture() {
             initial={{ scaleX: 0 }}
             animate={inView ? { scaleX: 1 } : undefined}
             transition={{ duration: 1.4, ease: [0.65, 0, 0.35, 1] }}
+          />
+          <motion.span
+            className='arch-flow-head'
+            aria-hidden='true'
+            initial={{ x: '-100%', opacity: 0 }}
+            animate={inView ? { x: '0%', opacity: [0, 1, 1, 0] } : undefined}
+            transition={{
+              x: { duration: 1.4, ease: [0.65, 0, 0.35, 1] },
+              opacity: { duration: 1.9, times: [0, 0.1, 0.72, 1] },
+            }}
           />
           <ol className='arch-steps'>
             {text.steps.map(([title, body, detail], index) => {

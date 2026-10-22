@@ -7,6 +7,7 @@ import { Highlighter } from '../../components/magicui/highlighter';
 import type { PageMetadata } from '../source';
 import { sitePath } from '../paths';
 import { ThemedImage } from './themed-image';
+import { WindowBar } from './window-bar';
 import '../../styles/landing.css';
 
 const copy = {
@@ -73,12 +74,7 @@ function Window({
 }) {
   return (
     <div className={`hero-window ${className}`}>
-      <div className='hero-window-bar' aria-hidden='true'>
-        <i />
-        <i />
-        <i />
-        <span>{address}</span>
-      </div>
+      <WindowBar address={address} />
       {children}
     </div>
   );

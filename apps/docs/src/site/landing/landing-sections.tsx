@@ -1,15 +1,13 @@
 import type { ReactNode } from 'react';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import {
-  ArrowRight,
-  Database,
-  FilePenLine,
-  GitPullRequest,
-  LayoutTemplate,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import appIcon from '../../assets/app-icon.svg';
 import { sitePath } from '../paths';
 import { DeployButton } from './deploy-button';
+import { FeatureVignette, type FeatureVignetteName } from './feature-vignettes';
+import { NightSky } from './night-sky';
 import { ThemedImage } from './themed-image';
+import { WindowBar } from './window-bar';
 
 /** Returns true when the current page is Japanese. */
 function useJapanese(): boolean {
@@ -54,54 +52,67 @@ export function BuiltOn() {
   );
 }
 
-/** A top page section: spacing, a hairline above, and the page width. */
+/**
+ * A top page section: spacing, a hairline above, and the page width.
+ *
+ * @param tone - `night` draws the section as a full-width deep violet band
+ *   with a few stars and a moon, in the light and the dark theme.
+ */
 export function LandingSection({
   id,
+  tone,
   children,
 }: {
   id?: string;
+  tone?: 'night';
   children: ReactNode;
 }) {
   return (
-    <section className='landing-section' id={id}>
+    <section
+      className={
+        tone === 'night' ? 'landing-section landing-night' : 'landing-section'
+      }
+      id={id}
+    >
+      {tone === 'night' ? <NightSky variant='architecture' /> : null}
       <div className='landing-wrap'>{children}</div>
     </section>
   );
 }
 
-/** The four feature cards, two per row on wide screens. */
+/**
+ * The four feature cards as a bento grid: on wide screens the first and the
+ * last card are wider than the two between them.
+ */
 export function FeatureGrid({ children }: { children: ReactNode }) {
   return <div className='feature-grid'>{children}</div>;
 }
 
-const featureIcons = {
-  'file-pen': FilePenLine,
-  database: Database,
-  'git-pull-request': GitPullRequest,
-  'layout-template': LayoutTemplate,
-} as const;
-
 /**
- * One feature card. The children are the lead sentence and an optional
- * {@link FeatureNote}.
+ * One feature card: an illustration above the title, the lead sentence, and
+ * an optional {@link FeatureNote}, all from the children.
  *
- * @param icon - A key of the small icon set used on the top page.
+ * @param visual - The illustration drawn above the title.
+ * @param wide - Spans seven of twelve columns instead of five on wide screens.
  */
 export function Feature({
-  icon,
+  visual,
+  wide = false,
   title,
   children,
 }: {
-  icon: keyof typeof featureIcons;
+  visual: FeatureVignetteName;
+  wide?: boolean;
   title: string;
   children: ReactNode;
 }) {
-  const Icon = featureIcons[icon];
   return (
-    <div className='feature'>
-      <Icon className='feature-icon' aria-hidden='true' />
-      <h3>{title}</h3>
-      {children}
+    <div className={wide ? 'feature feature-wide' : 'feature'}>
+      <FeatureVignette name={visual} />
+      <div className='feature-body'>
+        <h3>{title}</h3>
+        {children}
+      </div>
     </div>
   );
 }
@@ -133,12 +144,7 @@ export function AdminShowcase({ children }: { children: ReactNode }) {
     <div className='admin-showcase'>
       <div className='admin-showcase-text'>{children}</div>
       <div className='landing-shot'>
-        <div className='hero-window-bar' aria-hidden='true'>
-          <i />
-          <i />
-          <i />
-          <span>example.com/admin</span>
-        </div>
+        <WindowBar address='example.com/admin' />
         <ThemedImage
           path={`images/admin/inquiry-detail-${japanese ? 'ja' : 'en'}`}
           alt={
@@ -155,14 +161,24 @@ export function AdminShowcase({ children }: { children: ReactNode }) {
 }
 
 /**
- * The closing call to action: the heading and paragraph from the children,
- * then the documentation link and the Deploy to Cloudflare button.
+ * The closing call to action, drawn as a calm night band: the app icon, the
+ * heading and paragraph from the children, then the documentation link and
+ * the Deploy to Cloudflare button.
  */
 export function ClosingCta({ children }: { children: ReactNode }) {
   const japanese = useJapanese();
   return (
-    <section className='closing-cta'>
+    <section className='closing-cta landing-night'>
+      <NightSky variant='closing' />
       <div className='landing-wrap'>
+        <img
+          className='closing-mark'
+          src={appIcon}
+          alt=''
+          width={64}
+          height={64}
+          loading='lazy'
+        />
         {children}
         <div className='landing-actions closing-actions'>
           <a

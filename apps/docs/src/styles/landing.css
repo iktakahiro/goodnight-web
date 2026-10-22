@@ -20,11 +20,15 @@
   --landing-button-text: #ffffff;
   --landing-shadow:
     0 1px 2px rgb(20 17 28 / 6%), 0 8px 24px -12px rgb(20 17 28 / 18%);
-  --landing-shot-shadow:
-    0 1px 2px rgb(20 17 28 / 8%), 0 24px 48px -20px rgb(20 17 28 / 28%);
   --landing-glow: rgb(116 59 196 / 10%);
   --landing-button-shadow:
     0 1px 0 rgb(255 255 255 / 15%) inset, 0 6px 16px -6px rgb(116 59 196 / 60%);
+  --landing-card-shadow:
+    0 1px 2px rgb(20 17 28 / 5%), 0 18px 36px -24px rgb(52 16 101 / 30%);
+  --landing-shot-shadow:
+    0 0 0 1px rgb(20 17 28 / 3%), 0 2px 4px rgb(20 17 28 / 5%),
+    0 32px 64px -28px rgb(52 16 101 / 38%);
+  --landing-vignette-bg: #fbfafd;
 }
 .dark {
   --landing-accent-strong: #d3c4fd;
@@ -36,13 +40,92 @@
   --landing-wash: #1c1726;
   --landing-button-text: #1a1030;
   --landing-shadow: 0 1px 2px rgb(0 0 0 / 50%);
-  --landing-shot-shadow: 0 24px 60px -20px rgb(0 0 0 / 90%);
+  --landing-shot-shadow:
+    0 0 0 1px rgb(255 255 255 / 3%), 0 32px 64px -24px rgb(0 0 0 / 90%);
+  --landing-card-shadow: 0 18px 36px -24px rgb(0 0 0 / 90%);
+  --landing-vignette-bg: #131316;
   --landing-glow: rgb(191 171 252 / 8%);
   --landing-button-shadow:
     0 1px 0 rgb(255 255 255 / 25%) inset, 0 6px 14px -8px rgb(0 0 0 / 70%);
 }
 html:has(.landing):not(.dark) {
   --color-fd-background: var(--landing-bg);
+}
+/* The night bands (the architecture section and the closing call to
+   action): a deep violet derived from the primary #743bc4, the same in both
+   themes, with light lines and lavender accents. */
+.landing-night {
+  --landing-accent: #c9b6ff;
+  --landing-accent-strong: #e2d8ff;
+  --landing-ink: #f3efff;
+  --landing-text: #ddd5f3;
+  --landing-muted: #b9addb;
+  --landing-bg: #1b0f33;
+  --landing-soft: rgb(226 216 255 / 5%);
+  --landing-line: rgb(226 216 255 / 14%);
+  --landing-line-strong: rgb(226 216 255 / 30%);
+  --landing-line-soft: rgb(226 216 255 / 10%);
+  --landing-button-text: #1c123b;
+  --landing-button-shadow:
+    0 1px 0 rgb(255 255 255 / 40%) inset, 0 8px 20px -10px rgb(0 0 0 / 70%);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1b0f33, #24124a);
+  color: var(--landing-text);
+  color-scheme: dark;
+}
+.dark .landing-night {
+  background: linear-gradient(180deg, #170c2c, #20103f);
+  box-shadow:
+    0 1px 0 rgb(191 171 252 / 10%) inset,
+    0 -1px 0 rgb(191 171 252 / 10%) inset;
+}
+.landing-night ::selection {
+  background: rgb(201 182 255 / 35%);
+  color: #ffffff;
+}
+.night-sky {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+}
+.night-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #efe9ff;
+  opacity: 0.55;
+}
+.night-star-m {
+  width: 3px;
+  height: 3px;
+  opacity: 0.8;
+  box-shadow: 0 0 6px 1px rgb(226 216 255 / 35%);
+}
+/* Side stars sit in the gutters beside the page width; narrower screens
+   have no gutters, so they are not drawn there. */
+@media (max-width: 1239px) {
+  .night-sky-architecture .night-star-side {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .night-star-side {
+    display: none;
+  }
+}
+.night-moon {
+  position: absolute;
+  top: 4.25rem;
+  right: max(2rem, calc(50% - 548px));
+  width: 30px;
+  height: 30px;
+  fill: #e4d8fb;
+  filter: drop-shadow(0 0 14px rgb(228 216 251 / 45%));
+  transform: rotate(-12deg);
 }
 
 .landing {
@@ -63,10 +146,14 @@ html:has(.landing):not(.dark) {
   font-feature-settings: 'palt';
   text-wrap: balance;
 }
-/* Japanese: break at phrase boundaries and avoid one-character last lines. */
+/* Japanese: break at phrase boundaries and avoid one-character last lines.
+   Headings keep the balanced wrap set above. */
 .landing :is(h1, h2, h3, p, li, small),
 .site-footer p {
   word-break: auto-phrase;
+}
+.landing :is(p, li, small),
+.site-footer p {
   text-wrap: pretty;
 }
 .landing code {
@@ -82,6 +169,9 @@ html:has(.landing):not(.dark) {
     color 150ms,
     background-color 150ms,
     border-color 150ms;
+}
+.landing ::selection {
+  background: color-mix(in oklab, var(--landing-accent) 22%, transparent);
 }
 .landing :focus-visible {
   outline: 2px solid var(--landing-accent);
@@ -126,23 +216,25 @@ html:has(.landing):not(.dark) {
   text-wrap: balance;
 }
 .hero-title {
-  margin: 0.875rem 0 1.25rem;
-  font-size: clamp(2.25rem, 5.2vw, 3.75rem);
+  margin: 1rem 0 1.5rem;
+  font-size: clamp(2.5rem, 6vw, 4.75rem);
   font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
 }
 .hero-title:lang(ja) {
-  letter-spacing: 0;
+  font-size: clamp(2.25rem, 5.4vw, 4.25rem);
+  line-height: 1.24;
+  letter-spacing: -0.01em;
 }
 .hero-line {
   display: block;
 }
 .hero-tagline {
-  max-width: 40em;
-  margin: 0 auto 0.5rem;
+  max-width: 36em;
+  margin: 0 auto 0.625rem;
   color: var(--landing-muted);
-  font-size: 1.125rem;
+  font-size: 1.1875rem;
   line-height: 1.75;
 }
 .hero-gloss {
@@ -273,26 +365,43 @@ html:has(.landing):not(.dark) {
 .hero-window {
   position: absolute;
 }
-.hero-window-bar {
-  display: flex;
+.window-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 9px) minmax(0, 1fr) 51px;
   align-items: center;
   gap: 6px;
-  height: 30px;
+  height: 34px;
   padding: 0 12px;
   border-bottom: 1px solid var(--landing-line-soft);
   background: var(--landing-soft);
 }
-.hero-window-bar i {
+.window-bar i {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--landing-line);
+  background: var(--landing-line-strong);
+  opacity: 0.7;
 }
-.hero-window-bar span {
-  margin-left: 10px;
+.window-bar span {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 12px;
+  border: 1px solid var(--landing-line-soft);
+  border-radius: 6px;
+  background: var(--landing-bg);
   color: var(--landing-muted);
   font-family: var(--font-mono);
   font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.window-bar svg {
+  flex: none;
+  width: 10px;
+  height: 10px;
 }
 .hero-window img {
   display: block;
@@ -431,7 +540,9 @@ html:has(.landing):not(.dark) {
 .landing-section + .landing-section {
   padding-top: 5.5rem;
 }
-.landing-section + .landing-section > .landing-wrap {
+.landing-section
+  + .landing-section:not(.landing-night, .landing-night + *)
+  > .landing-wrap {
   padding-top: 5.5rem;
   background: linear-gradient(
       var(--landing-line-soft),
@@ -440,57 +551,95 @@ html:has(.landing):not(.dark) {
     top / calc(100% - 4rem) 1px no-repeat;
 }
 .landing-section h2 {
-  max-width: 24em;
-  margin: 0 0 1rem;
-  font-size: 2.375rem;
-  font-weight: 750;
-  line-height: 1.3;
-  letter-spacing: -0.015em;
+  max-width: 22em;
+  margin: 0 0 1.125rem;
+  font-size: clamp(2rem, 3.6vw, 3rem);
+  font-weight: 780;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
 }
 .landing-section h2:lang(ja) {
-  letter-spacing: 0;
+  font-size: clamp(1.875rem, 3.2vw, 2.625rem);
+  line-height: 1.32;
+  letter-spacing: -0.01em;
 }
 .landing-section > .landing-wrap > p {
   max-width: 40em;
-  margin: 0 0 2.75rem;
+  margin: 0 0 3rem;
   color: var(--landing-muted);
-  font-size: 1rem;
+  font-size: 1.0625rem;
   line-height: 1.8;
 }
+/* The architecture band: full width, with room above and below. The section
+   after it needs no hairline. */
+.landing-section.landing-night {
+  margin-top: 7rem;
+  padding-block: 6.5rem 7rem;
+}
+.landing-night + .landing-section {
+  padding-top: 7rem;
+}
 
-/* Features */
+/* Features: a bento grid. Each card has a small illustration in a tinted
+   well above its text (feature-vignettes.tsx). */
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 1rem;
 }
 .feature {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-content: start;
-  column-gap: 10px;
-  padding: 1.75rem 1.875rem;
+  display: flex;
+  grid-column: span 5;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--landing-line);
   border-radius: 12px;
   background: var(--landing-bg);
+  transition:
+    border-color 200ms,
+    box-shadow 200ms;
 }
-.feature-icon {
-  width: 18px;
-  height: 18px;
-  margin-top: 0.3em;
-  color: var(--landing-muted);
+.feature-wide {
+  grid-column: span 7;
+}
+.feature:hover {
+  border-color: var(--landing-line-strong);
+  box-shadow: var(--landing-card-shadow);
+}
+.feature-visual {
+  display: grid;
+  place-items: center;
+  height: 232px;
+  padding: 1.75rem 1.5rem;
+  overflow: hidden;
+  border-bottom: 1px solid var(--landing-line-soft);
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      color-mix(in oklab, var(--landing-accent) 6%, transparent),
+      transparent 70%
+    ),
+    var(--landing-soft);
+}
+.feature-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 1.625rem 1.875rem 1.875rem;
 }
 .feature h3 {
   margin: 0 0 0.625rem;
-  font-size: 1.1875rem;
-  font-weight: 700;
-  line-height: 1.45;
+  font-size: 1.3125rem;
+  font-weight: 750;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
 }
-.feature > :not(.feature-icon, h3) {
-  grid-column: 1 / -1;
+.feature h3:lang(ja) {
+  font-size: 1.25rem;
+  letter-spacing: 0;
 }
-.feature > p {
-  margin: 0 0 0.625rem;
+.feature-body > p {
+  margin: 0 0 0.75rem;
   font-size: 0.9375rem;
   line-height: 1.8;
 }
@@ -513,8 +662,283 @@ html:has(.landing):not(.dark) {
   text-decoration-thickness: 2px;
 }
 .feature .deploy-button {
+  align-self: flex-start;
+  margin-top: 1rem;
+}
+
+/* Vignettes: small, still UI fragments. Shared frame first. */
+.vignette {
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--landing-line);
+  border-radius: 10px;
+  background: var(--landing-bg);
+  box-shadow: var(--landing-card-shadow);
+  color: var(--landing-text);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.feature:hover .vignette {
+  transform: translateY(-3px);
+}
+.vignette svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+.vignette :is(code, time, [data-brand]) {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.vignette p {
+  margin: 0;
+}
+.vignette ul,
+.vignette ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Files: an editor with two tabs and an added news file. */
+.vignette-editor {
+  max-width: 480px;
+  overflow: hidden;
+}
+.vignette-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--landing-line-soft);
+  background: var(--landing-soft);
+}
+.vignette-tabs span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-right: 1px solid var(--landing-line-soft);
+  color: var(--landing-muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.vignette-tabs .is-active {
+  margin-bottom: -1px;
+  background: var(--landing-bg);
+  box-shadow: 0 -2px 0 var(--landing-accent) inset;
+  color: var(--landing-ink);
+}
+.vignette-path {
+  padding: 8px 14px 2px;
+  overflow: hidden;
+  color: var(--landing-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vignette-code {
+  padding: 4px 0 10px;
+}
+.vignette-code li {
+  display: grid;
+  grid-template-columns: 30px 14px minmax(0, 1fr);
+  align-items: baseline;
+  margin-inline: 6px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--landing-accent) 8%, transparent);
+}
+.vignette-code li + li {
+  margin-top: 1px;
+}
+.vignette-code-number {
+  padding-right: 8px;
+  color: var(--landing-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.7;
+}
+.vignette-code-sign {
+  color: var(--landing-accent);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.vignette-code code {
+  overflow: hidden;
+  color: var(--landing-ink);
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Data: inquiry rows in the site's own database. */
+.vignette-data {
+  max-width: 360px;
+  padding: 6px;
+}
+.vignette-data-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px 9px;
+  color: var(--landing-ink);
+}
+.vignette-data-head svg {
+  width: 22px;
+  height: 22px;
+  padding: 5px;
+  border-radius: 6px;
+  background: var(--landing-accent);
+  color: var(--landing-button-text);
+}
+.vignette-data-head [data-brand] {
+  margin-left: auto;
+  padding: 1px 7px;
+  border: 1px solid var(--landing-line);
+  border-radius: 5px;
+  color: var(--landing-muted);
+}
+.vignette-data li {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 9px 10px;
+  border-top: 1px solid var(--landing-line-soft);
+}
+.vignette-data li i {
+  grid-row: 1 / 3;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.vignette-data li.is-unread {
+  border-radius: 6px;
+  border-color: transparent;
+  background: color-mix(in oklab, var(--landing-accent) 8%, transparent);
+}
+.vignette-data li.is-unread i {
+  background: var(--landing-accent);
+}
+.vignette-data li b {
+  color: var(--landing-ink);
+  font-weight: 700;
+}
+.vignette-data li span {
+  grid-column: 2;
+  overflow: hidden;
+  color: var(--landing-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vignette-data li time {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  color: var(--landing-muted);
+}
+
+/* Pull request: a Dependabot update with the update check result. */
+.vignette-pr {
+  display: grid;
+  max-width: 360px;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+.vignette-pr-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--landing-ink);
+  font-size: 12.5px;
+}
+.vignette-pr-title svg {
+  margin-top: 2px;
+  color: var(--landing-accent);
+}
+.vignette-pr-author {
+  margin-left: 21px !important;
+  color: var(--landing-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.vignette-pr-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px !important;
+  padding: 7px 10px;
+  border: 1px solid var(--landing-line-soft);
+  border-radius: 6px;
+  background: var(--landing-soft);
+  color: var(--landing-ink);
+  font-weight: 600;
+}
+.vignette-pr-check svg {
+  color: var(--landing-accent);
+}
+.vignette-pr-merge {
+  display: inline-flex;
+  align-items: center;
   justify-self: start;
-  margin-top: 0.875rem;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  background: var(--landing-accent);
+  box-shadow: var(--landing-button-shadow);
+  color: var(--landing-button-text);
+  font-weight: 700;
+}
+
+/* Starter kit: the top of the repository. */
+.vignette-tree {
+  max-width: 400px;
+  padding: 10px 14px;
+}
+.vignette-tree li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+.vignette-tree li[data-depth='1'] {
+  margin-left: 22px;
+}
+.vignette-tree li[data-depth='1']::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: -15px;
+  width: 1px;
+  background: var(--landing-line);
+}
+.vignette-tree li svg {
+  color: var(--landing-muted);
+}
+.vignette-tree li:has(svg.lucide-folder) svg {
+  color: var(--landing-accent);
+}
+.vignette-tree code {
+  color: var(--landing-ink);
+}
+.vignette-tree span {
+  overflow: hidden;
+  color: var(--landing-muted);
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Architecture */
@@ -563,6 +987,7 @@ html:has(.landing):not(.dark) {
   padding: 6px 14px 14px;
   border: 1.5px dashed var(--landing-line-strong);
   border-radius: 12px;
+  background: var(--landing-soft);
 }
 .arch-account-label {
   margin: 2px 4px 12px;
@@ -578,8 +1003,37 @@ html:has(.landing):not(.dark) {
   z-index: 2;
   inset: 0 0 auto;
   height: 2px;
-  background: var(--landing-accent);
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--landing-accent) 45%, transparent),
+    var(--landing-accent-strong)
+  );
+  box-shadow: 0 0 12px 1px
+    color-mix(in oklab, var(--landing-accent) 70%, transparent);
   transform-origin: left;
+}
+/* The bright head of the flow line. It travels with the line once and fades;
+   without scripting or with reduced motion it is not drawn. */
+.arch-flow-head {
+  position: absolute;
+  z-index: 3;
+  inset: -3px 0 auto;
+  height: 8px;
+  pointer-events: none;
+}
+.arch-flow-head::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 0 8px 2px var(--landing-accent),
+    0 0 24px 6px color-mix(in oklab, var(--landing-accent) 50%, transparent);
 }
 .arch-steps {
   display: grid;
@@ -627,7 +1081,14 @@ html:has(.landing):not(.dark) {
 }
 .arch-step-own :is(.arch-step-number, .arch-step-icon) {
   color: var(--landing-accent);
-  transition: color 300ms 800ms;
+  transition:
+    color 300ms 800ms,
+    filter 300ms 800ms;
+}
+.arch-step-own .arch-step-icon {
+  filter: drop-shadow(
+    0 0 8px color-mix(in oklab, var(--landing-accent) 70%, transparent)
+  );
 }
 /* Before the steps scroll into view, the own-database step waits for the
    line. Without scripting or with reduced motion, it shows the final state. */
@@ -636,6 +1097,7 @@ html:has(.landing):not(.dark) {
     .arch-step-own
     :is(.arch-step-number, .arch-step-icon) {
     color: var(--landing-muted);
+    filter: none;
   }
 }
 .arch-repo {
@@ -647,6 +1109,7 @@ html:has(.landing):not(.dark) {
   padding: 12px 16px;
   border: 1px solid var(--landing-line);
   border-radius: 10px;
+  background: var(--landing-soft);
   color: var(--landing-muted);
   font-size: 0.84rem;
 }
@@ -665,8 +1128,8 @@ html:has(.landing):not(.dark) {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 0 24px;
-  margin-top: 2.5rem;
-  padding: 1.75rem 1.875rem;
+  margin-top: 3.5rem;
+  padding: 2.25rem 0 0;
   border-top: 1px solid var(--landing-line);
   scroll-margin-top: 5rem;
 }
@@ -691,6 +1154,11 @@ html:has(.landing):not(.dark) {
 }
 
 /* Admin */
+.admin-showcase h2,
+.admin-showcase h2:lang(ja) {
+  font-size: clamp(1.875rem, 2.9vw, 2.375rem);
+  line-height: 1.25;
+}
 .admin-showcase {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.6fr);
@@ -737,24 +1205,37 @@ html:has(.landing):not(.dark) {
   object-position: 50% 0;
 }
 
-/* Closing call to action */
+/* Closing call to action: the second night band, calm and centered. */
 .closing-cta {
-  margin-top: 7rem;
-  padding-block: 5.5rem 6rem;
-  border-top: 1px solid var(--landing-line-soft);
-  background: var(--landing-soft);
+  margin-top: 8rem;
+  padding-block: 6rem 6.5rem;
   text-align: center;
+}
+.closing-mark {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.75rem;
+  border-radius: 15px;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 10%),
+    0 16px 36px -12px rgb(0 0 0 / 70%);
 }
 .closing-cta h2 {
   margin: 0 0 1rem;
-  font-size: 2.375rem;
-  font-weight: 750;
-  line-height: 1.3;
+  font-size: clamp(2rem, 3.6vw, 3rem);
+  font-weight: 780;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+}
+.closing-cta h2:lang(ja) {
+  font-size: clamp(1.875rem, 3.2vw, 2.625rem);
+  letter-spacing: -0.01em;
 }
 .closing-cta p {
-  margin: 0 0 2rem;
+  margin: 0 0 2.25rem;
   color: var(--landing-muted);
-  font-size: 0.9375rem;
+  font-size: 1rem;
   text-wrap: balance;
 }
 .closing-actions {
@@ -768,6 +1249,10 @@ html:has(.landing):not(.dark) {
   border-top: 1px solid var(--landing-line-soft);
   color: var(--landing-muted);
   font-size: 0.8125rem;
+}
+/* The closing night band already separates the footer. */
+.landing:has(.closing-cta) + .site-footer {
+  border-top: 0;
 }
 .site-footer-row {
   display: flex;
@@ -817,6 +1302,12 @@ html:has(.landing):not(.dark) {
     width: 68px;
     height: 68px;
     border-radius: 15px;
+  }
+}
+@media (max-width: 900px) {
+  .feature,
+  .feature-wide {
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 980px) {
@@ -921,10 +1412,10 @@ html:has(.landing):not(.dark) {
     transform: scale(1.25) translateX(-8%);
     transform-origin: 0 0;
   }
-  .hero-window-bar {
+  .window-bar {
     height: 22px;
   }
-  .hero-window-bar span {
+  .window-bar span {
     display: none;
   }
   .hero-label {
@@ -961,29 +1452,49 @@ html:has(.landing):not(.dark) {
   }
   .landing-section,
   .landing-section + .landing-section,
-  .landing-section + .landing-section > .landing-wrap {
+  .landing-section + .landing-section > .landing-wrap,
+  .landing-night + .landing-section {
     padding-top: 4rem;
   }
   .landing-section + .landing-section > .landing-wrap {
     background-size: calc(100% - 2.25rem) 1px;
   }
+  .landing-section.landing-night {
+    margin-top: 4.5rem;
+    padding-block: 4rem 4.5rem;
+  }
+  .landing-section.landing-night > .landing-wrap {
+    padding-top: 0;
+  }
+  .night-moon {
+    top: 1.5rem;
+    right: 1.25rem;
+    width: 24px;
+    height: 24px;
+  }
   .landing-section h2,
   .admin-showcase h2,
-  .closing-cta h2 {
+  .closing-cta h2,
+  .landing-section h2:lang(ja),
+  .closing-cta h2:lang(ja) {
     margin-bottom: 0.75rem;
-    font-size: 1.625rem;
+    font-size: 1.75rem;
+    line-height: 1.3;
   }
   .landing-section > .landing-wrap > p {
     margin-bottom: 2rem;
     font-size: 0.9375rem;
   }
-  .feature-grid {
-    grid-template-columns: minmax(0, 1fr);
+  .feature-visual {
+    height: auto;
+    min-height: 196px;
+    padding: 1.5rem 1rem;
   }
-  .feature {
-    padding: 1.5rem 1.375rem;
+  .feature-body {
+    padding: 1.375rem 1.375rem 1.5rem;
   }
-  .feature h3 {
+  .feature h3,
+  .feature h3:lang(ja) {
     font-size: 1.125rem;
   }
   .arch-steps {
@@ -1001,7 +1512,13 @@ html:has(.landing):not(.dark) {
   }
   .closing-cta {
     margin-top: 4.5rem;
-    padding-block: 3.5rem 4rem;
+    padding-block: 4rem 4.5rem;
+  }
+  .closing-mark {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 1.25rem;
+    border-radius: 12px;
   }
   .closing-actions {
     align-items: stretch;
@@ -1081,6 +1598,9 @@ html:has(.landing):not(.dark) {
     filter: none !important;
     transform: none !important;
   }
+  .arch-flow-head {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .blur-fade,
@@ -1088,6 +1608,16 @@ html:has(.landing):not(.dark) {
     opacity: 1 !important;
     filter: none !important;
     transform: none !important;
+  }
+  .arch-flow-head {
+    display: none;
+  }
+  .feature,
+  .vignette {
+    transition: none;
+  }
+  .feature:hover .vignette {
+    transform: none;
   }
   .highlighter-mark path {
     animation: none;
