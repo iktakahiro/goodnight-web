@@ -615,6 +615,15 @@ the Worker a token that can write to GitHub.
 - `bun run screenshots <dir>` in `packages/server` takes screenshots of the
   admin UI in Japanese and English with fictional sample inquiries, using the
   same local setup.
+- `bun run screenshots:docs` in `packages/server` regenerates the admin
+  screen figures of the documentation site with the same local setup and
+  samples (`e2e/samples.ts`). It writes
+  `apps/docs/public/images/admin/<screen>-<ja|en>-<light|dark>.webp` and the
+  sizes in `apps/docs/src/site/admin-screens.json`, which the MDX component
+  `<AdminScreen name="..." alt="..." caption="..." />` reads. The browser
+  clock and the sample times are fixed, so the images change only when the
+  admin UI changes. Run it after a visible admin UI change and commit the
+  images with the change. Port: `E2E_PORT` (default 8791).
 - `bun test` also runs the admin UI's unit tests (`admin-ui/src/**/*.test.ts`):
   language detection, date and number formatting, routes and the `next`
   parameter, list query parsing, and the message catalogs.

@@ -26,6 +26,7 @@
     "test:e2e": "bun e2e/run.ts",
     "deploy:check": "wrangler deploy --dry-run -c e2e/wrangler.jsonc --outdir dist/dry-run",
     "screenshots": "bun e2e/screenshots.ts",
+    "screenshots:docs": "bun e2e/docs-screenshots.ts",
     "db:generate": "drizzle-kit generate",
     "auth:schema": "auth generate --config scripts/auth-schema.config.ts --yes --output",
     "db:check": "bun scripts/check-migrations.ts"
