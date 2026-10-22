@@ -1,0 +1,16 @@
+---
+title: How it works
+description: One page for each part of goodnight-web, with what it does and why it is built that way.
+---
+
+<Callout type='info'>
+  These pages describe the design from the product requirements. Code excerpts
+  will be added once the server package lands.
+</Callout>
+
+- [Contact form protection](/docs/how-it-works/contact-protection/): Turnstile verified on the server, a honeypot field, and the Rate Limiting binding.
+- [Passkey sign-in](/docs/how-it-works/passkeys/): why admins use passkeys and not passwords.
+- [First admin setup](/docs/how-it-works/first-admin/): how `SETUP_TOKEN` and `ADMIN_EMAILS` stop a stranger from becoming the first admin.
+- [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/): how the retention period works with no scheduled job.
+- [Slack notifications](/docs/how-it-works/notifications/): a short message after the reply, with no personal data.
+- [No raw IP addresses](/docs/how-it-works/ip-hashing/): why only an HMAC of the IP address is stored.

@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "goodnight-web-docs",
+  "compatibility_date": "2026-10-19",
+  // A static-assets-only Worker: there is no `main` script, so no code runs
+  // for any request.
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "force-trailing-slash",
+    "not_found_handling": "404-page",
+  },
+  // No custom domain yet. When one is chosen, add it here, for example
+  // "routes": [{ "pattern": "docs.example.com", "custom_domain": true }],
+  // and build with DOCS_SITE_URL set to the same origin.
+}

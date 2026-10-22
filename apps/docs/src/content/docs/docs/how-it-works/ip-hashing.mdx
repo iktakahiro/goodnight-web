@@ -1,0 +1,21 @@
+---
+title: No raw IP addresses
+description: goodnight-web never stores or logs a visitor's IP address. It stores HMAC-SHA256(ip, IP_HASH_SECRET), which is enough for rate limiting and spotting repeat senders.
+---
+
+<Callout type='info'>
+  Code excerpts will be added once the server package lands.
+</Callout>
+
+## What it does
+
+- For each contact submission, the Worker computes `ip_hash = HMAC-SHA256(ip, IP_HASH_SECRET)`.
+- Only `ip_hash` is stored in D1. The raw IP address is never written to D1 and never logged.
+- The Rate Limiting binding uses `ip_hash` as its key.
+
+## Why it is built this way
+
+- An IP address can identify a person, so storing it adds to the personal data you hold and must protect.
+- The same IP always gives the same `ip_hash`, so you can still limit requests and see that several inquiries came from one sender.
+- A plain SHA-256 of an IP address is easy to reverse, because there are only about four billion IPv4 addresses to try. An HMAC with a secret key cannot be reversed without that key, and the key stays in the Worker.
+- Keep `IP_HASH_SECRET` stable. If you change it, new hashes no longer match old ones.

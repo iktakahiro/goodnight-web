@@ -1,0 +1,9 @@
+{
+  "name": "goodnight-web",
+  "short_name": "goodnight-web",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#fbf9ff",
+  "theme_color": "#fbf9ff",
+  "icons": [{ "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any" }]
+}

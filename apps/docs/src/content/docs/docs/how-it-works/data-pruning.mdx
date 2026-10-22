@@ -1,0 +1,24 @@
+---
+title: Deleting old inquiries without Cron
+description: Inquiries older than the retention period (180 days by default) are deleted during normal requests, at most once an hour, with no scheduled job.
+---
+
+<Callout type='info'>
+  Code excerpts will be added once the server package lands.
+</Callout>
+
+## What it does
+
+- Each inquiry is kept for a retention period, 180 days by default.
+- After a new inquiry is saved, the Worker checks `settings.last_cleanup_at` inside `ctx.waitUntil`. If the last cleanup was more than an hour ago, it deletes inquiries older than the retention period and updates `last_cleanup_at`.
+- Opening the inquiry list in the admin screen runs the same cleanup, so old inquiries are deleted even when no new ones arrive.
+- An index on `created_at` keeps the delete fast.
+- Admins can also delete an inquiry by hand and export inquiries as CSV.
+
+## Why it is built this way
+
+goodnight-web uses no Cron Triggers, so that one Worker and one database are all there is to set up and understand. Old data only needs to be removed eventually, not at an exact time, so doing it during requests that already happen is enough. The once-an-hour limit keeps the extra work small.
+
+The cleanup runs after the reply, so it never slows down or breaks a contact submission.
+
+Deleted rows can still be restored from D1 Time Travel for a while. See [Privacy notes](/docs/privacy/).
