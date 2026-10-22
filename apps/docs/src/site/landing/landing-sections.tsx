@@ -163,7 +163,7 @@ export function AdminShowcase({ children }: { children: ReactNode }) {
 /**
  * The closing call to action, drawn as a calm night band: the full logo, the
  * heading and paragraph from the children, then the same two buttons as
- * the hero: Deploy to Cloudflare and the documentation link.
+ * the hero: the documentation link and Deploy to Cloudflare.
  */
 export function ClosingCta({ children }: { children: ReactNode }) {
   const japanese = useJapanese();
@@ -183,14 +183,14 @@ export function ClosingCta({ children }: { children: ReactNode }) {
         />
         {children}
         <div className='landing-actions closing-actions'>
-          <DeployButton />
           <a
-            className='landing-button secondary'
+            className='landing-button primary'
             href={sitePath(japanese ? 'ja/docs/' : 'docs/')}
           >
             <BookOpen aria-hidden='true' />
             {japanese ? 'ドキュメントを読む' : 'Read the docs'}
           </a>
+          <DeployButton />
         </div>
       </div>
     </section>

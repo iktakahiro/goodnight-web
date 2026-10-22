@@ -94,7 +94,7 @@ function Window({
 
 /**
  * The top page hero: the eyebrow, the title with its underlined phrase, the
- * tagline, the two entry points (Deploy to Cloudflare and the docs), and the website and admin screenshots. Text is never animated, so the prerendered HTML shows it.
+ * tagline, the two entry points (the docs and Deploy to Cloudflare), and the website and admin screenshots. Text is never animated, so the prerendered HTML shows it.
  */
 export function LandingHero({ page }: { page: PageMetadata }) {
   const japanese = page.slug === 'ja';
@@ -118,14 +118,14 @@ export function LandingHero({ page }: { page: PageMetadata }) {
           {text.gloss} <a href='#cloudflare'>{text.whatIsCloudflare}</a>
         </p>
         <div className='landing-actions'>
-          <DeployButton />
           <a
-            className='landing-button secondary'
+            className='landing-button primary'
             href={sitePath(`${prefix}docs/`)}
           >
             <BookOpen aria-hidden='true' />
             {text.docs}
           </a>
+          <DeployButton />
         </div>
         <div className='hero-stage' role='group' aria-label={text.stage}>
           <BlurFade
