@@ -55,13 +55,17 @@ passkey({
       }
 ```
 
-The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate (a running instance of the Worker). Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. The cache is keyed by the `env` object and the origin, so a new set of bindings gets a new instance:
+The Better Auth instance is built from the Worker's bindings when a request needs it, and reused for later requests in the same isolate (a running instance of the Worker). Building it costs about 5 ms of CPU, so building it on every request would use half of the free plan's limit. The cache is keyed by the `env` object and the origin, so a new set of bindings gets a new instance. A site has one or two origins, so each `env` keeps at most 8 instances and drops the least recently used one beyond that:
 
 ```ts title="packages/server/src/features/auth/auth.ts"
+export const MAX_AUTH_INSTANCES_PER_ENV = 8;
+
 // Building betterAuth() costs about 5 ms of CPU, close to the free plan's
 // 10 ms limit, so instances are reused within an isolate. They are keyed by
 // the env object (a new env means new bindings or secrets) and by origin
-// (passkeys are bound to the hostname). See docs/decisions/0001.
+// (passkeys are bound to the hostname). See docs/decisions/0001. A Map keeps
+// insertion order, so re-inserting on use makes the first key the least
+// recently used.
 const cache = new WeakMap<GoodnightEnv, Map<string, GoodnightAuth>>();
 ```
 
@@ -73,10 +77,16 @@ export const getAuth = (env: GoodnightEnv, origin: string): GoodnightAuth => {
     cache.set(env, byOrigin);
   }
   let auth = byOrigin.get(origin);
-  if (!auth) {
+  if (auth) {
+    byOrigin.delete(origin);
+  } else {
     auth = buildAuth(env, origin);
-    byOrigin.set(origin, auth);
+    for (const oldest of byOrigin.keys()) {
+      if (byOrigin.size < MAX_AUTH_INSTANCES_PER_ENV) break;
+      byOrigin.delete(oldest);
+    }
   }
+  byOrigin.set(origin, auth);
   return auth;
 };
 ```

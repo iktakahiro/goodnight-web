@@ -55,13 +55,17 @@ passkey({
       }
 ```
 
-Better Auth のインスタンスは、必要になったときに Worker の binding から作り、同じ isolate（Worker の実行環境）の後のリクエストでも使い回します。作るのに CPU を約 5 ms 使うので、毎回作ると無料プランの上限の半分を使ってしまいます。キャッシュは `env` オブジェクトとオリジンをキーにするので、binding が変われば新しいインスタンスを作ります。
+Better Auth のインスタンスは、必要になったときに Worker の binding から作り、同じ isolate（Worker の実行環境）の後のリクエストでも使い回します。作るのに CPU を約 5 ms 使うので、毎回作ると無料プランの上限の半分を使ってしまいます。キャッシュは `env` オブジェクトとオリジンをキーにするので、binding が変われば新しいインスタンスを作ります。サイトのオリジンは 1 つか 2 つなので、`env` ごとに保持するのは最大 8 個までで、それを超えると最後に使われてから最も時間がたったものを捨てます。
 
 ```ts title="packages/server/src/features/auth/auth.ts"
+export const MAX_AUTH_INSTANCES_PER_ENV = 8;
+
 // Building betterAuth() costs about 5 ms of CPU, close to the free plan's
 // 10 ms limit, so instances are reused within an isolate. They are keyed by
 // the env object (a new env means new bindings or secrets) and by origin
-// (passkeys are bound to the hostname). See docs/decisions/0001.
+// (passkeys are bound to the hostname). See docs/decisions/0001. A Map keeps
+// insertion order, so re-inserting on use makes the first key the least
+// recently used.
 const cache = new WeakMap<GoodnightEnv, Map<string, GoodnightAuth>>();
 ```
 
@@ -73,10 +77,16 @@ export const getAuth = (env: GoodnightEnv, origin: string): GoodnightAuth => {
     cache.set(env, byOrigin);
   }
   let auth = byOrigin.get(origin);
-  if (!auth) {
+  if (auth) {
+    byOrigin.delete(origin);
+  } else {
     auth = buildAuth(env, origin);
-    byOrigin.set(origin, auth);
+    for (const oldest of byOrigin.keys()) {
+      if (byOrigin.size < MAX_AUTH_INSTANCES_PER_ENV) break;
+      byOrigin.delete(oldest);
+    }
   }
+  byOrigin.set(origin, auth);
   return auth;
 };
 ```
