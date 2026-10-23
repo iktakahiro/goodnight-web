@@ -198,8 +198,8 @@ The SQL text is the same for every search term, page, and page size. Only the pa
 
 - All secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`, `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL`) are Worker secrets.
 - Secrets are never sent to the browser and never written to D1. The admin screen does not show the Slack webhook URL.
-- `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. A shorter value counts as missing, so setup, sign-in, or the contact form returns 503.
-- While setup is open, `GET /api/setup` lists the names of the settings that are missing or too short (never the values). The admin screen also says when `IP_HASH_SECRET` is too short.
+- `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. A shorter value counts as missing, so setup, sign-in, or the contact form returns 503. A value with fewer than 10 distinct characters, or one short block repeated, is refused the same way. This basic check catches placeholders and hand-typed values; it does not measure randomness, so generate each value with `openssl rand -base64 32`. Nothing in goodnight-web or the Deploy button form generates them for you.
+- While setup is open, `GET /api/setup` lists the names of the settings that are missing, too short, or not random enough (never the values). The admin screen also says when `IP_HASH_SECRET` is too short or not random enough.
 - Better Auth reads a few variables from the Worker's environment by itself. goodnight-web turns its origin and CSRF checks on explicitly, so a variable named `TEST` or `NODE_ENV` cannot turn them off. Sign-in stays off (503) while `BETTER_AUTH_TRUSTED_ORIGINS` or `BETTER_AUTH_SECRETS` is set, because they would add trusted origins or replace `BETTER_AUTH_SECRET`.
 - There is no update button in the admin screen, because it would need a token that can write to your GitHub repository.
 

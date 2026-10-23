@@ -252,12 +252,42 @@ describe('/api/setup', () => {
     },
   );
 
-  test('accepts secrets of exactly 32 characters', async () => {
-    const token = 't'.repeat(MIN_SECRET_LENGTH);
+  test.each([
+    ['one repeated character', 'x'.repeat(40)],
+    ['too few distinct characters', 'abcdefghi'.repeat(4)],
+    ['a repeated block', '0123456789'.repeat(4)],
+    ['a repeated longer block', 'Kq3!zT9#mW1@pL5$'.repeat(2)],
+  ])('fails closed with 503 when a secret is weak: %s', async (_case, weak) => {
+    for (const [name, code] of [
+      ['SETUP_TOKEN', 'setup_unavailable'],
+      ['IP_HASH_SECRET', 'setup_unavailable'],
+      ['BETTER_AUTH_SECRET', 'auth_unavailable'],
+    ] as const) {
+      const worker = createTestWorker({ env: { [name]: weak } });
+      const state = await (await worker.fetch('/api/setup')).json();
+      expect(state).toEqual({
+        configured: false,
+        open: false,
+        problems: [{ name, issue: 'weak' }],
+      });
+      // The value itself is never returned.
+      expect(JSON.stringify(state)).not.toContain(weak);
+      const response = await setup(worker, {
+        token: name === 'SETUP_TOKEN' ? weak : SECRETS.SETUP_TOKEN,
+        email: 'admin@example.com',
+      });
+      expect(response.status).toBe(503);
+      expect((await response.json()).error.code).toBe(code);
+    }
+  });
+
+  test('accepts random secrets of exactly 32 characters', async () => {
+    const token = 'n4Vq8ZrT1xKp0sWb7LmC3yHd6FgJ2eRa';
+    expect(token).toHaveLength(MIN_SECRET_LENGTH);
     const worker = createTestWorker({
       env: {
         SETUP_TOKEN: token,
-        IP_HASH_SECRET: 'i'.repeat(MIN_SECRET_LENGTH),
+        IP_HASH_SECRET: 'Qm7Xc2Lr9VbN4tKs8WpZ1hGd5JfY3aEu',
       },
     });
     const response = await setup(worker, {

@@ -1,6 +1,6 @@
 import type { GoodnightEnv } from '../env.ts';
 import { hmacSha256Hex } from './crypto.ts';
-import { isLongEnough } from './secret-length.ts';
+import { isUsableSecret } from './secret-length.ts';
 
 /** Result of {@link limitByIpHash}. */
 export type IpRateLimitResult = 'allowed' | 'limited' | 'unavailable';
@@ -92,7 +92,7 @@ export const ipRateLimitKey = (
  *
  * @param scope - Key prefix, so each feature has its own counter.
  * @returns `unavailable` when the binding is missing or `IP_HASH_SECRET` is
- *   missing or shorter than `MIN_SECRET_LENGTH`. Callers answer 503 then
+ *   missing, too short, or weak (`secretState`). Callers answer 503 then
  *   (fail closed).
  */
 export const limitByIpHash = async (
@@ -105,7 +105,7 @@ export const limitByIpHash = async (
   if (
     typeof limiter?.limit !== 'function' ||
     !secret ||
-    !isLongEnough(secret)
+    !isUsableSecret(secret)
   ) {
     return 'unavailable';
   }

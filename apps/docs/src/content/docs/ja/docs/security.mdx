@@ -198,8 +198,8 @@ limit ? offset ?
 
 - シークレット（`SETUP_TOKEN`、`ADMIN_EMAILS`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET`、`TURNSTILE_SECRET`、`SLACK_WEBHOOK_URL`）は、すべて Worker のシークレットに置きます。
 - シークレットをブラウザに返すことも、D1 に書くこともありません。Slack の Webhook URL は管理画面にも表示しません。
-- `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は設定されていないものとみなします。それを使うセットアップ、ログイン、問い合わせフォームは 503 を返します。
-- セットアップが完了するまでは、`GET /api/setup` が、足りない設定と短すぎる設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときは、管理画面にも表示します。
+- `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は設定されていないものとみなします。それを使うセットアップ、ログイン、問い合わせフォームは 503 を返します。使われている文字が 10 種類より少ない値や、短い文字列を繰り返しただけの値も同じ扱いです。この確認は、仮の値や手で打った値を見つけるための簡単なもので、ランダムさを測るものではありません。値は `openssl rand -base64 32` で作ってください。goodnight-web も Deploy ボタンの設定フォームも、値を作りません。
+- セットアップが完了するまでは、`GET /api/setup` が、足りない設定、短すぎる設定、ランダムさが足りない設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときや、ランダムさが足りないときは、管理画面にも表示します。
 - Better Auth は、Worker の環境変数のいくつかを自分で読みます。goodnight-web は Origin と CSRF の確認を明示的に有効にしているため、`TEST` や `NODE_ENV` という名前の変数があっても、確認は止まりません。`BETTER_AUTH_TRUSTED_ORIGINS` と `BETTER_AUTH_SECRETS` は、信頼する Origin を増やしたり `BETTER_AUTH_SECRET` を置き換えたりする変数です。どちらかが設定されている間、ログインは 503 を返します。
 - 管理画面に更新ボタンはありません。あなたの GitHub リポジトリに書き込めるトークンが必要になるからです。
 

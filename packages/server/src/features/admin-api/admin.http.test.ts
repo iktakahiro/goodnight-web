@@ -727,6 +727,17 @@ describe('admin API with an admin session', () => {
     expect(JSON.stringify(status)).not.toContain('short-secret');
   });
 
+  test('GET /status reports a weak IP_HASH_SECRET', async () => {
+    worker.env.IP_HASH_SECRET = '0123456789'.repeat(4);
+    const status = await (await get('/api/admin/status')).json();
+    expect(status).toMatchObject({
+      contactAvailable: false,
+      contactMissing: ['IP_HASH_SECRET'],
+      contactTooShort: ['IP_HASH_SECRET'],
+    });
+    expect(JSON.stringify(status)).not.toContain('0123456789');
+  });
+
   test('GET /status reports a missing Turnstile setup', async () => {
     worker.env.TURNSTILE_SECRET = undefined;
     worker.env.TURNSTILE_SITE_KEY = undefined;

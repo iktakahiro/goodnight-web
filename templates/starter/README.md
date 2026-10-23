@@ -41,7 +41,10 @@ computer only. Create the GitHub repository yourself and choose **Private**.
 
 Set these as Worker secrets in the Cloudflare dashboard (or in the deploy
 form). Never write them in a file in this repository. `.dev.vars.example`
-lists them with notes.
+lists them with notes. The deploy form does not generate values for you:
+create each of the three random values with `openssl rand -base64 32`. A
+value that is too short or clearly not random (such as one character
+repeated) keeps the features that use it off.
 
 | Name                 | Required | Purpose                                                                                               |
 | -------------------- | -------- | ----------------------------------------------------------------------------------------------------- |

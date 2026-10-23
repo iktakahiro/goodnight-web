@@ -131,13 +131,13 @@ export interface AdminStatus {
   contactAvailable: boolean;
   /**
    * Names of missing settings that keep the contact API closed. A secret that
-   * is set but too short is listed here and in `contactTooShort`.
+   * is set but too short or weak is listed here and in `contactTooShort`.
    */
   contactMissing: string[];
   /**
    * Names of secrets that are set but shorter than `MIN_SECRET_LENGTH`
-   * characters (`IP_HASH_SECRET`). The contact API stays closed until they
-   * are replaced.
+   * characters or weak (`IP_HASH_SECRET`; see `secretState`). The contact
+   * API stays closed until they are replaced.
    */
   contactTooShort: string[];
   /** `SLACK_WEBHOOK_URL` is set to a Slack incoming webhook URL. */
@@ -238,10 +238,11 @@ export const adminRoutes = new Hono<HonoEnv>()
       contact.ipHashSecret ? null : 'IP_HASH_SECRET',
       contact.rateLimiter ? null : 'CONTACT_RATE_LIMITER',
     ].filter((name): name is string => name !== null);
-    const contactTooShort =
-      secretState(c.env.IP_HASH_SECRET) === 'too_short'
-        ? ['IP_HASH_SECRET']
-        : [];
+    const contactTooShort = ['too_short', 'weak'].includes(
+      secretState(c.env.IP_HASH_SECRET),
+    )
+      ? ['IP_HASH_SECRET']
+      : [];
     const [retentionDays, unreadCount] = await Promise.all([
       getRetentionDays(c.env.DB),
       countUnread(c.env.DB),

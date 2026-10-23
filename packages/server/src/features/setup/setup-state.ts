@@ -9,7 +9,8 @@ import { unsupportedAuthVariables } from '../auth/unsupported-variables.ts';
 
 /**
  * A setting that keeps setup off: `missing`, `too_short` for a secret
- * shorter than `MIN_SECRET_LENGTH` characters, or `unsupported` for a
+ * shorter than `MIN_SECRET_LENGTH` characters, `weak` for a secret that is
+ * clearly not random (`secretState`), or `unsupported` for a
  * variable that must not be set (`UNSUPPORTED_AUTH_VARIABLES`).
  */
 export interface SetupProblem {
@@ -21,14 +22,14 @@ export interface SetupProblem {
     | 'CONTACT_RATE_LIMITER'
     | 'BETTER_AUTH_TRUSTED_ORIGINS'
     | 'BETTER_AUTH_SECRETS';
-  issue: 'missing' | 'too_short' | 'unsupported';
+  issue: 'missing' | 'too_short' | 'weak' | 'unsupported';
 }
 
 /**
  * Lists the settings that keep setup off. Setup needs `SETUP_TOKEN`,
  * `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, and the attempt limit
  * (`IP_HASH_SECRET` and the `CONTACT_RATE_LIMITER` binding). The three
- * secrets must be at least `MIN_SECRET_LENGTH` characters, and no
+ * secrets must be at least `MIN_SECRET_LENGTH` characters and not weak, and no
  * `UNSUPPORTED_AUTH_VARIABLES` may be set. Names only; never values.
  */
 export const setupProblems = (env: GoodnightEnv): SetupProblem[] => {

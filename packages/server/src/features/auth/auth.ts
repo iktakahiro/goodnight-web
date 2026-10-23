@@ -5,7 +5,7 @@ import { APIError } from 'better-auth/api';
 import { getDatabase } from '../../db/database.ts';
 import * as schema from '../../db/schema.ts';
 import { redactQueryText, safeErrorMessage } from '../../shared/log-error.ts';
-import { isLongEnough } from '../../shared/secret-length.ts';
+import { isUsableSecret } from '../../shared/secret-length.ts';
 import type { GoodnightEnv } from '../../env.ts';
 import { beforePasskeySaved } from '../setup/first-passkey.ts';
 import { createSetupPlugin } from '../setup/setup-plugin.ts';
@@ -13,13 +13,13 @@ import { AUTH_BASE_PATH } from './auth-paths.ts';
 import { unsupportedAuthVariables } from './unsupported-variables.ts';
 
 /**
- * Returns whether sign-in can run. Without a `BETTER_AUTH_SECRET` of at
- * least `MIN_SECRET_LENGTH` characters, or while one of the
+ * Returns whether sign-in can run. Without a usable `BETTER_AUTH_SECRET`
+ * (at least `MIN_SECRET_LENGTH` characters and not weak), or while one of the
  * `UNSUPPORTED_AUTH_VARIABLES` is set, auth and the admin API answer
  * 503 (fail closed).
  */
 export const isAuthConfigured = (env: GoodnightEnv): boolean =>
-  isLongEnough(env.BETTER_AUTH_SECRET) &&
+  isUsableSecret(env.BETTER_AUTH_SECRET) &&
   unsupportedAuthVariables(env).length === 0;
 
 const buildAuth = (env: GoodnightEnv, origin: string) =>
