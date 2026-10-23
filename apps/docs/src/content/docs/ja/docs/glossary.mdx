@@ -24,6 +24,10 @@ Workers の機能のひとつで、ビルドしたページ、画像、スタイ
 
 SQLite をもとにした、Cloudflare のデータベースのサービスです。goodnight-web は、問い合わせ、フォームの設定、ログインに必要なデータを、自分のアカウントの D1 データベースに保存します。
 
+### Binding [#binding]
+
+Worker に、D1 データベースなどの Cloudflare のリソースを使わせるための Workers の設定です。Worker の設定に書いておくと、Worker は `env.DB` のように `env` を通してリソースを使えます。リソースのパスワードやキーを Worker に持たせる必要はありません。[データベースがネットワークに公開されない理由](/ja/docs/security/#database-access)を参照してください。
+
 ### Turnstile [#turnstile]
 
 Cloudflare のボット対策です。問い合わせフォームで、人間と自動プログラムを見分けるために使います。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。

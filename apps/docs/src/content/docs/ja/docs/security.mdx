@@ -10,6 +10,7 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 
 - `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上のランダムな値にします（[シークレット](#secrets)）。
 - セットアップが終わったら `SETUP_TOKEN` を削除します。もう使いません。
+- Cloudflare アカウントの 2 要素認証を有効にします（[データベースがネットワークに公開されない理由](#database-access)）。
 - 管理用のパスに Cloudflare Access を設定します。任意ですが、強く推奨します（[Cloudflare Access](#cloudflare-access)）。
 - 独自ドメインで動くようになったら、`workers.dev` とプレビュー URL を無効にします。
 - ゾーンの **Always Use HTTPS** を有効にします（[HTTPS](#https)）。
@@ -119,6 +120,22 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id
 - honeypot 欄が埋まっていても、応答は変えません。その送信も Turnstile、回数制限、検証を通ったときだけ、スパムの疑いとして保存します。honeypot 欄の値そのものは保存しません。
 - スパムスコアが高い送信にも、スパムの疑いの印を付けます。スパムの疑いは Slack に通知せず、管理画面では分けて表示します。
 - ページに API キーを入れません。ブラウザが読めるキーは秘密ではなく、守っているという誤解を生むだけです。
+
+## データベースがネットワークに公開されない理由 [#database-access]
+
+D1 は、ネットワーク越しに接続して使うデータベースではありません。Postgres や MySQL はドライバーを使って TCP で接続しますが、D1 について Cloudflare のドキュメントは、[ネットワーク接続ではなく Workers の binding を通して使う](https://developers.cloudflare.com/workers/databases/connecting-to-databases/)と説明しています。D1 を操作する方法は、次の 3 つです（[Cloudflare: Query a database](https://developers.cloudflare.com/d1/best-practices/query-d1/)）。
+
+- **binding を設定した Worker。** [binding](/ja/docs/glossary/#binding) を設定すると、その Worker だけがデータベースを使えます。Worker がデータベースのパスワードやキーを持つ必要はありません（[Cloudflare: Bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/)）。
+- **REST API。** リクエストには API トークン（古い方式の API キーでも可）が必要で、トークンには `D1 Read` か `D1 Write` の権限が要ります（[Cloudflare: Query D1 Database](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/)）。
+- **Wrangler と Cloudflare ダッシュボード。** Wrangler のコマンドは REST API を使います。ダッシュボードは、アカウントにログインして使います。
+
+保存されたデータは、保存時に暗号化されます。Cloudflare のドキュメントでは、D1 に保存されるすべてのオブジェクトが対象で、自動で行われ、設定は要らないと説明されています（[Cloudflare: D1 data security](https://developers.cloudflare.com/d1/reference/data-security/)）。
+
+goodnight-web で `DB` binding を使うのは、Worker のコードだけです。問い合わせ API、管理 API、Better Auth のログイン用ルートが、この binding を通してデータベースを読み書きします。ビルドしたページは静的なファイルで、訪問者が送れるのは問い合わせフォームだけです。その値は、Worker が確かめてから保存します。そのため、訪問者がデータベースへ直接クエリを送る手段はなく、守る必要があるのは次の 3 つです。
+
+- **Cloudflare アカウント。** ログインできる人や、D1 の権限を持つ API トークンを持つ人は、データベースを読めます。[2 要素認証](https://developers.cloudflare.com/fundamentals/user-profiles/2fa/)を有効にします。
+- **管理画面のログイン。** Passkey を使います。さらに手前に [Cloudflare Access](#cloudflare-access) を置けます。
+- **Worker のコード。** 値はすべて Drizzle を通して、バインドされたパラメーターとして D1 に届きます。入力は、使う前に確かめます。[SQL インジェクション](#sql-injection)を参照してください。
 
 ## SQL インジェクション [#sql-injection]
 

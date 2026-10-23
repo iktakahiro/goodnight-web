@@ -10,6 +10,7 @@ This page explains what goodnight-web protects and how, and what you need to do 
 
 - Use random values of at least 32 characters for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` ([Secrets](#secrets)).
 - Delete `SETUP_TOKEN` after setup. It is not needed again.
+- Turn on two-factor authentication for your Cloudflare account ([Why the database is not reachable from the network](#database-access)).
 - Put Cloudflare Access on the admin paths. It is optional but strongly recommended ([Cloudflare Access](#cloudflare-access)).
 - Turn off `workers.dev` and preview URLs once your own domain works.
 - Turn on **Always Use HTTPS** for your zone ([HTTPS](#https)).
@@ -119,6 +120,22 @@ The contact API checks a submission like this before it saves it. [Contact form 
 - A filled honeypot field does not change the response. The submission is stored as suspected spam only if it passes Turnstile, the rate limit, and validation. The honeypot value itself is not stored.
 - A high spam score also flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed separately in the admin screen.
 - There is no API key in the page. A key that the browser can read is not a secret, so it would only give a false sense of protection.
+
+## Why the database is not reachable from the network [#database-access]
+
+D1 is not a database you connect to over the network. Postgres and MySQL are reached over TCP with a driver, but Cloudflare documents D1 as [accessed through a Workers binding rather than a network connection](https://developers.cloudflare.com/workers/databases/connecting-to-databases/). There are three ways to work with a D1 database ([Cloudflare: Query a database](https://developers.cloudflare.com/d1/best-practices/query-d1/)):
+
+- **A Worker with a binding.** A [binding](/docs/glossary/#binding) gives one Worker access to the database. The Worker holds no database password or key ([Cloudflare: Bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/)).
+- **The REST API.** A request needs an API token, or the older API key, and the token needs the `D1 Read` or `D1 Write` permission ([Cloudflare: Query D1 Database](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/)).
+- **Wrangler and the Cloudflare dashboard.** Wrangler commands use the REST API. The dashboard is where you work after you sign in to your account.
+
+The stored data is encrypted at rest. Cloudflare's documentation says this covers every object stored in D1, happens automatically, and needs no configuration ([Cloudflare: D1 data security](https://developers.cloudflare.com/d1/reference/data-security/)).
+
+In goodnight-web, only the Worker code uses the `DB` binding. The contact API, the admin API, and the Better Auth sign-in routes read and write the database through it. The built pages are static files, and a visitor can send only a contact form, whose values the Worker checks before it saves them. So a visitor has no way to query the database directly, and what needs protecting is:
+
+- **Your Cloudflare account.** Anyone who can sign in to it, or who holds an API token with D1 permission, can read the database. Turn on [two-factor authentication](https://developers.cloudflare.com/fundamentals/user-profiles/2fa/).
+- **The admin sign-in.** It uses passkeys, and you can add [Cloudflare Access](#cloudflare-access) in front of it.
+- **The Worker code.** Every value reaches D1 as a bound parameter through Drizzle, and input is checked before it is used. See [SQL injection](#sql-injection).
 
 ## SQL injection [#sql-injection]
 
