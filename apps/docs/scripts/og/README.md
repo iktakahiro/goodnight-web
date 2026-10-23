@@ -11,7 +11,9 @@ under the title (where the kit runs) is written in `copy.ts`, because it
 differs from the page eyebrow. The sky has a few star marks (four-point sparkles and some five-point stars)
 drawn from a seeded generator, and a row of house silhouettes along the bottom
 edge. Stars keep clear of the text, logo, screenshot, and houses, so a run always
-gives the same image. The logo is
+gives the same image. The star and house shapes live in
+`src/site/night-art.ts`, which the closing band of the top page uses too, so edit
+them there. The logo is
 `brand/goodnight-web-lockup-dark.svg`, and the screenshot is the inquiry list
 in `public/images/admin/`. Run `bun run og` and commit the PNGs whenever the
 hero copy, the logo, or that screenshot changes. The alt text and file names

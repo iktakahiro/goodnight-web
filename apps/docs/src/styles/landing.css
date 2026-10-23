@@ -112,6 +112,33 @@ html:has(.landing):not(.dark) {
     display: none;
   }
 }
+.night-mark {
+  position: absolute;
+  display: block;
+  line-height: 0;
+}
+/* The side marks need gutters wide enough to leave the heading clear. */
+@media (max-width: 1099px) {
+  .night-mark-side {
+    display: none;
+  }
+}
+/* Houses along the bottom edge, centered on four runs of artwork that are
+   wider than any screen, so the edges are always cropped. */
+.night-town {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2640px;
+  height: 140px;
+  transform: translateX(-50%);
+}
+@media (max-width: 760px) {
+  .night-town {
+    width: 1848px;
+    height: 98px;
+  }
+}
 .night-moon {
   position: absolute;
   top: 4.25rem;
@@ -1102,7 +1129,7 @@ html:has(.landing):not(.dark) {
 /* Closing call to action: the second night band, calm and centered. */
 .closing-cta {
   margin-top: 8rem;
-  padding-block: 6rem 6.5rem;
+  padding-block: 6rem 11rem;
   text-align: center;
 }
 .closing-logo {
@@ -1387,7 +1414,7 @@ html:has(.landing):not(.dark) {
   }
   .closing-cta {
     margin-top: 4.5rem;
-    padding-block: 4rem 4.5rem;
+    padding-block: 4rem 8.5rem;
   }
   .closing-logo {
     width: min(240px, 66vw);
