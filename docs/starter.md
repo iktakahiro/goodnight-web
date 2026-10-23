@@ -70,9 +70,8 @@ added only when a page needs real interactivity.
   [0003](decisions/0003-rate-limit-binding.md)); and the variable
   `TURNSTILE_SITE_KEY`, empty by default.
 - The D1 binding has no `database_id`. `wrangler dev`, `d1 migrations apply
-  --local`, and `deploy --dry-run` work without it. That the Deploy button
-  creates the database and fills in the ID is not verified yet: it needs the
-  public repository and the package on npm.
+  --local`, and `deploy --dry-run` work without it. Cloudflare creates the
+  database and writes the ID when the Deploy button first deploys the site.
 - Secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`,
   `IP_HASH_SECRET`, `TURNSTILE_SECRET`, optional `SLACK_WEBHOOK_URL`) are
   listed with comments in `.dev.vars.example`. `package.json`

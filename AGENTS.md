@@ -33,8 +33,6 @@ The planned layout. Some workspaces do not exist yet. See
   `createGoodnightWorker(options)`, the contact API, Better Auth with passkeys,
   the admin API, security headers, D1 migrations, and the prebuilt admin UI
   with its ja/en strings. Users install it and never edit it.
-- `packages/astro` (`@goodnight-web/astro`): an optional thin Astro
-  integration. Add it only if the admin UI delivery needs it.
 - `packages/typescript-config` (`@goodnight-web/typescript-config`): shared
   `tsconfig` presets (`base.json`, `react.json`).
 - `templates/starter`: the Astro site that users copy and edit, usually with AI

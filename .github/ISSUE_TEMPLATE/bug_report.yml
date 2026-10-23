@@ -1,0 +1,48 @@
+name: Bug report
+description: Something does not work as the documentation says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security problem, do not open an issue. Use the private report
+        link on the issue chooser page, or see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest steps that show the problem.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: '@goodnight-web/server version'
+      description: From `package.json` or the lockfile of your site.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - Contact form or API
+        - Admin screen
+        - Setup or passkey sign-in
+        - Deploy to Cloudflare
+        - Starter site
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Remove secrets, email addresses, and anything else private before you paste.

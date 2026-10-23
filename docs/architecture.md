@@ -1,10 +1,9 @@
 # Architecture
 
-This document describes the architecture of goodnight-web. Milestone M1 is in
-progress: `@goodnight-web/server` (contact API, setup, passkey auth, admin API,
-admin UI, migrations) and the documentation site are implemented; the starter
-is not yet. Design decisions are recorded in
-[decisions/](decisions/README.md).
+This document describes the architecture of goodnight-web:
+`@goodnight-web/server` (contact API, setup, passkey auth, admin API, admin UI,
+migrations), the starter in `templates/starter`, and the documentation site.
+Design decisions are recorded in [decisions/](decisions/README.md).
 
 ## Constraints
 
@@ -513,8 +512,8 @@ The code is split by who edits it.
 
 **`@goodnight-web/server`** holds the parts users should not edit: the Worker
 factory, the contact API, auth, the admin API and UI, security headers, and
-migrations. It follows semver. No `@goodnight-web/astro` package is needed
-for the admin UI ([0004](decisions/0004-admin-ui-delivery.md)).
+migrations. It follows semver. The admin UI needs no Astro integration
+package ([0004](decisions/0004-admin-ui-delivery.md)).
 
 Entry points (`exports` in `packages/server/package.json`):
 
@@ -641,14 +640,14 @@ the Worker a token that can write to GitHub.
 ## Documentation site
 
 `apps/docs` (`@goodnight-web/docs`, private) is the user-facing documentation.
-It follows the same setup as the calendarpit documentation site:
+Its setup:
 
 - Fumadocs with TanStack Start. Every page is prerendered to static HTML; the
   server bundle is deleted after the build.
 - A static-assets-only Worker serves `apps/docs/dist` (`wrangler.jsonc`: no
   `main`, `html_handling: force-trailing-slash`, `not_found_handling:
-  404-page`, `workers_dev` and `preview_urls` off). There is no custom domain
-  yet.
+  404-page`, `workers_dev` and `preview_urls` off). The custom domain
+  `goodnight-web.dev` is a route with `custom_domain: true`.
 - English is at the root and Japanese under `/ja/`, with the same slugs. The
   landing page is `/` (and `/ja/`); the documentation is under `/docs/` (and
   `/ja/docs/`). Pages live in `apps/docs/src/content/docs/`.
@@ -660,5 +659,3 @@ It follows the same setup as the calendarpit documentation site:
 - `DOCS_SITE_URL` sets the origin for canonical, language-alternate, Open
   Graph, and X card URLs. It defaults to `https://goodnight-web.dev`
   (`apps/docs/scripts/site-url.ts`).
-
-Mark anything not tested end to end with a "Draft / not verified yet" callout.

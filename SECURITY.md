@@ -17,9 +17,8 @@ credit you in the advisory unless you prefer not to be named.
 
 ## Supported versions
 
-No version has been released yet. Once packages are published, security fixes
-go to the latest minor version of `@goodnight-web/server` and
-`@goodnight-web/astro`, and the advisory states the fixed version.
+Security fixes go to the latest minor version of `@goodnight-web/server`, and
+the advisory states the fixed version.
 
 ## Scope
 
