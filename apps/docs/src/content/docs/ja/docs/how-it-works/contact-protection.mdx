@@ -129,7 +129,7 @@ return { ok: true };
 
 Turnstile の設定がなければ、フォームを止めます。`TURNSTILE_SECRET` と `TURNSTILE_SITE_KEY` がそろっていなければ、問い合わせ API は 503 を返し、フォームには「お問い合わせフォームは準備中です」と表示します。
 
-`IP_HASH_SECRET` か Rate Limiting binding がないときも同じです。どちらか一方でも欠けると、回数制限が動かないからです。Turnstile が設定済みなら、管理画面のお知らせに足りない設定の名前が出ます。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
+IP アドレスのハッシュに使う鍵（`APP_SECRET`）か Rate Limiting binding がないときも同じです。どちらか一方でも欠けると、回数制限が動かないからです。Turnstile が設定済みなら、管理画面のお知らせに足りない設定の名前が出ます。[Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
 
 ### ルールによるスパムスコア
 

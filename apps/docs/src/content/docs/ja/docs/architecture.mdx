@@ -65,7 +65,7 @@ description: Worker 1 つと D1 1 つで動く部品の一覧と、問い合わ�
 問い合わせ API はフェイルクローズです。次のどれかに当てはまると、API は 503 を返し、フォームには「お問い合わせフォームは準備中です」と表示します。
 
 - `TURNSTILE_SECRET` か `TURNSTILE_SITE_KEY` が設定されていない。
-- `IP_HASH_SECRET` がないか、32 文字より短い。
+- `APP_SECRET` がないか 32 文字より短く、`IP_HASH_SECRET` も設定されていない。設定した `IP_HASH_SECRET` が 32 文字より短い場合も止まります。
 - Rate Limiting binding がない。
 
 設定は [Turnstile を設定する](/ja/docs/setup/turnstile/)を参照してください。
@@ -117,22 +117,23 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 
 ## シークレットと binding
 
-| 名前                   | 種類                   | 用途                                                                                                  |
-| ---------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| `DB`                   | D1 binding             | 保存するすべてのデータ                                                                                |
-| `ASSETS`               | Static Assets binding  | Astro でビルドしたページ                                                                              |
-| `CONTACT_RATE_LIMITER` | Rate Limiting binding  | `ip_hash` ごとの回数制限（問い合わせ、セットアップ、Passkey でのログイン）                            |
-| `TURNSTILE_SITE_KEY`   | 変数                   | 公開してよい Turnstile のサイトキー。`wrangler.jsonc` に書きます。ないと問い合わせ API は止まります。 |
-| `SETUP_TOKEN`          | シークレット           | 最初の管理者を作るときに必要。32 文字以上。セットアップ後に削除します。                               |
-| `ADMIN_EMAILS`         | シークレットまたは変数 | 管理者になれるメールアドレス                                                                          |
-| `BETTER_AUTH_SECRET`   | シークレット           | Better Auth の署名用。32 文字以上。                                                                   |
-| `IP_HASH_SECRET`       | シークレット           | `HMAC-SHA256(ip, IP_HASH_SECRET)` の鍵。32 文字以上。                                                 |
-| `TURNSTILE_SECRET`     | シークレット           | Turnstile のシークレットキー。siteverify で使います。ないと問い合わせ API は止まります。              |
-| `SLACK_WEBHOOK_URL`    | シークレット（任意）   | 新しい問い合わせの通知                                                                                |
-| `ACCESS_AUD`           | 変数（任意）           | Cloudflare Access アプリケーションの AUD タグ。`ACCESS_TEAM_DOMAIN` と一緒に設定します。              |
-| `ACCESS_TEAM_DOMAIN`   | 変数（任意）           | Cloudflare Access のチームドメイン。たとえば `your-team.cloudflareaccess.com`。                       |
+| 名前                   | 種類                   | 用途                                                                                                                                                |
+| ---------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DB`                   | D1 binding             | 保存するすべてのデータ                                                                                                                              |
+| `ASSETS`               | Static Assets binding  | Astro でビルドしたページ                                                                                                                            |
+| `CONTACT_RATE_LIMITER` | Rate Limiting binding  | `ip_hash` ごとの回数制限（問い合わせ、セットアップ、Passkey でのログイン）                                                                          |
+| `TURNSTILE_SITE_KEY`   | 変数                   | 公開してよい Turnstile のサイトキー。`wrangler.jsonc` に書きます。ないと問い合わせ API は止まります。                                               |
+| `APP_SECRET`           | シークレット           | 最初の管理者を作るときのセットアップトークンで、セッションの鍵と IP アドレスのハッシュの鍵の元にもなります。32 文字以上。セットアップ後も残します。 |
+| `ADMIN_EMAILS`         | シークレットまたは変数 | 管理者になれるメールアドレス                                                                                                                        |
+| `TURNSTILE_SECRET`     | シークレット           | Turnstile のシークレットキー。siteverify で使います。ないと問い合わせ API は止まります。                                                            |
+| `SLACK_WEBHOOK_URL`    | シークレット（任意）   | 新しい問い合わせの通知                                                                                                                              |
+| `ACCESS_AUD`           | 変数（任意）           | Cloudflare Access アプリケーションの AUD タグ。`ACCESS_TEAM_DOMAIN` と一緒に設定します。                                                            |
+| `ACCESS_TEAM_DOMAIN`   | 変数（任意）           | Cloudflare Access のチームドメイン。たとえば `your-team.cloudflareaccess.com`。                                                                     |
+| `SETUP_TOKEN`          | シークレット（任意）   | 個別のセットアップトークン。設定すると、セットアップではこの値だけを受け付けます。セットアップ後に削除します。                                      |
+| `BETTER_AUTH_SECRET`   | シークレット（任意）   | 個別の Better Auth の署名用の鍵。`APP_SECRET` から作る鍵の代わりに使います。                                                                        |
+| `IP_HASH_SECRET`       | シークレット（任意）   | `HMAC-SHA256(ip, key)` の個別の鍵。`APP_SECRET` から作る鍵の代わりに使います。                                                                      |
 
-`SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` が 32 文字より短いときは、ないものとして扱い、それを使う機能を止めます。シークレットは Worker の中だけで使います。ブラウザに返すことも、D1 に書くこともありません。
+`BETTER_AUTH_SECRET` か `IP_HASH_SECRET` が設定されていないときは、Worker が Web Crypto の [HKDF](/ja/docs/glossary/#hkdf) を使い、用途ごとに異なる決まったラベルで、その鍵を `APP_SECRET` から作ります。32 文字より短いシークレットはないものとして扱い、それを使う機能を止めます。設定した値が短すぎる場合も、`APP_SECRET` から作った鍵には置き換えません。シークレットは Worker の中だけで使います。ブラウザに返すことも、D1 に書くこともありません。
 
 `/admin`、`/admin/*` と、問い合わせ API を含む `/api/` の下のすべてのパスは、`https://` でだけ動きます（`localhost` を除く）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
 

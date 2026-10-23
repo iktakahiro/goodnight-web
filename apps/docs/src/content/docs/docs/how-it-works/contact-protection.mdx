@@ -129,7 +129,7 @@ return { ok: true };
 
 Without Turnstile, the form is off. If `TURNSTILE_SECRET` or `TURNSTILE_SITE_KEY` is missing, the contact API returns 503 and the form says "The contact form is not available yet".
 
-The same happens when `IP_HASH_SECRET` or the Rate Limiting binding is missing, because the rate limit cannot run if either one is missing. If Turnstile is set up, the admin screen's notice names the missing settings. See [Set up Turnstile](/docs/setup/turnstile/).
+The same happens when the key for IP hashes (`APP_SECRET`) or the Rate Limiting binding is missing, because the rate limit cannot run if either one is missing. If Turnstile is set up, the admin screen's notice names the missing settings. See [Set up Turnstile](/docs/setup/turnstile/).
 
 ### Rule-based spam score
 

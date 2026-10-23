@@ -46,9 +46,15 @@ You need:
 
 <Step>
 
-### Set `SETUP_TOKEN` again
+### Have the setup token ready
 
-If you deleted `SETUP_TOKEN` after the first setup, set it again with a value of 32 characters or more. Without it, the setup screen reports `SETUP_TOKEN` as missing. You can also set it in the Cloudflare dashboard.
+The setup screen accepts `SETUP_TOKEN` when it is set, and `APP_SECRET` otherwise.
+
+- **Your site uses `APP_SECRET` and no `SETUP_TOKEN`:** there is nothing to set. Have the value of `APP_SECRET` ready.
+- **You no longer have a copy of `APP_SECRET`:** do not change it, because a new value changes IP hashes. Set `SETUP_TOKEN` for the recovery instead, with the commands below.
+- **Your site has no `APP_SECRET` and you deleted `SETUP_TOKEN` after the first setup:** set `SETUP_TOKEN` again with the commands below. Without a setup token, the setup screen reports `APP_SECRET` as missing; setting either one works.
+
+`SETUP_TOKEN` must be 32 characters or more. You can also set it in the Cloudflare dashboard.
 
 ```sh
 openssl rand -base64 32
@@ -68,7 +74,7 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM passkey; DELETE FROM 
 Run all three statements, in this order:
 
 - **Passkeys go first**, so the old passkey cannot sign in and create a new session while the command runs. Setup is still closed at this point.
-- **Sessions go next**, so no old session is left when setup opens. A session that survives can register a passkey on the setup screen without `SETUP_TOKEN`.
+- **Sessions go next**, so no old session is left when setup opens. A session that survives can register a passkey on the setup screen without the setup token.
 - **The setup lock goes last**, which opens setup.
 - **Deleting only the passkeys does not work.** `settings.setup_closed_at` stays, so setup stays closed.
 - **Deleting only `setup_closed_at` does not work.** Setup stays closed while any passkey exists, and the old passkey still signs in.
@@ -79,7 +85,7 @@ Run all three statements, in this order:
 
 ### Run setup again
 
-Open `https://<your domain>/admin/` on the domain you want the passkey bound to. If Cloudflare Access is in front of `/admin`, sign in through Access first. Enter `SETUP_TOKEN` and an address from `ADMIN_EMAILS`, select **Continue**, and register a passkey in a provider that syncs.
+Open `https://<your domain>/admin/` on the domain you want the passkey bound to. If Cloudflare Access is in front of `/admin`, sign in through Access first. Enter the setup token (`SETUP_TOKEN` if it is set, otherwise `APP_SECRET`) and an address from `ADMIN_EMAILS`, select **Continue**, and register a passkey in a provider that syncs.
 
 With the same address as before, setup reuses the existing user. With another address from `ADMIN_EMAILS`, setup creates a new user, and the old user stays in the database without a passkey and cannot use the admin screen.
 
@@ -91,7 +97,7 @@ Once the new passkey is saved, setup closes again and `/api/setup` returns 403.
 
 ### Clean up
 
-Delete the `SETUP_TOKEN` secret again. Also delete the old passkey for this site from your password manager or browser. If it is still listed and you choose it, sign-in fails with "this passkey is not registered for this site".
+If you set `SETUP_TOKEN` for the recovery, delete it again. Do not delete `APP_SECRET`. Also delete the old passkey for this site from your password manager or browser. If it is still listed and you choose it, sign-in fails with "this passkey is not registered for this site".
 
 </Step>
 
@@ -99,6 +105,6 @@ Delete the `SETUP_TOKEN` secret again. Also delete the old passkey for this site
 
 ## What was verified
 
-These steps were run against a local D1 database with `wrangler dev` and a virtual authenticator in Chrome. The statements were later put in the order shown above (passkeys before sessions); the reordered command was run with `wrangler d1 execute --local` and in the server's tests (`passkey-recovery.http.test.ts`) with the same results. After the change, setup was open, a new passkey could be registered with the same address, and the admin API worked again. Earlier sessions got 401, and the old passkey could not sign in. The two partial deletions above did not reopen setup.
+These steps were run against a local D1 database with `wrangler dev` and a virtual authenticator in Chrome. The statements were later put in the order shown above (passkeys before sessions); the reordered command was run with `wrangler d1 execute --local` and in the server's tests (`passkey-recovery.http.test.ts`) with the same results. After the change, setup was open, a new passkey could be registered with the same address, and the admin API worked again. Earlier sessions got 401, and the old passkey could not sign in. The two partial deletions above did not reopen setup. The server package's automated tests run the same statements on a site with `APP_SECRET` only, on a site with the four separate secrets, and with `SETUP_TOKEN` set for the recovery and deleted afterwards.
 
 These steps were not run against a deployed Cloudflare Worker or with `--remote`. A move from one domain to another could not be tested locally either, because the local check can run only on `localhost`.

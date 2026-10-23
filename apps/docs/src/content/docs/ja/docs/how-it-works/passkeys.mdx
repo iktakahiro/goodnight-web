@@ -24,7 +24,7 @@ description: 管理者が Better Auth の Passkey でログインするしくみ
 - **ほかの入り口はありません。** メールとパスワードでのログインは無効です。開発用の抜け道、既定のアカウント、共有のキーもありません。
 - **本人確認が必要です。** Passkey の登録とログインには、PIN や生体認証による本人確認が必要です。
 - **IP アドレスを記録しません。** Better Auth はセッションに IP アドレスを記録しません。
-- **ログインには回数制限があります。** 問い合わせフォームと同じ Rate Limiting binding で、ハッシュ化した IP アドレスごとに数えます。その binding か `IP_HASH_SECRET` がなければ、ログインは使えません。
+- **ログインには回数制限があります。** 問い合わせフォームと同じ Rate Limiting binding で、ハッシュ化した IP アドレスごとに数えます。その binding か、IP アドレスのハッシュに使う鍵（`APP_SECRET`）がなければ、ログインは使えません。
 - **`https://` でだけ動きます。** ログイン、セットアップ、管理画面、管理 API が対象です。`wrangler dev` のために、`localhost` では平文の HTTP も使えます。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
 - **Cloudflare Access を前に置けます。** `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` が対象です。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すれば、Worker も Access のトークンを確認します。Access を使っても、Passkey でのログインは必要です。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。
 - **Passkey より前のセッションは使えません。** 管理 API は、最初の Passkey より前に作られたセッションを受け付けません。受け付けるのは、Passkey でのログインか、最初の Passkey の登録で作られたセッションです。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/#sessions)を参照してください。

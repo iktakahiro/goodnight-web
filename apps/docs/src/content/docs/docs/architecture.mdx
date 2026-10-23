@@ -65,7 +65,7 @@ The inquiry list in the admin screen shows 50 inquiries per page, sorted by rece
 The contact API fails closed. In any of these cases it returns 503, and the form says "The contact form is not available yet":
 
 - `TURNSTILE_SECRET` or `TURNSTILE_SITE_KEY` is not set.
-- `IP_HASH_SECRET` is missing or shorter than 32 characters.
+- `APP_SECRET` is missing or shorter than 32 characters, and `IP_HASH_SECRET` is not set either. A set `IP_HASH_SECRET` that is shorter than 32 characters also turns it off.
 - The Rate Limiting binding is missing.
 
 To set them up, see [Set up Turnstile](/docs/setup/turnstile/).
@@ -117,22 +117,23 @@ The code for contact, setup, auth, the admin API, and the admin screen lives in 
 
 ## Secrets and bindings
 
-| Name                   | Kind                  | Purpose                                                                                |
-| ---------------------- | --------------------- | -------------------------------------------------------------------------------------- |
-| `DB`                   | D1 binding            | All stored data                                                                        |
-| `ASSETS`               | Static Assets binding | The pages built by Astro                                                               |
-| `CONTACT_RATE_LIMITER` | Rate Limiting binding | Rate limits per `ip_hash` (contact submissions, setup attempts, passkey sign-ins)      |
-| `TURNSTILE_SITE_KEY`   | Variable              | The public Turnstile site key, in `wrangler.jsonc`. Without it the contact API is off. |
-| `SETUP_TOKEN`          | Secret                | Required to create the first admin. At least 32 characters. Delete it after setup.     |
-| `ADMIN_EMAILS`         | Secret or variable    | Email addresses allowed to become admins                                               |
-| `BETTER_AUTH_SECRET`   | Secret                | Better Auth signing secret. At least 32 characters.                                    |
-| `IP_HASH_SECRET`       | Secret                | Key for `HMAC-SHA256(ip, IP_HASH_SECRET)`. At least 32 characters.                     |
-| `TURNSTILE_SECRET`     | Secret                | The Turnstile secret key, used for siteverify. Without it the contact API is off.      |
-| `SLACK_WEBHOOK_URL`    | Secret, optional      | New-inquiry notification                                                               |
-| `ACCESS_AUD`           | Variable, optional    | Cloudflare Access application audience tag. Set together with `ACCESS_TEAM_DOMAIN`.    |
-| `ACCESS_TEAM_DOMAIN`   | Variable, optional    | Cloudflare Access team domain, such as `your-team.cloudflareaccess.com`.               |
+| Name                   | Kind                  | Purpose                                                                                                                                  |
+| ---------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `DB`                   | D1 binding            | All stored data                                                                                                                          |
+| `ASSETS`               | Static Assets binding | The pages built by Astro                                                                                                                 |
+| `CONTACT_RATE_LIMITER` | Rate Limiting binding | Rate limits per `ip_hash` (contact submissions, setup attempts, passkey sign-ins)                                                        |
+| `TURNSTILE_SITE_KEY`   | Variable              | The public Turnstile site key, in `wrangler.jsonc`. Without it the contact API is off.                                                   |
+| `APP_SECRET`           | Secret                | The setup token for the first admin, and the source of the session key and the IP hash key. At least 32 characters. Keep it after setup. |
+| `ADMIN_EMAILS`         | Secret or variable    | Email addresses allowed to become admins                                                                                                 |
+| `TURNSTILE_SECRET`     | Secret                | The Turnstile secret key, used for siteverify. Without it the contact API is off.                                                        |
+| `SLACK_WEBHOOK_URL`    | Secret, optional      | New-inquiry notification                                                                                                                 |
+| `ACCESS_AUD`           | Variable, optional    | Cloudflare Access application audience tag. Set together with `ACCESS_TEAM_DOMAIN`.                                                      |
+| `ACCESS_TEAM_DOMAIN`   | Variable, optional    | Cloudflare Access team domain, such as `your-team.cloudflareaccess.com`.                                                                 |
+| `SETUP_TOKEN`          | Secret, optional      | A separate setup token. When set, setup accepts only this value. Delete it after setup.                                                  |
+| `BETTER_AUTH_SECRET`   | Secret, optional      | A separate Better Auth signing key, used instead of the one derived from `APP_SECRET`.                                                   |
+| `IP_HASH_SECRET`       | Secret, optional      | A separate key for `HMAC-SHA256(ip, key)`, used instead of the one derived from `APP_SECRET`.                                            |
 
-If `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, or `IP_HASH_SECRET` is shorter than 32 characters, it counts as missing, and the features that use it are turned off. Secrets are used only inside the Worker. They are never sent to the browser or written to D1.
+When `BETTER_AUTH_SECRET` or `IP_HASH_SECRET` is not set, the Worker derives that key from `APP_SECRET` with [HKDF](/docs/glossary/#hkdf) in Web Crypto, with a different fixed label for each purpose. A secret shorter than 32 characters counts as missing, and the features that use it are turned off; a set value that is too short is not replaced by a derived key. Secrets are used only inside the Worker. They are never sent to the browser or written to D1.
 
 `/admin`, `/admin/*`, and every path under `/api/`, including the contact API, work only over `https://` (except on `localhost`). See [Security model](/docs/security/#https).
 

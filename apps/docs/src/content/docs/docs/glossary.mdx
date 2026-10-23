@@ -89,3 +89,7 @@ A GitHub tool that opens pull requests when a package your site uses has a new v
 ### Passkey [#passkey]
 
 A way to sign in without a password, using a fingerprint, a face scan, or a device PIN. The admin screen accepts passkeys only. See [Passkey sign-in](/docs/how-it-works/passkeys/).
+
+### HKDF [#hkdf]
+
+A standard method, defined in RFC 5869, for making several separate keys from one secret value. goodnight-web uses it to make the key that signs admin sessions and the key that hashes IP addresses from `APP_SECRET`. Each key uses its own fixed label, so one key cannot be used to work out `APP_SECRET` or the other key.
