@@ -54,11 +54,16 @@ export const deriveAppSecretKey = async (
     .join('');
 };
 
-// The resolved env of each env object, for the APP_SECRET value it was
-// resolved with, and the env object of each resolved env.
+// The resolved env of each env object, for the APP_SECRET and explicit
+// BETTER_AUTH_SECRET values it was resolved with (together they decide the
+// signing key), and the env object of each resolved env.
 const resolvedEnvs = new WeakMap<
   GoodnightEnv,
-  { appSecret: string | null; resolved: GoodnightEnv }
+  {
+    appSecret: string | null;
+    authSecret: string | undefined;
+    resolved: GoodnightEnv;
+  }
 >();
 const sourceEnvs = new WeakMap<GoodnightEnv, GoodnightEnv>();
 
@@ -136,10 +141,10 @@ const createResolvedEnv = (
  * signed with the old key stop working, and IP hashes (rate limits and the
  * stored `ip_hash`) change.
  *
- * The result is the same object for the same `env` and `APP_SECRET`, so
- * caches keyed by the env object (Better Auth, docs/decisions/0001) keep
- * working, and a new object when `APP_SECRET` changes, so they are not
- * reused with old keys. Other properties are read from `env` on every
+ * The result is the same object for the same `env`, `APP_SECRET` and
+ * `BETTER_AUTH_SECRET`, so caches keyed by the env object (Better Auth,
+ * docs/decisions/0001) keep working, and a new object when either value
+ * changes, so they are not reused with an old signing key. Other properties are read from `env` on every
  * access. Passing a resolved env returns it unchanged. Nothing here logs or
  * stores a secret.
  */
@@ -151,7 +156,14 @@ export const resolveAppSecret = async (
   }
   const appSecret = usableAppSecret(env);
   const cached = resolvedEnvs.get(env);
-  if (cached && cached.appSecret === appSecret) return cached.resolved;
+  const authSecret = env.BETTER_AUTH_SECRET;
+  if (
+    cached &&
+    cached.appSecret === appSecret &&
+    cached.authSecret === authSecret
+  ) {
+    return cached.resolved;
+  }
   let keys: Record<DerivedSecretName, string> | null = null;
   if (appSecret !== null) {
     const [betterAuth, ipHash] = await Promise.all([
@@ -161,7 +173,7 @@ export const resolveAppSecret = async (
     keys = { BETTER_AUTH_SECRET: betterAuth, IP_HASH_SECRET: ipHash };
   }
   const resolved = createResolvedEnv(env, appSecret, keys);
-  resolvedEnvs.set(env, { appSecret, resolved });
+  resolvedEnvs.set(env, { appSecret, authSecret, resolved });
   sourceEnvs.set(resolved, env);
   return resolved;
 };

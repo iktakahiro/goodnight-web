@@ -175,8 +175,10 @@ describe.each<[TestSecrets, string]>([
       env: { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/T/B/X' },
     });
     const logs = captureConsole();
+    let logText = '';
     const bodies: string[] = [];
     try {
+      console.warn('log-capture-sentinel');
       bodies.push(await (await worker.fetch('/api/setup')).text());
       bodies.push(await (await setup(worker, 'wrong-token')).text());
       const { cookie } = await registerFirstPasskey(worker);
@@ -188,8 +190,10 @@ describe.each<[TestSecrets, string]>([
       bodies.push(await (await submitContact(worker)).text());
       bodies.push(await (await worker.fetch('/api/contact/form')).text());
     } finally {
+      logText = logs.text();
       logs.restore();
     }
+    expect(logText).toContain('log-capture-sentinel');
     const resolved = await resolveAppSecret(worker.env);
     const secretValues = [
       APP_SECRET,
@@ -200,7 +204,7 @@ describe.each<[TestSecrets, string]>([
       resolved.BETTER_AUTH_SECRET ?? '',
       resolved.IP_HASH_SECRET ?? '',
     ];
-    const outputs = [dumpDatabase(worker.sqlite), logs.text(), ...bodies];
+    const outputs = [dumpDatabase(worker.sqlite), logText, ...bodies];
     for (const output of outputs) {
       for (const value of secretValues) expect(output).not.toContain(value);
     }
@@ -235,6 +239,16 @@ describe('APP_SECRET alone', () => {
       await hmacSha256Hex((await derived()).ip, CLIENT_IP),
       await hmacSha256Hex((await derived(OTHER_APP_SECRET)).ip, CLIENT_IP),
     ]);
+  });
+
+  test('setting or removing BETTER_AUTH_SECRET replaces the signing key', async () => {
+    const worker = createTestWorker({ secrets: 'app-secret' });
+    const { cookie } = await registerFirstPasskey(worker);
+    expect((await me(worker, cookie)).status).toBe(200);
+    worker.env.BETTER_AUTH_SECRET = SECRETS.BETTER_AUTH_SECRET;
+    expect((await me(worker, cookie)).status).toBe(401);
+    worker.env.BETTER_AUTH_SECRET = undefined;
+    expect((await me(worker, cookie)).status).toBe(200);
   });
 
   test('removing APP_SECRET turns sign-in and the contact API off', async () => {

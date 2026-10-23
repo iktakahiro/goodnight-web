@@ -65,10 +65,14 @@ rate limits and stored `ip_hash` values change), and the same setup rules.
 
 ## Why the setup token may be APP_SECRET
 
-`APP_SECRET` is already the root of the session signing key. Anyone who
-knows it can sign a session cookie for any user, which is more than setup
-gives. Accepting it as the setup token therefore gives an attacker who has
-it nothing new. Setup still requires an address in `ADMIN_EMAILS`, still
+`APP_SECRET` is an intentional bootstrap credential: the owner types it into
+the browser once, to create the first admin, and the same value is the root
+of the derived keys. This is a tradeoff. The value is exposed to the browser
+and a password manager once, and with an explicit `BETTER_AUTH_SECRET` it is
+no longer the signing key, so accepting it grants setup rights beyond what
+signing cookies would. Setting `SETUP_TOKEN` avoids this. The signing key
+alone does not authenticate anyone, because sessions are stored in D1 and the
+cookie must carry an existing random session token. Setup still requires an address in `ADMIN_EMAILS`, still
 closes once the first passkey is registered
 ([0006](0006-admin-sessions-and-setup-closure.md)), and is still rate-limited
 per `ip_hash`.
