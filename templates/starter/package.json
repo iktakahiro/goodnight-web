@@ -28,17 +28,11 @@
   },
   "cloudflare": {
     "bindings": {
-      "SETUP_TOKEN": {
-        "description": "A random string of **32 characters or more**. Used once at `/admin` to create the first admin. Make one: `openssl rand -base64 32`"
+      "APP_SECRET": {
+        "description": "A random string of **32+ characters**. Enter it once at `/admin` to create the first admin. Do not delete it. Make one: `openssl rand -base64 32`"
       },
       "ADMIN_EMAILS": {
         "description": "Email addresses that may become admins, separated by commas, such as `you@example.com,colleague@example.com`."
-      },
-      "BETTER_AUTH_SECRET": {
-        "description": "A random string of **32 characters or more** that signs admin sign-in sessions. Make one: `openssl rand -base64 32`"
-      },
-      "IP_HASH_SECRET": {
-        "description": "A random string of **32 characters or more**. IP addresses are stored only as an HMAC made with this key."
       },
       "TURNSTILE_SECRET": {
         "description": "The Turnstile secret key. The form accepts no messages until this and the site key are both set."

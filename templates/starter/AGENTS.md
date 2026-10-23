@@ -105,6 +105,10 @@ delete inquiries through the admin API.
 - Do not add secrets, API keys, or passwords to any file. Secrets are set in
   the Cloudflare dashboard. The Turnstile site key (`TURNSTILE_SITE_KEY` in
   `wrangler.jsonc`) is public and is the only key that belongs in the code.
+- Never tell the person to delete or change the `APP_SECRET` secret after
+  setup. The site derives its sign-in and IP hash keys from it: deleting it
+  turns sign-in and the contact form off, and changing it signs every admin
+  out.
 
 ## Contact form fields
 

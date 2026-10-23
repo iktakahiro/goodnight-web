@@ -1,6 +1,6 @@
 ---
 title: First admin setup
-description: How you create the first admin with SETUP_TOKEN and ADMIN_EMAILS, and how setup closes after that.
+description: How you create the first admin with APP_SECRET and ADMIN_EMAILS, and how setup closes after that.
 ---
 
 Right after a deploy, the site has no admin. This page shows how you create the first one, and how goodnight-web stops a stranger from getting there first.
@@ -12,16 +12,18 @@ Opening `/admin/` on a site without an admin shows the setup screen at `/admin/s
 <AdminScreen
   name='setup'
   alt='The first-admin setup screen with the setup token and an email address filled in.'
-  caption='Step 1. Enter the SETUP_TOKEN value and an address from ADMIN_EMAILS.'
+  caption='Step 1. Enter the APP_SECRET value and an address from ADMIN_EMAILS.'
 />
 
 Setup has three steps:
 
-1. **Check the setup token.** Enter the value of `SETUP_TOKEN`, an address from `ADMIN_EMAILS`, and optionally your name, then select **Continue**. If the check passes, you are signed in and move on to step 2. A wrong token, an address that is not allowed, and a closed setup each get their own message.
+1. **Check the setup token.** Enter the value of `APP_SECRET`, an address from `ADMIN_EMAILS`, and optionally your name, then select **Continue**. If the check passes, you are signed in and move on to step 2. A wrong token, an address that is not allowed, and a closed setup each get their own message.
 2. **Register a passkey.** Select **Register a passkey**. Your browser, phone, or password manager creates the passkey and asks for your fingerprint, face, or PIN. The screen shows the domain the passkey belongs to.
 3. **Done.** Setup is closed and you are signed in. Select **Open inquiries** to go to the admin screen. Next time, sign in at `/admin/login` with the passkey.
 
-When you are done, delete the `SETUP_TOKEN` secret. It is not needed again.
+When you are done, keep the `APP_SECRET` secret. The site derives the key that signs admin sessions and the key that hashes IP addresses from it. Deleting it turns sign-in and the contact form off, and changing it signs every admin out and changes IP hashes.
+
+If you set a separate `SETUP_TOKEN` ([Separate keys](/docs/getting-started/#separate-keys)), setup accepts only that value, and the screen names it. Delete `SETUP_TOKEN` when you are done; it is not needed again.
 
 If you leave after step 1, opening `/admin/setup` again continues at step 2. Leaving before you register a passkey does not lock you out.
 
@@ -31,13 +33,13 @@ The setup endpoint `/api/setup` creates the first admin. It accepts a request on
 
 - the request comes from the site itself (the `Origin` header is checked),
 - the request uses `https://` (plain HTTP is allowed only on `localhost`),
-- the request includes the correct `SETUP_TOKEN` (compared in constant time, so the response time does not give the token away), and
+- the request includes the correct setup token, which is `SETUP_TOKEN` when it is set and `APP_SECRET` otherwise (compared in constant time, so the response time does not give the token away), and
 - the email address is in `ADMIN_EMAILS` (case-insensitive).
 
 Setup is also off in these cases:
 
-- **The rate limit cannot run.** Setup attempts are rate-limited. Without the Rate Limiting binding or `IP_HASH_SECRET`, setup is turned off.
-- **A setting is missing or a secret is too short.** `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. When a required setting is missing or too short, the setup screen shows its name.
+- **The rate limit cannot run.** Setup attempts are rate-limited. Without the Rate Limiting binding or a key for IP hashes, setup is turned off.
+- **A setting is missing or a secret is too short.** `APP_SECRET` must be at least 32 characters, and so must `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` if you set them. When a required setting is missing or too short, the setup screen shows its name.
 
 ## How setup closes
 
@@ -114,6 +116,8 @@ return sessionCreatedAt.getTime() < first.createdAt.getTime()
 
 A newly deployed site is public on the internet before its owner has signed in. If the first visitor to the setup page became the admin, a stranger who found the site first could take it over.
 
-So setup requires both a secret that only the owner knows and an allowed address. Setup closes afterwards, so a leaked `SETUP_TOKEN` cannot create more admins later.
+So setup requires both a secret that only the owner knows and an allowed address. Setup closes afterwards, so a leaked setup token cannot create more admins later.
+
+`APP_SECRET` can be the setup token because it is already the root of the session key: anyone who knows it could sign a session cookie, which gives more than setup does. If you do not want to type `APP_SECRET` into a browser, set `SETUP_TOKEN` as well.
 
 If Cloudflare Access protects `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`, only people who pass Access can reach setup at all. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token on `/api/setup` itself. See [Security model](/docs/security/#cloudflare-access).

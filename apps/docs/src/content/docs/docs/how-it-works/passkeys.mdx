@@ -24,7 +24,7 @@ Admins sign in at `/admin/login` with a [passkey](/docs/glossary/#passkey) inste
 - **No other way in.** Email and password sign-in is turned off. There is no development bypass, default account, or shared key.
 - **User verification is required.** Passkey registration and sign-in require user verification (a PIN or biometrics).
 - **No IP addresses.** Better Auth does not record IP addresses in sessions.
-- **Sign-in is rate-limited.** Requests are counted per hashed IP address with the same Rate Limiting binding as the contact form. Without that binding or `IP_HASH_SECRET`, sign-in is turned off.
+- **Sign-in is rate-limited.** Requests are counted per hashed IP address with the same Rate Limiting binding as the contact form. Without that binding or a key for IP hashes (`APP_SECRET`), sign-in is turned off.
 - **`https://` only.** This covers sign-in, setup, the admin screen, and the admin API. Plain HTTP is allowed on `localhost` for `wrangler dev`. See [Security model](/docs/security/#https).
 - **Cloudflare Access can sit in front.** It covers `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. Passkey sign-in is still required with Access. See [Security model](/docs/security/#cloudflare-access).
 - **No sessions from before the passkey.** The admin API accepts only a session created at or after your first passkey: one from a passkey sign-in, or from registering the first passkey. See [First admin setup](/docs/how-it-works/first-admin/#sessions).

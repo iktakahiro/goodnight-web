@@ -1,6 +1,7 @@
 # Secrets for this site. Never commit real values.
 #
-# - Deploy to Cloudflare button: the setup form asks for each value below.
+# - Deploy to Cloudflare button: the setup form asks for each value below that
+#   is not commented out.
 # - Production: set them in the Cloudflare dashboard (Workers & Pages > your
 #   Worker > Settings > Variables and Secrets) or with `npx wrangler secret put
 #   <NAME>`.
@@ -9,33 +10,28 @@
 #
 # A feature whose secret is missing is turned off: for example, the contact
 # form does not accept messages until TURNSTILE_SECRET and the public
-# TURNSTILE_SITE_KEY (in wrangler.jsonc) are set. SETUP_TOKEN,
-# BETTER_AUTH_SECRET, and IP_HASH_SECRET must be random values of at least 32
-# characters. Nothing generates them for you, not even the Deploy button form:
-# use `openssl rand -base64 32`. A shorter value, or one that is clearly not
-# random (such as one character repeated), turns its features off in the same
-# way, and the admin screen says which one to replace.
+# TURNSTILE_SITE_KEY (in wrangler.jsonc) are set. APP_SECRET must be a random
+# value of at least 32 characters. Nothing generates it for you, not even the
+# Deploy button form: use `openssl rand -base64 32`. A shorter value, or one
+# that is clearly not random (such as one character repeated), turns sign-in
+# and the contact form off in the same way, and the admin screen says which
+# value to replace.
 #
 # The admin screen, setup, sign-in, and the contact API work only over
 # https://, except on localhost and 127.0.0.1 for `wrangler dev`.
 
-# A random string of 32 characters or more. You enter it once at /admin to
-# create the first admin. Delete it after setup is done.
+# One random string of 32 characters or more. You enter it once at /admin to
+# create the first admin. The key that signs admin sessions and the key for IP
+# address hashes are derived from it.
+# Do not delete or change it after setup: deleting it turns sign-in and the
+# contact form off, and changing it signs every admin out and changes IP
+# hashes. Keep a copy in a password manager.
 # Create one with: openssl rand -base64 32
-SETUP_TOKEN=
+APP_SECRET=
 
 # Email addresses that may become admins, separated by commas.
 # Example: you@example.com,colleague@example.com
 ADMIN_EMAILS=
-
-# A random string of 32 characters or more. Signs admin sign-in sessions.
-# Create one with: openssl rand -base64 32
-BETTER_AUTH_SECRET=
-
-# A random string of 32 characters or more. IP addresses are stored only as an
-# HMAC made with this key, never as they are.
-# Create one with: openssl rand -base64 32
-IP_HASH_SECRET=
 
 # The Turnstile secret key (Cloudflare dashboard > Turnstile). It pairs with
 # TURNSTILE_SITE_KEY in wrangler.jsonc.
@@ -55,3 +51,14 @@ SLACK_WEBHOOK_URL=
 # your-team.cloudflareaccess.com.
 # ACCESS_AUD=
 # ACCESS_TEAM_DOMAIN=
+
+# Optional. Separate values instead of the ones APP_SECRET gives. A value set
+# here wins over APP_SECRET for its purpose. SETUP_TOKEN: the only value setup
+# accepts; you may delete it after setup. BETTER_AUTH_SECRET: signs admin
+# sessions. IP_HASH_SECRET: the key for IP address hashes. Each is a random
+# string of 32 characters or more. A site that already sets these three
+# keeps working as before. The Deploy to Cloudflare form does not ask for
+# them; set them in the dashboard or with `npx wrangler secret put`.
+# SETUP_TOKEN=
+# BETTER_AUTH_SECRET=
+# IP_HASH_SECRET=

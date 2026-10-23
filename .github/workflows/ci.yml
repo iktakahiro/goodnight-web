@@ -111,11 +111,20 @@ jobs:
           E2E_SECRETS: legacy
           E2E_DEBUG_DIR: ${{ github.workspace }}/e2e-artifacts/server-legacy
         run: bun run test:e2e
-      - name: Starter e2e
+      # The starter e2e also runs in both modes: APP_SECRET and ADMIN_EMAILS
+      # only, as the Deploy to Cloudflare form asks, and the four variables.
+      - name: Starter e2e (APP_SECRET only)
         if: ${{ !cancelled() }}
         working-directory: templates/starter
         env:
           E2E_DEBUG_DIR: ${{ github.workspace }}/e2e-artifacts/starter
+        run: bun run test:e2e
+      - name: Starter e2e (four variables)
+        if: ${{ !cancelled() }}
+        working-directory: templates/starter
+        env:
+          E2E_SECRETS: legacy
+          E2E_DEBUG_DIR: ${{ github.workspace }}/e2e-artifacts/starter-legacy
         run: bun run test:e2e
       - name: Upload screenshots and traces
         if: ${{ failure() }}
