@@ -28,9 +28,9 @@ const en = {
   'error.forbidden': 'Your account cannot use the admin screen.',
   'error.passkey_required': 'Register a passkey to continue.',
   'error.auth_unavailable':
-    'Sign-in is not configured. Set BETTER_AUTH_SECRET (at least 32 characters) for this site.',
+    'Sign-in is not configured. Set APP_SECRET (at least 32 characters) for this site. If BETTER_AUTH_SECRET is set, it must also be at least 32 characters.',
   'error.setup_unavailable':
-    'Setup is not configured. Set SETUP_TOKEN (at least 32 characters) and ADMIN_EMAILS for this site.',
+    'Setup is not configured. Set APP_SECRET (at least 32 characters) and ADMIN_EMAILS for this site. If SETUP_TOKEN, BETTER_AUTH_SECRET, or IP_HASH_SECRET is set, it must also be at least 32 characters.',
   'error.setup_closed': 'Setup is already complete.',
   'error.invalid_setup_token': 'The setup token is not correct.',
   'error.email_not_allowed': 'This email address is not in ADMIN_EMAILS.',
@@ -112,9 +112,9 @@ const ja: MessageCatalog = {
   'error.forbidden': 'このアカウントでは管理画面を使えません。',
   'error.passkey_required': 'Passkey を登録してください。',
   'error.auth_unavailable':
-    'ログインに必要な設定がありません。このサイトに BETTER_AUTH_SECRET（32 文字以上）を設定してください。',
+    'ログインに必要な設定がありません。このサイトに APP_SECRET（32 文字以上）を設定してください。BETTER_AUTH_SECRET を設定している場合は、それも 32 文字以上にしてください。',
   'error.setup_unavailable':
-    'セットアップに必要な設定がありません。このサイトに SETUP_TOKEN（32 文字以上）と ADMIN_EMAILS を設定してください。',
+    'セットアップに必要な設定がありません。このサイトに APP_SECRET（32 文字以上）と ADMIN_EMAILS を設定してください。SETUP_TOKEN、BETTER_AUTH_SECRET、IP_HASH_SECRET を設定している場合は、それも 32 文字以上にしてください。',
   'error.setup_closed': 'セットアップは完了しています。',
   'error.invalid_setup_token': 'セットアップトークンが正しくありません。',
   'error.email_not_allowed':
