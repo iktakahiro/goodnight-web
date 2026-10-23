@@ -28,8 +28,9 @@ maintain. What remains is reviewing and merging update pull requests (see
 2. In the setup form, tick **Create private Git repository**. If you leave it
    unticked, the new repository is public, and the **Visibility check**
    workflow in it fails on every push.
-3. Enter the secrets listed below. Cloudflare creates the Worker and the D1
-   database and deploys the site.
+3. Enter the secrets listed below. Two are required: `APP_SECRET` and
+   `ADMIN_EMAILS`. Cloudflare creates the Worker and the D1 database and
+   deploys the site.
 4. If the repository was created as public anyway, make it private on
    GitHub: **Settings > General > Danger Zone > Change visibility >
    Private**.
@@ -47,14 +48,22 @@ create `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` with
 value that is too short or clearly not random (such as one character
 repeated) keeps the features that use it off.
 
-| Name                 | Required | Purpose                                                                                               |
-| -------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `SETUP_TOKEN`        | yes      | A random string (32 characters or more). You enter it once at `/admin` to create the first admin.     |
-| `ADMIN_EMAILS`       | yes      | Email addresses that may become admins, separated by commas.                                          |
-| `BETTER_AUTH_SECRET` | yes      | A long random string (32 characters or more) that signs admin sessions.                               |
-| `IP_HASH_SECRET`     | yes      | A random string (32 characters or more) used to hash IP addresses. Raw IP addresses are never stored. |
-| `TURNSTILE_SECRET`   | yes      | The Turnstile secret key. Without it, the contact form does not accept inquiries.                     |
-| `SLACK_WEBHOOK_URL`  | no       | A Slack incoming webhook for new-inquiry notices. Notices contain no names or form contents.          |
+| Name                               | Required | Purpose                                                                                                                                                                                                             |
+| ---------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_SECRET`                       | yes      | A random string (32 characters or more). You enter it once at `/admin` to create the first admin. The keys for admin sessions and IP address hashes are derived from it. Create one with `openssl rand -base64 32`. |
+| `ADMIN_EMAILS`                     | yes      | Email addresses that may become admins, separated by commas.                                                                                                                                                        |
+| `TURNSTILE_SECRET`                 | yes      | The Turnstile secret key. Without it, the contact form does not accept inquiries.                                                                                                                                   |
+| `SLACK_WEBHOOK_URL`                | no       | A Slack incoming webhook for new-inquiry notices. Notices contain no names or form contents.                                                                                                                        |
+| `ACCESS_AUD`, `ACCESS_TEAM_DOMAIN` | no       | Cloudflare Access in front of the admin screen. Set both or neither.                                                                                                                                                |
+
+Keep `APP_SECRET` after setup. If you delete it, sign-in and the contact form
+stop working. If you change it, every admin is signed out and IP address
+hashes change. Keep a copy in a password manager.
+
+If you prefer separate keys, you can also set `SETUP_TOKEN`,
+`BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` (each 32 characters or more). A
+value that is set is used instead of the one derived from `APP_SECRET`. Sites
+that already set these three keep working as before.
 
 ## Contact form
 
@@ -89,11 +98,13 @@ The documentation has a step-by-step page (Setup > Turnstile).
 ## First admin
 
 1. Open `https://<your-site>/admin`.
-2. Enter `SETUP_TOKEN` and an email address listed in `ADMIN_EMAILS`.
+2. Enter the value of `APP_SECRET` and an email address listed in
+   `ADMIN_EMAILS`. If you set `SETUP_TOKEN`, enter that instead.
 3. Register a passkey (for example with your phone or your computer's
    fingerprint or face sign-in). There are no passwords.
 
-Setup closes once the first admin exists.
+Setup closes once the first admin exists. Do not delete `APP_SECRET`
+afterwards; the site still uses it.
 
 A passkey works only on the domain it was registered on, so attach your own
 domain to the Worker before step 1 if you have one. Then set
