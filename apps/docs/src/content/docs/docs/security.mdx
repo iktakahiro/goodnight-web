@@ -201,7 +201,7 @@ The SQL text is the same for every search term, page, and page size. Only the pa
 ## CSV export
 
 - The export reads 200 rows per query and streams them, so a large table never sits in the Worker's memory as one file.
-- To keep spreadsheet apps from running a cell as a formula, a cell whose first non-whitespace character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return, gets a leading `'`. The app then shows it as text.
+- To keep spreadsheet apps from running a cell as a formula, a cell whose first visible character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return, gets a leading `'`. The app then shows it as text. Whitespace and invisible characters such as zero-width spaces and bidi controls before it are skipped, and the full-width forms `＝`, `＋`, `－`, and `＠` count too.
 
 ## Updates and your repository [#updates]
 
