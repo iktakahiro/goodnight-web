@@ -14,7 +14,7 @@ hero:
 
 ## CMS も外部のフォームサービスも使わない
 
-ページは静的なファイル、問い合わせは自分のデータベースで扱います。必要なサービスは、Cloudflare と GitHub だけです。
+ページは静的なファイルで管理し、問い合わせは自分のデータベースに保存します。必要なサービスは、Cloudflare と GitHub だけです。
 
 <FeatureGrid>
   <Feature visual='files' wide title='コンテンツは、静的なファイルで管理する'>
@@ -26,13 +26,13 @@ hero:
 
   </Feature>
   <Feature visual='data' title='個人情報を、外部のフォームサービスに預けない'>
-    問い合わせフォームは実装済みです。届いた内容は自分のデータベースに保存され、管理画面で確認します。ログインは Passkey だけで、パスワードは使いません。
+    問い合わせフォームは実装済みです。届いた内容は自分のデータベースに保存され、管理画面で確認できます。ログインは Passkey だけで、パスワードは使いません。
 
     <FeatureNote>※ 問い合わせは、自分の Cloudflare アカウント内の D1 データベースに保存します。</FeatureNote>
 
   </Feature>
   <Feature visual='build' title='ビルド済みのファイルを、そのまま配信する'>
-    Webサイトは SSG でビルドし、できあがったファイルをそのまま Cloudflare から配信します。表示のたびにサーバーで組み立てないので、軽く動きます。
+    Webサイトは SSG でビルドし、できあがったファイルをそのまま Cloudflare から配信します。表示のたびにサーバーで組み立てないので、素早く表示されます。
 
     <FeatureNote>
       ※ 配信には、Cloudflare Workers の Static Assets を使います。

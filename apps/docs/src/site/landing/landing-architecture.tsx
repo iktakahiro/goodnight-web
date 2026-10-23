@@ -14,11 +14,11 @@ import {
 
 const copy = {
   en: {
-    label: 'Architecture of a goodnight-web site',
+    label: 'Architecture of a goodnight-web website',
     visitor: ['Visitor', 'Reads pages, sends the form'],
     owner: ['Admin', 'Reads inquiries'],
     waf: ['Cloudflare WAF', 'Filters requests by rules you set'],
-    access: ['Cloudflare Access', 'A second sign-in for the admin area'],
+    access: ['Cloudflare Access', 'A second sign-in for the admin panel'],
     optional: 'Optional',
     account: 'Your Cloudflare account',
     workers: 'Workers',
@@ -30,7 +30,7 @@ const copy = {
     github: ['GitHub', 'Your files and history'],
   },
   ja: {
-    label: 'goodnight-web のサイト構成図',
+    label: 'goodnight-web のWebサイト構成図',
     visitor: ['訪問者', 'ページを見る・フォームを送る'],
     owner: ['管理者', '問い合わせを確認'],
     waf: ['Cloudflare WAF', '設定したルールでリクエストを制限'],

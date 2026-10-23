@@ -1205,6 +1205,9 @@ html:has(.landing):not(.dark) {
   .arch-label {
     margin: 0;
   }
+  .arch-node {
+    align-self: stretch;
+  }
   .arch-label-account {
     order: 6;
     margin-top: 18px;
@@ -1242,8 +1245,7 @@ html:has(.landing):not(.dark) {
     order: 11;
   }
   :is(.arch-website, .arch-form, .arch-admin, .arch-d1, .arch-builds) {
-    margin-left: 14px;
-    border-left: 3px solid var(--arch-wire, var(--landing-line-strong));
+    margin-left: 20px;
   }
   .arch-node.is-optional {
     background: transparent;
