@@ -30,9 +30,9 @@ starter の `AGENTS.md` と `CLAUDE.md` は、AI ツールに次のことを伝�
 
 ## コピーの作り方
 
-Deploy to Cloudflare ボタンは、公開されている starter リポジトリを、**あなたの GitHub アカウントの新しいリポジトリ**にコピーします。fork ではなく、コピーです。
+Deploy to Cloudflare ボタンは、公開されている goodnight-web リポジトリの `templates/starter` フォルダーを、**あなたの GitHub アカウントの新しいリポジトリ**にコピーします。fork ではなく、コピーです。
 
-あなたのコピーは、starter リポジトリの変更を追いかけません。サーバーのコードは、npm パッケージを通して届きます。手順は[はじめかた](/ja/docs/getting-started/)を参照してください。
+あなたのコピーは、goodnight-web リポジトリの変更を追いかけません。サーバーのコードは、npm パッケージを通して届きます。手順は[はじめかた](/ja/docs/getting-started/)を参照してください。
 
 ## リポジトリは private にする [#private-repository]
 
@@ -42,7 +42,7 @@ public リポジトリでは、サイトのソース全体、設定、すべて�
 
 starter の `.github/workflows/visibility-check.yml` は、push のたびに動きます。手動でも実行できます。リポジトリが public なら、「private にしてください」というエラーを日本語と英語で出し、ジョブを失敗させます。
 
-このワークフローには、トークンも権限もいりません。public にしてよいのは、サイトのコピー元である公開の starter リポジトリだけです。そのため、そのリポジトリでだけジョブを実行しません。
+このワークフローには、トークンも権限もいりません。このワークフローは starter フォルダーの中にあるため、あなたのコピーでだけ動きます。
 
 ## 更新の届き方
 

@@ -11,9 +11,6 @@ permissions: {}
 
 jobs:
   private-repository:
-    # The public goodnight-web starter that sites are copied from is the only
-    # repository allowed to be public.
-    if: github.repository != 'iktakahiro/goodnight-web-starter'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

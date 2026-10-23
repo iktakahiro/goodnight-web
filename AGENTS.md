@@ -38,15 +38,17 @@ The planned layout. Some workspaces do not exist yet. See
 - `packages/typescript-config` (`@goodnight-web/typescript-config`): shared
   `tsconfig` presets (`base.json`, `react.json`).
 - `templates/starter`: the Astro site that users copy and edit, usually with AI
-  tools. It depends on `@goodnight-web/server` through `workspace:*` here and
-  on a published exact version once copied out.
+  tools. It pins `@goodnight-web/server` to an exact version: bun links the
+  workspace package here, and a copy of the folder installs it from npm. Bump
+  both versions together (`bun run check:release`).
 - `apps/docs`: the user-facing documentation site (Fumadocs and TanStack Start,
   prerendered and served by Workers Static Assets).
 - `brand/`: the logo, favicon, and app icon files. `bun run brand:build`
   regenerates them, and the copies in the admin UI and the docs site, from
   `brand/scripts/logo.ts`. Do not edit the generated files by hand.
 - `docs/`: contributor and maintainer documentation. Record design decisions
-  in [docs/decisions/](docs/decisions/README.md).
+  in [docs/decisions/](docs/decisions/README.md). Publishing the server
+  package is described in [docs/releasing.md](docs/releasing.md).
 
 ## Languages
 

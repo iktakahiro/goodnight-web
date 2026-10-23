@@ -30,9 +30,9 @@ The site and the admin screen have separate colors. Changing your site's colors 
 
 ## How you get a copy
 
-The Deploy to Cloudflare button copies the public starter repository into a **new repository in your own GitHub account**. It is a copy, not a fork.
+The Deploy to Cloudflare button copies the `templates/starter` folder of the public goodnight-web repository into a **new repository in your own GitHub account**. It is a copy, not a fork.
 
-Your copy does not follow the starter repository. The server code reaches you through the npm package instead. See [Getting started](/docs/getting-started/).
+Your copy does not follow the goodnight-web repository. The server code reaches you through the npm package instead. See [Getting started](/docs/getting-started/).
 
 ## Your repository must be private [#private-repository]
 
@@ -42,7 +42,7 @@ A public repository shows anyone your full site source, your configuration, and 
 
 The starter's `.github/workflows/visibility-check.yml` runs on every push, and you can also run it manually. If the repository is public, the job fails with an error in Japanese and English that tells you to make it private.
 
-The workflow needs no token and no permissions. Only the public starter repository that sites are copied from may be public, so the job is skipped in that repository only.
+The workflow needs no token and no permissions. The workflow lives in the starter folder, so it runs only in your copy.
 
 ## How updates reach you
 

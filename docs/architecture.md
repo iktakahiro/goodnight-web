@@ -535,11 +535,13 @@ official `@goodnight-web/*` update pull requests, and a Visibility check
 workflow that fails while the repository is public. See
 [starter.md](starter.md).
 
-In this repository the starter depends on `@goodnight-web/server` through
-`workspace:*`. Its contact form uses `getContactForm()` and
+In this repository the starter pins the exact version of
+`@goodnight-web/server`, and bun links the workspace package because the
+versions match. Its contact form uses `getContactForm()` and
 `submitContact()`: it renders the fields of the current form definition and
-gets the Turnstile site key from the same response. When the starter is copied out for users (planned for M2), that
-dependency is replaced with the published exact version.
+gets the Turnstile site key from the same response. When a user copies the
+starter (the Deploy to Cloudflare button copies the `templates/starter`
+folder), the same pin installs the package from npm.
 
 ## How updates reach users
 

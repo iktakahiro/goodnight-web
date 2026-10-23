@@ -74,4 +74,4 @@ curl -s "localhost:8813/?key=ip-hash-b"
   limit as counted per location and not exact, so it is a guard against floods,
   not a strict quota.
 - Not tested: the Deploy to Cloudflare button with this binding. That needs a
-  public repository (M2).
+  public repository and the package on npm.
