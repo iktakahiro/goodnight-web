@@ -1,0 +1,102 @@
+---
+title: When you cannot use or have lost your passkey
+description: Which environments can use passkeys, how to avoid getting locked out, and how to regain admin access with a manual change in D1.
+---
+
+The admin screen accepts only passkeys. This page covers which environments can use them, how to avoid getting locked out, and how to [regain admin access](#regain-admin-access) if you lose every passkey. How sign-in works is in [Passkey sign-in](/docs/how-it-works/passkeys/).
+
+## Can you use a passkey?
+
+Current browsers and operating systems mostly can. On Windows, what works depends on the OS version and on where the passkey is saved.
+
+- **Chrome on Windows 10 or later can save passkeys in Google Password Manager.** They are available on every device where you are signed in to Chrome or Android with the same Google Account. This does not need Windows Hello. See [Manage passkeys in Chrome](https://support.google.com/chrome/answer/13168025) and [Passkey support on Android and Chrome](https://developers.google.com/identity/passkeys/supported-environments).
+- **Passkey management and passkey autofill in Chrome need Windows 11, version 22H2 or later.** Microsoft says passkeys can be used in all supported versions of Windows, and that the native management screen starts with Windows 11 22H2. See [Support for passkeys in Windows](https://learn.microsoft.com/en-us/windows/security/identity-protection/passkeys/).
+- **A passkey saved only in Windows Hello is not synced or backed up.** If the PC is lost or Windows is reinstalled, you cannot recover it.
+
+If your computer cannot create or sync a passkey on its own, use one of these instead:
+
+- **A password manager that stores passkeys**, such as 1Password or Bitwarden.
+- **A phone or tablet.** When Chrome asks, choose **Use a phone or tablet** and scan the QR code. The passkey is saved on the phone. On Windows, both devices need Bluetooth and an internet connection.
+- **A USB security key.** The admin screen requires user verification, so the key needs a PIN. The passkey stays on the key, so if you lose the key, use the recovery steps below.
+
+## Avoid getting locked out
+
+- **Save the passkey where it syncs.** When your browser asks where to save the passkey during setup, pick iCloud Keychain, Google Password Manager, or a password manager such as 1Password or Bitwarden.
+- **Add your domain first.** A passkey is bound to one domain, its relying party ID. A passkey registered on a `workers.dev` address does not work on your own domain. Add your domain before you [create the first admin](/docs/how-it-works/first-admin/).
+- **There is no second passkey yet.** The admin screen has no page to add one. A page for it is planned, with no date.
+
+## Regain admin access [#regain-admin-access]
+
+If you cannot sign in with any passkey, you can reopen setup by changing the D1 database by hand. Use this after a lost device, a reinstalled OS, a deleted passkey, or a move to another domain.
+
+<Callout type='warn'>
+  This needs access to the Cloudflare account that owns the Worker and its
+  database. That account is the root of trust: anyone with it can run these
+  steps. See [Security model](/docs/security/#database-access).
+</Callout>
+
+The change deletes every session and every passkey, so all admins are signed out and none of the old passkeys work. Inquiries and settings other than `setup_closed_at` are not touched.
+
+You need:
+
+- Wrangler, signed in to your Cloudflare account and run in your project directory. `DB` in the command below is the D1 binding name in `wrangler.jsonc`. The database name works too.
+- An address that is in `ADMIN_EMAILS`.
+
+<Steps>
+
+<Step>
+
+### Set `SETUP_TOKEN` again
+
+If you deleted `SETUP_TOKEN` after the first setup, set it again with a value of 32 characters or more. Without it, the setup screen reports `SETUP_TOKEN` as missing. You can also set it in the Cloudflare dashboard.
+
+```sh
+openssl rand -base64 32
+npx wrangler secret put SETUP_TOKEN
+```
+
+</Step>
+
+<Step>
+
+### Clear sessions, passkeys, and the setup lock
+
+```sh
+npx wrangler d1 execute DB --remote --command "DELETE FROM session; DELETE FROM passkey; DELETE FROM settings WHERE key = 'setup_closed_at';"
+```
+
+Run all three statements, in this order:
+
+- **Sessions go first**, so no old session is left when setup opens. A session that survives can register a passkey on the setup screen without `SETUP_TOKEN`.
+- **Deleting only the passkeys does not work.** `settings.setup_closed_at` stays, so setup stays closed.
+- **Deleting only `setup_closed_at` does not work.** Setup stays closed while any passkey exists, and the old passkey still signs in.
+
+</Step>
+
+<Step>
+
+### Run setup again
+
+Open `https://<your domain>/admin/` on the domain you want the passkey bound to. If Cloudflare Access is in front of `/admin`, sign in through Access first. Enter `SETUP_TOKEN` and an address from `ADMIN_EMAILS`, select **Continue**, and register a passkey in a provider that syncs.
+
+With the same address as before, setup reuses the existing user. With another address from `ADMIN_EMAILS`, setup creates a new user, and the old user stays in the database without a passkey and cannot use the admin screen.
+
+Once the new passkey is saved, setup closes again and `/api/setup` returns 403.
+
+</Step>
+
+<Step>
+
+### Clean up
+
+Delete the `SETUP_TOKEN` secret again. Also delete the old passkey for this site from your password manager or browser. If it is still listed and you choose it, sign-in fails with "this passkey is not registered for this site".
+
+</Step>
+
+</Steps>
+
+## What was verified
+
+These steps were run against a local D1 database with `wrangler dev` and a virtual authenticator in Chrome. After the change, setup was open, a new passkey could be registered with the same address, and the admin API worked again. Earlier sessions got 401, and the old passkey could not sign in. The two partial deletions above did not reopen setup.
+
+These steps were not run against a deployed Cloudflare Worker or with `--remote`. A move from one domain to another could not be tested locally either, because the local check can run only on `localhost`.

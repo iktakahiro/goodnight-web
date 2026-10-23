@@ -41,7 +41,7 @@ Setup is also off in these cases:
 
 ## How setup closes
 
-Once the first passkey is registered, setup is closed and the setup endpoint stops working. It stays closed even if every passkey is deleted later.
+Once the first passkey is registered, setup is closed and the setup endpoint stops working. It stays closed even if every passkey is deleted later. To reopen it on purpose, follow [When you cannot use or have lost your passkey](/docs/how-it-works/passkey-recovery/).
 
 Setup counts as closed when `settings.setup_closed_at` exists or any passkey exists. The first passkey registration writes `setup_closed_at` itself (see [Sessions](#sessions)).
 

@@ -4,6 +4,7 @@
   "pages": [
     "contact-protection",
     "passkeys",
+    "passkey-recovery",
     "first-admin",
     "data-pruning",
     "notifications",
