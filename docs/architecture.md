@@ -313,7 +313,8 @@ setup off (`{ name, issue }`, issue `missing`, `too_short`, `weak`, or
 `unsupported`) and is empty once setup is closed.
 
 Session rules ([0006](decisions/0006-admin-sessions-and-setup-closure.md)):
-the passkey plugin's `registration.afterVerification` calls
+the passkey plugin's `registration.afterVerification` first refuses (403) a
+session whose user is no longer in `ADMIN_EMAILS`, then calls
 `beforePasskeySaved()` (`src/features/setup/first-passkey.ts`). A user who
 already has a passkey may add another, but only from a session created at or
 after the first passkey (401 otherwise). For a user without one it refuses
