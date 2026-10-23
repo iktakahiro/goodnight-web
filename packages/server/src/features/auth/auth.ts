@@ -9,6 +9,7 @@ import { isUsableSecret } from '../../shared/secret-length.ts';
 import type { GoodnightEnv } from '../../env.ts';
 import { beforePasskeySaved } from '../setup/first-passkey.ts';
 import { createSetupPlugin } from '../setup/setup-plugin.ts';
+import { isAdminEmail } from './admin-emails.ts';
 import { AUTH_BASE_PATH } from './auth-paths.ts';
 import { unsupportedAuthVariables } from './unsupported-variables.ts';
 
@@ -87,6 +88,20 @@ const buildAuth = (env: GoodnightEnv, origin: string) =>
             if (!verification.registrationInfo?.userVerified) {
               throw new APIError('UNAUTHORIZED', {
                 message: 'user verification required',
+              });
+            }
+            // The same allowlist as setup and requireAdmin. A user whose
+            // address was removed from ADMIN_EMAILS keeps a session until
+            // the next admin request, and must not save a new passkey in
+            // that time.
+            if (
+              !isAdminEmail(
+                env.ADMIN_EMAILS,
+                ctx.context.session?.user.email ?? '',
+              )
+            ) {
+              throw new APIError('FORBIDDEN', {
+                message: 'not an admin address',
               });
             }
             await beforePasskeySaved(env.DB, {

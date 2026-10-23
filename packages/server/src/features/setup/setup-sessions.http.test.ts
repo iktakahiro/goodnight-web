@@ -124,6 +124,20 @@ describe('sessions around setup and the first passkey', () => {
     expect((await me(worker, cookie)).status).toBe(200);
   });
 
+  test('an address removed from ADMIN_EMAILS cannot add a passkey', async () => {
+    const worker = createTestWorker();
+    const jar = new CookieJar(await runSetup(worker));
+    const authenticator = new SoftAuthenticator();
+    await authenticator.register(worker, jar, { createSession: true });
+    expect(count(worker, 'passkey')).toBe(1);
+    // The owner removes the address. The session is still valid until the
+    // next admin request purges it.
+    worker.env.ADMIN_EMAILS = 'someone-else@example.com';
+    const response = await authenticator.register(worker, jar);
+    expect(response.status).toBe(403);
+    expect(count(worker, 'passkey')).toBe(1);
+  });
+
   test('requireAdmin rejects a session older than the first passkey', async () => {
     // Defense in depth: even if a session from setup was not deleted (here
     // the passkey row is inserted without the registration hook), it never
