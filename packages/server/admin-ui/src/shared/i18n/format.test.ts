@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import {
+  formatCountry,
   formatDateTime,
   formatListDate,
   formatNumber,
@@ -58,6 +59,43 @@ describe('formatListDate', () => {
 test('formatNumber groups digits', () => {
   expect(formatNumber(1234, 'ja')).toBe('1,234');
   expect(formatNumber(1234, 'en')).toBe('1,234');
+});
+
+describe('formatCountry', () => {
+  test('shows the Japanese country name with its code', () => {
+    expect(formatCountry('JP', 'ja')).toBe('日本（JP）');
+  });
+
+  test('shows the English country name with its code', () => {
+    expect(formatCountry('JP', 'en')).toBe('Japan (JP)');
+  });
+
+  test('trims and uppercases country codes', () => {
+    expect(formatCountry(' jp ', 'ja')).toBe('日本（JP）');
+    expect(formatCountry('jp', 'en')).toBe('Japan (JP)');
+  });
+
+  test.each(['XX', 'T1', 'not-a-country', ''])(
+    'preserves the unrecognized code %j',
+    (code) => {
+      expect(formatCountry(code, 'ja')).toBe(code);
+      expect(formatCountry(code, 'en')).toBe(code);
+    },
+  );
+
+  test('preserves the code when Intl throws', () => {
+    const of = spyOn(Intl.DisplayNames.prototype, 'of').mockImplementation(
+      () => {
+        throw new RangeError('Region names unavailable');
+      },
+    );
+    try {
+      expect(formatCountry('JP', 'ja')).toBe('JP');
+      expect(formatCountry('JP', 'en')).toBe('JP');
+    } finally {
+      of.mockRestore();
+    }
+  });
 });
 
 describe('pageRange', () => {
