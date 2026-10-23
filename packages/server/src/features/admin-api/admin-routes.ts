@@ -16,7 +16,10 @@ import {
   getFormVersion,
   getFormVersions,
 } from '../contact-form/form-store.ts';
-import { isSlackWebhookUrl } from '../notify/slack.ts';
+import {
+  isInvalidSlackWebhookUrl,
+  isSlackWebhookUrl,
+} from '../notify/slack.ts';
 import { getRetentionDays, pruneIfDue } from '../retention/prune.ts';
 import { SUBMISSION_STATUSES } from '../submissions/submission-status.ts';
 import {
@@ -137,6 +140,11 @@ export interface AdminStatus {
   contactTooShort: string[];
   /** `SLACK_WEBHOOK_URL` is set to a Slack incoming webhook URL. */
   slackConfigured: boolean;
+  /**
+   * `SLACK_WEBHOOK_URL` is set but is not a Slack incoming webhook URL, so
+   * no notification is sent. The value itself is never returned.
+   */
+  slackInvalid: boolean;
   retentionDays: number;
   unreadCount: number;
 }
@@ -240,6 +248,7 @@ export const adminRoutes = new Hono<HonoEnv>()
       contactMissing,
       contactTooShort,
       slackConfigured: isSlackWebhookUrl(c.env.SLACK_WEBHOOK_URL),
+      slackInvalid: isInvalidSlackWebhookUrl(c.env.SLACK_WEBHOOK_URL),
       retentionDays,
       unreadCount,
     };

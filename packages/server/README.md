@@ -33,7 +33,8 @@ version, so old inquiries keep their own labels. The documentation site's
 - a Rate Limiting binding `CONTACT_RATE_LIMITER`
 - the variable `TURNSTILE_SITE_KEY` and the secrets `APP_SECRET` (32
   characters or more), `ADMIN_EMAILS`, `TURNSTILE_SECRET`, and optionally
-  `SLACK_WEBHOOK_URL`
+  `SLACK_WEBHOOK_URL` (`https://hooks.slack.com/services/T…/B…/…`;
+  another value is ignored, and the admin list shows a warning)
 
 `APP_SECRET` stands in for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and
 `IP_HASH_SECRET`. When `BETTER_AUTH_SECRET` or `IP_HASH_SECRET` is not set,

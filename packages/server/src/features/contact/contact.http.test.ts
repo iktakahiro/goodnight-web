@@ -752,4 +752,22 @@ describe('Slack notification', () => {
       'https://attacker.example/hook',
     );
   });
+
+  test('a Slack URL that is not an incoming webhook is never called', async () => {
+    for (const url of [
+      `${SLACK_URL}/`,
+      `${SLACK_URL}?channel=x`,
+      'https://hooks.slack.com/services/T000/B000',
+      'http://hooks.slack.com/services/T000/B000/XXXX',
+    ]) {
+      const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: url } });
+      expect((await post(worker, validBody())).status).toBe(200);
+      const [row] = rows(worker);
+      expect(row).toBeDefined();
+      expect(row?.notified_at).toBeNull();
+    }
+    expect(
+      external.calls.filter((c) => c.url.includes('hooks.slack.com')),
+    ).toEqual([]);
+  });
 });

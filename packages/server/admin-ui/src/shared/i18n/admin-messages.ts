@@ -285,6 +285,10 @@ const en = {
   'notice.slack':
     'Slack notifications are off (optional). Set SLACK_WEBHOOK_URL to be notified in Slack when a new inquiry arrives. Notifications contain no personal data.',
   'notice.slackLink': 'About notifications',
+  'notice.slackInvalidTitle':
+    'The Slack webhook URL is not in the expected format',
+  'notice.slackInvalidBody':
+    'SLACK_WEBHOOK_URL is set, but it is not in the form https://hooks.slack.com/services/T…/B…/…, so Slack notifications are not sent. Inquiries are still saved. Copy the webhook URL from Slack again and set it as SLACK_WEBHOOK_URL.',
   'notice.close': 'Dismiss',
 
   'forbidden.title': 'This account cannot use the admin screen',
@@ -579,6 +583,9 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'notice.slack':
     'Slack への通知はオフです（任意）。SLACK_WEBHOOK_URL を設定すると、新しいお問い合わせが届いたときに Slack へ通知します。通知に個人情報は含まれません。',
   'notice.slackLink': '通知について',
+  'notice.slackInvalidTitle': 'Slack の Webhook URL の形式が正しくありません',
+  'notice.slackInvalidBody':
+    'SLACK_WEBHOOK_URL は設定されていますが、https://hooks.slack.com/services/T…/B…/… の形式ではないため、Slack には通知しません。お問い合わせは保存されています。Slack で Webhook URL をもう一度コピーして、SLACK_WEBHOOK_URL に設定してください。',
   'notice.close': '閉じる',
 
   'forbidden.title': 'このアカウントでは管理画面を使えません',

@@ -3,20 +3,31 @@ import { translate, type Locale } from '../../shared/messages.ts';
 import { markNotified } from '../submissions/submission-store.ts';
 
 /**
- * Returns whether `url` looks like a Slack incoming webhook
- * (`https://hooks.slack.com/...`). Other URLs are never called.
+ * The form of a Slack incoming webhook URL:
+ * `https://hooks.slack.com/services/T…/B…/…`. The workspace (`T…`) and
+ * channel (`B…`) IDs are upper-case letters and digits, the last segment is
+ * letters and digits, and each segment is at most 64 characters. Nothing may
+ * follow: no trailing slash, query, or fragment. Credentials and a port
+ * cannot match.
  */
-export const isSlackWebhookUrl = (url: string | undefined): url is string => {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.protocol === 'https:' && parsed.hostname === 'hooks.slack.com'
-    );
-  } catch {
-    return false;
-  }
-};
+const SLACK_WEBHOOK_URL_PATTERN =
+  /^https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]{1,63}\/B[A-Z0-9]{1,63}\/[A-Za-z0-9]{1,64}$/;
+
+/**
+ * Returns whether `url` has the form of a Slack incoming webhook URL
+ * (`https://hooks.slack.com/services/T…/B…/…`). Whitespace around the value
+ * is ignored. Other URLs are never called.
+ */
+export const isSlackWebhookUrl = (url: string | undefined): url is string =>
+  url !== undefined && SLACK_WEBHOOK_URL_PATTERN.test(url.trim());
+
+/**
+ * Returns whether `url` is set to something other than a Slack incoming
+ * webhook URL, so the admin screen can say so without showing the value.
+ * An unset or blank value is not invalid: Slack is optional.
+ */
+export const isInvalidSlackWebhookUrl = (url: string | undefined): boolean =>
+  url !== undefined && url.trim() !== '' && !isSlackWebhookUrl(url);
 
 /** A Block Kit text object. */
 export type SlackText =

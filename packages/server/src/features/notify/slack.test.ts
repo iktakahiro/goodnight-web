@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   buildSlackPayload,
+  isInvalidSlackWebhookUrl,
   isSlackWebhookUrl,
   SLACK_PAGE_PATH_MAX,
   SLACK_SITE_NAME_MAX,
@@ -283,19 +284,79 @@ describe('buildSlackPayload', () => {
 });
 
 describe('isSlackWebhookUrl', () => {
-  test('accepts only https://hooks.slack.com', () => {
-    expect(isSlackWebhookUrl('https://hooks.slack.com/services/T/B/X')).toBe(
-      true,
-    );
+  test('accepts the incoming webhook form', () => {
+    for (const url of [
+      'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX',
+      // Built at run time so that secret scanners do not flag a sample.
+      `https://hooks.slack.com/services/T00000000/B00000000/${'X'.repeat(24)}`,
+      'https://hooks.slack.com/services/T0/B0/x',
+      `https://hooks.slack.com/services/T${'A'.repeat(63)}/B${'1'.repeat(63)}/${'aZ9'.repeat(21)}a`,
+      // Whitespace around a pasted secret is ignored.
+      ' https://hooks.slack.com/services/T0001/B0001/abc123\n',
+    ]) {
+      expect(isSlackWebhookUrl(url)).toBe(true);
+    }
+  });
+
+  test('rejects anything else', () => {
+    const ok = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX';
     for (const url of [
       undefined,
       '',
-      'http://hooks.slack.com/services/x',
-      'https://hooks.slack.com.evil.example/x',
-      'https://evil.example/hooks.slack.com',
+      '   ',
       'not a url',
+      ok.replace('https:', 'http:'),
+      ok.replace('hooks.slack.com', 'hooks.slack.com.evil.example'),
+      ok.replace('hooks.slack.com', 'evil.example'),
+      ok.replace('hooks.slack.com', 'HOOKS.slack.com'),
+      ok.replace('hooks.slack.com', 'slack.com'),
+      ok.replace('hooks.slack.com', 'hooks.slack.com:443'),
+      ok.replace('hooks.slack.com', 'hooks.slack.com:8443'),
+      ok.replace('hooks.slack.com', 'user:pass@hooks.slack.com'),
+      ok.replace('hooks.slack.com', 'evil.example@hooks.slack.com'),
+      'https://evil.example/hooks.slack.com/services/T0/B0/X',
+      // A trailing slash is rejected: Slack's URLs have none.
+      `${ok}/`,
+      `${ok}/extra`,
+      `${ok}?x=1`,
+      `${ok}?`,
+      `${ok}#x`,
+      `${ok} x`,
+      `${ok}%20`,
+      'https://hooks.slack.com/services/T00000000/B00000000',
+      'https://hooks.slack.com/services/T00000000/B00000000/',
+      'https://hooks.slack.com/services/T00000000//XXXXXXXX',
+      'https://hooks.slack.com/services/T/B/X',
+      'https://hooks.slack.com/services/B00000000/T00000000/XXXXXXXX',
+      'https://hooks.slack.com/services/t00000000/B00000000/XXXXXXXX',
+      'https://hooks.slack.com/services/T0000000a/B00000000/XXXXXXXX',
+      'https://hooks.slack.com/services/T00000000/B00000000/XXXX-XXXX',
+      'https://hooks.slack.com/services/T00000000/B00000000/XXXX_XXXX',
+      'https://hooks.slack.com/workflows/T00000000/A00000000/1/x',
+      'https://hooks.slack.com/Services/T00000000/B00000000/XXXXXXXX',
+      'https://hooks.slack.com/services/T00000000/B00000000/../XXXXXXXX',
+      `https://hooks.slack.com/services/T${'0'.repeat(64)}/B0/X`,
+      `https://hooks.slack.com/services/T0/B${'0'.repeat(64)}/X`,
+      `https://hooks.slack.com/services/T0/B0/${'X'.repeat(65)}`,
     ]) {
       expect(isSlackWebhookUrl(url)).toBe(false);
     }
+  });
+});
+
+describe('isInvalidSlackWebhookUrl', () => {
+  test('is true only for a value that is set and not a webhook URL', () => {
+    expect(isInvalidSlackWebhookUrl(undefined)).toBe(false);
+    expect(isInvalidSlackWebhookUrl('')).toBe(false);
+    expect(isInvalidSlackWebhookUrl('  ')).toBe(false);
+    expect(
+      isInvalidSlackWebhookUrl(
+        'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX',
+      ),
+    ).toBe(false);
+    expect(isInvalidSlackWebhookUrl('https://hooks.slack.com/services/')).toBe(
+      true,
+    );
+    expect(isInvalidSlackWebhookUrl('https://example.com/hook')).toBe(true);
   });
 });

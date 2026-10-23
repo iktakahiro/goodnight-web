@@ -511,6 +511,40 @@ const main = async () => {
         throw new Error('Turnstile notice shown although it is configured');
       }
     });
+    await step('an invalid Slack URL shows a warning instead', async () => {
+      // The dev server has no SLACK_WEBHOOK_URL, so the status the server
+      // would send for an invalid one is stubbed for this step.
+      const statusUrl = `${base}/api/admin/status`;
+      await page.route(statusUrl, async (route) => {
+        const response = await route.fetch();
+        const status = await response.json();
+        await route.fulfill({
+          response,
+          json: { ...status, slackConfigured: false, slackInvalid: true },
+        });
+      });
+      try {
+        await page.reload();
+        const notice = page.getByTestId('slack-invalid-notice');
+        await notice.getByText(ui('en', 'notice.slackInvalidTitle')).waitFor();
+        if (await page.getByTestId('slack-notice').count()) {
+          throw new Error('the quiet Slack note is shown with the warning');
+        }
+        await notice
+          .getByRole('button', { name: ui('en', 'notice.close') })
+          .click();
+        await notice.waitFor({ state: 'detached' });
+        if (await page.getByTestId('slack-notice').count()) {
+          throw new Error(
+            'the quiet Slack note replaced the dismissed warning',
+          );
+        }
+      } finally {
+        await page.unroute(statusUrl);
+      }
+      await page.reload();
+      await page.getByTestId('slack-notice').waitFor();
+    });
 
     await step('sign-out returns to the sign-in screen', async () => {
       // The flag applies from the next page load.
