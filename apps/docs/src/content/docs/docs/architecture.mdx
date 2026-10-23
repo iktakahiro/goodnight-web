@@ -57,7 +57,7 @@ The inquiry list in the admin screen shows 50 inquiries per page, sorted by rece
    - The form fields are checked with a zod schema built from the current form definition in D1, never from a definition the browser sent. Unknown fields and unknown keys in the request body are rejected.
    - If the visitor's page showed an older version of the form, the Worker returns 409 `form_outdated`.
    - Simple rules add to a spam score. A score of 3 or more, or a filled honeypot, flags the submission as suspected spam. A flagged submission is still saved, with the status `unread`.
-6. **Save, then respond.** The row is inserted into D1. The visitor gets a 200 response only after the insert succeeds. Nothing after this step can change the response.
+6. **Save, then respond.** If 500 or more inquiries were stored in the last hour (all senders together), the Worker returns 503 `contact_busy` and stores nothing. Otherwise the row is inserted into D1. The visitor gets a 200 response only after the insert succeeds. Nothing after this step can change the response.
 7. **After the response (in `ctx.waitUntil`).**
    - If the submission is not suspected spam and a Slack webhook is set, the Worker posts a notice with the site name, the page path, the received time, and the admin URL, and records `notified_at`.
    - If the last cleanup was more than an hour ago, the Worker deletes inquiries older than the retention period (180 days by default), expired passkey challenges, and expired sessions.
@@ -65,7 +65,7 @@ The inquiry list in the admin screen shows 50 inquiries per page, sorted by rece
 The contact API fails closed. In any of these cases it returns 503, and the form says "The contact form is not available yet":
 
 - `TURNSTILE_SECRET` or `TURNSTILE_SITE_KEY` is not set.
-- `APP_SECRET` is missing or shorter than 32 characters, and `IP_HASH_SECRET` is not set either. A set `IP_HASH_SECRET` that is shorter than 32 characters also turns it off.
+- `APP_SECRET` is missing, shorter than 32 characters, or clearly not random, and `IP_HASH_SECRET` is not set either. A set `IP_HASH_SECRET` that is too short or clearly not random also turns it off.
 - The Rate Limiting binding is missing.
 
 To set them up, see [Set up Turnstile](/docs/setup/turnstile/).
@@ -133,7 +133,7 @@ The code for contact, setup, auth, the admin API, and the admin screen lives in 
 | `BETTER_AUTH_SECRET`   | Secret, optional      | A separate Better Auth signing key, used instead of the one derived from `APP_SECRET`.                                                   |
 | `IP_HASH_SECRET`       | Secret, optional      | A separate key for `HMAC-SHA256(ip, key)`, used instead of the one derived from `APP_SECRET`.                                            |
 
-When `BETTER_AUTH_SECRET` or `IP_HASH_SECRET` is not set, the Worker derives that key from `APP_SECRET` with [HKDF](/docs/glossary/#hkdf) in Web Crypto, with a different fixed label for each purpose. A secret shorter than 32 characters counts as missing, and the features that use it are turned off; a set value that is too short is not replaced by a derived key. Secrets are used only inside the Worker. They are never sent to the browser or written to D1.
+When `BETTER_AUTH_SECRET` or `IP_HASH_SECRET` is not set, the Worker derives that key from `APP_SECRET` with [HKDF](/docs/glossary/#hkdf) in Web Crypto, with a different fixed label for each purpose. A secret shorter than 32 characters, or clearly not random (a single character repeated, for example), counts as missing, and the features that use it are turned off; a set value that is too short is not replaced by a derived key. Secrets are used only inside the Worker. They are never sent to the browser or written to D1.
 
 `/admin`, `/admin/*`, and every path under `/api/`, including the contact API, work only over `https://` (except on `localhost`). See [Security model](/docs/security/#https).
 

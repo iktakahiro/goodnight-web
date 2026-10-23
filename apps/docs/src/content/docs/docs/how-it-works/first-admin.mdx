@@ -39,7 +39,7 @@ The setup endpoint `/api/setup` creates the first admin. It accepts a request on
 Setup is also off in these cases:
 
 - **The rate limit cannot run.** Setup attempts are rate-limited. Without the Rate Limiting binding or a key for IP hashes, setup is turned off.
-- **A setting is missing or a secret is too short.** `APP_SECRET` must be at least 32 characters, and so must `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` if you set them. When a required setting is missing or too short, the setup screen shows its name.
+- **A setting is missing or a secret is too short or not random.** `APP_SECRET` must be at least 32 characters and clearly random (not one character repeated), and so must `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` if you set them. Setting `BETTER_AUTH_TRUSTED_ORIGINS` or `BETTER_AUTH_SECRETS` also turns setup off. When a setting is missing or unusable, the setup screen shows its name.
 
 ## How setup closes
 
