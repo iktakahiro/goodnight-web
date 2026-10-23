@@ -606,6 +606,70 @@ const main = async () => {
       if (rows !== 1) throw new Error(`expected 1 row, got ${rows}`);
     });
 
+    await step(
+      'mobile view tabs reveal the active tab and keep the page position',
+      async () => {
+        const viewport = page.viewportSize();
+        try {
+          await page.setViewportSize({ width: 390, height: 844 });
+          await page.goto(`${base}/admin?view=spam`);
+          const tabs = page.getByRole('tablist', {
+            name: ui('en', 'list.filterLabel'),
+          });
+          const spam = tabs
+            .getByRole('tab', { selected: true })
+            .and(page.locator('[data-view="spam"]'));
+          await spam.getByTestId('view-count-spam').getByText('1').waitFor();
+          await page.getByTestId('spam-view-hint').waitFor();
+          await page.getByTestId('inquiry-row').first().waitFor();
+          await page.waitForFunction(() => {
+            const active = document.querySelector(
+              '[role="tab"][data-view="spam"][aria-selected="true"]',
+            );
+            const list = active?.closest('[role="tablist"]');
+            const badge = active?.querySelector(
+              '[data-testid="view-count-spam"]',
+            );
+            if (!active || !list || !badge) return false;
+            const box = list.getBoundingClientRect();
+            const left = box.left + list.clientLeft;
+            const right = left + list.clientWidth;
+            return [active, badge].every((element) => {
+              const bounds = element.getBoundingClientRect();
+              return bounds.left >= left && bounds.right <= right;
+            });
+          });
+          await page.evaluate(() =>
+            window.scrollTo({ top: 64, behavior: 'instant' }),
+          );
+          const scrollY = await page.evaluate(() => window.scrollY);
+          if (scrollY <= 0)
+            throw new Error('the page did not scroll before switching tabs');
+          await tabs
+            .getByRole('tab')
+            .and(page.locator('[data-view="read"]'))
+            .click();
+          await page.waitForURL(`${base}/admin?view=read`);
+          await tabs
+            .getByRole('tab', { selected: true })
+            .and(page.locator('[data-view="read"]'))
+            .waitFor();
+          await page
+            .getByText(ui('en', 'list.empty.read'), { exact: true })
+            .waitFor();
+          const after = await page.evaluate(() => window.scrollY);
+          if (after <= 0 || Math.abs(after - scrollY) > 1) {
+            throw new Error(
+              `switching tabs moved the page from ${scrollY} to ${after}`,
+            );
+          }
+        } finally {
+          if (viewport) await page.setViewportSize(viewport);
+          await page.goto(`${base}/admin`);
+        }
+      },
+    );
+
     await step('an invalid list URL falls back to the defaults', async () => {
       await page.goto(`${base}/admin?view=held&page=abc&sort=email`);
       await page
