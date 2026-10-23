@@ -18,16 +18,23 @@
 //    from GET /api/contact/form, validation messages, then a submission that
 //    is saved to D1 (`fields` JSON and `form_version`). Then the admin screen
 //    in a Japanese browser with a CDP virtual authenticator: first-admin
-//    setup with SETUP_TOKEN and an ADMIN_EMAILS address -> passkey
-//    registration -> sign-out -> passkey sign-in -> the inquiry in the list
-//    -> switch to English -> the detail with the field labels, marked read
-//    -> back to unread, stored in D1.
+//    setup with APP_SECRET (or SETUP_TOKEN) and an ADMIN_EMAILS address ->
+//    passkey registration -> sign-out -> passkey sign-in -> the inquiry in
+//    the list -> switch to English -> the detail with the field labels,
+//    marked read -> back to unread, stored in D1. The stored ip_hash is
+//    checked against the key from IP_HASH_SECRET or APP_SECRET.
 //
-// Every secret is passed with --var, so a local .dev.vars does not change the
-// result. Set E2E_PORT to change the port (default 8841),
-// E2E_SCREENSHOT_DIR to save screenshots, and E2E_DEBUG_DIR to save a
-// screenshot of each failed admin step and a Playwright trace of the admin
-// screen (trace.zip, open it with `npx playwright show-trace`).
+// E2E_SECRETS picks the secrets: `app-secret` (the default) sets APP_SECRET
+// and ADMIN_EMAILS only, as the Deploy to Cloudflare form does; `legacy` sets
+// the four variables SETUP_TOKEN, ADMIN_EMAILS, BETTER_AUTH_SECRET, and
+// IP_HASH_SECRET of earlier sites instead.
+//
+// Every secret is passed with --var, and the secrets of the other mode as
+// empty values, so a local .dev.vars does not change the result. Set E2E_PORT
+// to change the port (default 8841), E2E_SCREENSHOT_DIR to save screenshots,
+// and E2E_DEBUG_DIR to save a screenshot of each failed admin step and a
+// Playwright trace of the admin screen (trace.zip, open it with
+// `npx playwright show-trace`).
 //
 // Button names and headings in the admin screen come from
 // @goodnight-web/server/admin-messages.json, and the contact form fields and
@@ -63,13 +70,33 @@ const debugDir = process.env.E2E_DEBUG_DIR;
 const TEST_SITE_KEY = '1x00000000000000000000AA';
 const TEST_SECRET = '1x0000000000000000000000000000000AA';
 
-const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdefghij';
+const E2E_SECRETS = ((): 'app-secret' | 'legacy' => {
+  const mode = process.env.E2E_SECRETS ?? 'app-secret';
+  if (mode === 'app-secret' || mode === 'legacy') return mode;
+  throw new Error(`E2E_SECRETS must be app-secret or legacy, not ${mode}`);
+})();
 const ADMIN_EMAIL = 'admin@example.com';
+const secretVars =
+  E2E_SECRETS === 'legacy'
+    ? {
+        APP_SECRET: '',
+        SETUP_TOKEN: 'e2e-setup-token-0123456789abcdefghij',
+        BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
+        IP_HASH_SECRET: 'e2e-ip-hash-secret-0123456789abcdef',
+      }
+    : {
+        APP_SECRET: 'e2e-app-secret-0123456789abcdefghijklmn',
+        SETUP_TOKEN: '',
+        BETTER_AUTH_SECRET: '',
+        IP_HASH_SECRET: '',
+      };
+/** The secret the setup screen asks for, and its value. */
+const SETUP_TOKEN_NAME =
+  E2E_SECRETS === 'legacy' ? 'SETUP_TOKEN' : 'APP_SECRET';
+const SETUP_TOKEN = secretVars[SETUP_TOKEN_NAME];
 const baseVars = {
-  SETUP_TOKEN,
+  ...secretVars,
   ADMIN_EMAILS: `${ADMIN_EMAIL},colleague@example.com`,
-  BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
-  IP_HASH_SECRET: 'e2e-ip-hash-secret-0123456789abcdef',
   SLACK_WEBHOOK_URL: '',
 };
 const noTurnstile = { TURNSTILE_SITE_KEY: '', TURNSTILE_SECRET: '' };
@@ -91,6 +118,51 @@ function ui(
   return adminMessages[locale][key].replace(/\{(\w+)\}/g, (match, name) =>
     String(params[name] ?? match),
   );
+}
+
+const encoder = new TextEncoder();
+const hex = (bytes: ArrayBuffer) =>
+  [...new Uint8Array(bytes)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+
+/**
+ * The key the server hashes IP addresses with: IP_HASH_SECRET, or the key it
+ * derives from APP_SECRET (HKDF-SHA-256, empty salt, the fixed label
+ * `goodnight-web:ip-hash`, 32 bytes written as hex).
+ */
+async function ipHashKey(): Promise<string> {
+  if (secretVars.IP_HASH_SECRET) return secretVars.IP_HASH_SECRET;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secretVars.APP_SECRET),
+    'HKDF',
+    false,
+    ['deriveBits'],
+  );
+  return hex(
+    await crypto.subtle.deriveBits(
+      {
+        name: 'HKDF',
+        hash: 'SHA-256',
+        salt: new Uint8Array(0),
+        info: encoder.encode('goodnight-web:ip-hash'),
+      },
+      key,
+      256,
+    ),
+  );
+}
+
+async function hmacSha256Hex(secret: string, message: string) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  return hex(await crypto.subtle.sign('HMAC', key, encoder.encode(message)));
 }
 
 const VISITOR_NAME = 'E2E 訪問者';
@@ -567,6 +639,17 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
     /^[0-9a-f]{64}$/.test(String(row?.ip_hash)),
     row?.ip_hash,
   );
+  const ipKey = await ipHashKey();
+  const localHashes = await Promise.all(
+    ['127.0.0.1', '::1', '::ffff:127.0.0.1', 'unknown'].map((ip) =>
+      hmacSha256Hex(ipKey, ip),
+    ),
+  );
+  check(
+    `ip_hash is keyed with ${E2E_SECRETS === 'legacy' ? 'IP_HASH_SECRET' : 'the key derived from APP_SECRET'}`,
+    localHashes.includes(String(row?.ip_hash)),
+    row?.ip_hash,
+  );
   await page.close();
 }
 
@@ -638,9 +721,14 @@ async function adminFlow(browser: Browser): Promise<void> {
         .waitFor();
     },
   );
+  await step(page, `the setup screen asks for ${SETUP_TOKEN_NAME}`, () =>
+    page
+      .getByText(ui('ja', 'setup.tokenHint', { name: SETUP_TOKEN_NAME }))
+      .waitFor(),
+  );
   await step(
     page,
-    'setup with SETUP_TOKEN and an ADMIN_EMAILS address',
+    `setup with ${SETUP_TOKEN_NAME} and an ADMIN_EMAILS address`,
     async () => {
       await page.getByLabel(ui('ja', 'admin.setup.token')).fill(SETUP_TOKEN);
       await page.getByLabel(ui('ja', 'admin.setup.email')).fill(ADMIN_EMAIL);
