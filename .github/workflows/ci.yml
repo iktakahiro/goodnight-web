@@ -87,10 +87,20 @@ jobs:
         run: node_modules/.bin/playwright install --with-deps chromium
       - name: Build
         run: bun run build
-      - name: Server e2e
+      # The server e2e runs twice: with APP_SECRET and ADMIN_EMAILS only (the
+      # default, plus a check that a 31-character APP_SECRET fails closed),
+      # and with the four variables of earlier sites.
+      - name: Server e2e (APP_SECRET only)
         working-directory: packages/server
         env:
           E2E_DEBUG_DIR: ${{ github.workspace }}/e2e-artifacts/server
+        run: bun run test:e2e
+      - name: Server e2e (four variables)
+        if: ${{ !cancelled() }}
+        working-directory: packages/server
+        env:
+          E2E_SECRETS: legacy
+          E2E_DEBUG_DIR: ${{ github.workspace }}/e2e-artifacts/server-legacy
         run: bun run test:e2e
       - name: Starter e2e
         if: ${{ !cancelled() }}
