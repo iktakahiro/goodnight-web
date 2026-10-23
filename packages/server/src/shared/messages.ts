@@ -75,10 +75,16 @@ const en = {
   'admin.turnstileNoticeLink': 'How to set up Turnstile',
   'admin.language': 'Language',
 
-  // Slack notification. No personal data and no message body.
-  'notify.newInquiry': '1 new inquiry',
-  'notify.receivedAt': 'Received: {time}',
-  'notify.open': 'Open the admin screen',
+  // Slack notification. No personal data and no message body. `{site}` is
+  // the site name, already escaped for Slack; `notify.body` is also the
+  // fallback text, without bold.
+  'notify.header': '🌙 New inquiry',
+  'notify.body': 'A new inquiry arrived on {site}.',
+  'notify.receivedAt': 'Received',
+  'notify.page': 'Page',
+  'notify.privacy':
+    'This notification does not include personal data or anything typed into the form.',
+  'notify.open': 'Open in admin',
 } as const;
 
 /** Message keys. Every locale defines every key. */
@@ -158,9 +164,13 @@ const ja: MessageCatalog = {
   'admin.turnstileNoticeLink': 'Turnstile の設定方法',
   'admin.language': '言語',
 
-  'notify.newInquiry': '新しいお問い合わせが 1 件あります',
-  'notify.receivedAt': '受信日時: {time}',
-  'notify.open': '管理画面を開く',
+  'notify.header': '🌙 新しいお問い合わせ',
+  'notify.body': '{site} に新しいお問い合わせが届きました。',
+  'notify.receivedAt': '受信日時',
+  'notify.page': 'ページ',
+  'notify.privacy':
+    'この通知には、個人情報やフォームの入力内容を含めていません。',
+  'notify.open': '管理画面で開く',
 };
 
 /** Message catalogs for every locale. */

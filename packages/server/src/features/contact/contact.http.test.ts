@@ -635,46 +635,101 @@ describe('GET /api/contact/form', () => {
 describe('Slack notification', () => {
   test('contains no personal data and no field values', async () => {
     const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
-    const body = validBody();
-    expect((await post(worker, body)).status).toBe(200);
+    const distinct = {
+      email: 'zq-unique-visitor@example.org',
+      name: 'Zebulon Quixote',
+      company: 'Quixote Holdings',
+      phone: '090-9876-5432',
+      message: 'Secret project codename BLUEFALCON.',
+    };
+    const body = validBody(
+      { email: distinct.email, pagePath: '/contact?ref=BLUEFALCON#frag' },
+      {
+        f_name: distinct.name,
+        f_company: distinct.company,
+        f_phone: distinct.phone,
+        f_category: 'press',
+        f_message: distinct.message,
+      },
+    );
+    const userAgent = 'DistinctAgent/9.9 (ZQ)';
+    const response = await post(worker, body, {
+      headers: { 'user-agent': userAgent },
+    });
+    expect(response.status).toBe(200);
     const [call] = external.slackCalls();
     expect(call?.url).toBe(SLACK_URL);
-    const payload = JSON.parse(call?.body ?? '{}');
-    expect(Object.keys(payload)).toEqual(['text']);
-    for (const value of [
-      body.email,
-      ...Object.values(validFields),
-      'Hanako',
-      'hanako',
-      'Yamada',
-      'Business proposal',
-      CLIENT_IP,
-    ]) {
-      expect(call?.body).not.toContain(value);
-    }
+    const sent = call?.body ?? '';
     const [row] = rows(worker);
-    const lines = String(payload.text).split('\n');
-    expect(lines).toHaveLength(3);
-    expect(lines[0]).toBe('1 new inquiry');
-    expect(lines[1]).toMatch(
-      /^Received: <!date\^\d+\^\{date_short_pretty\} \{time\}\|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z>$/,
+    for (const value of [
+      ...Object.values(distinct),
+      'Zebulon',
+      'zq-unique',
+      'BLUEFALCON',
+      'press',
+      'Press',
+      '取材',
+      'frag',
+      userAgent,
+      'DistinctAgent',
+      CLIENT_IP,
+      String(row?.ip_hash),
+    ]) {
+      expect(sent).not.toContain(value);
+    }
+    const payload = JSON.parse(sent);
+    expect(Object.keys(payload).sort()).toEqual(['blocks', 'text']);
+    expect(payload.text).toBe('A new inquiry arrived on example.com.');
+    expect(sent).toContain('*example.com*');
+    expect(sent).toContain('`/contact`');
+    expect(sent).toMatch(
+      /<!date\^\d+\^\{date_num\} \{time\}\|\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC>/,
     );
-    expect(lines[2]).toBe(
-      `<${ORIGIN}/admin/inquiries/${row?.id}|Open the admin screen>`,
+    const actions = payload.blocks.find(
+      (block: { type: string }) => block.type === 'actions',
+    );
+    expect(actions.elements[0].url).toBe(
+      `${ORIGIN}/admin/inquiries/${row?.id}`,
     );
     expect(row?.notified_at).toBeNumber();
   });
 
-  test('uses the configured locale', async () => {
+  test('uses the configured locale and site name', async () => {
     const worker = createTestWorker({
       env: { SLACK_WEBHOOK_URL: SLACK_URL },
-      options: { locale: 'ja' },
+      options: { locale: 'ja', siteName: 'Acme & <Co> *x*' },
     });
     await post(worker, validBody());
-    const body = external.slackCalls()[0]?.body ?? '';
-    expect(body).toContain('新しいお問い合わせ');
-    expect(body).toContain('受信日時');
-    expect(body).not.toContain('お名前');
+    const sent = external.slackCalls()[0]?.body ?? '';
+    const payload = JSON.parse(sent);
+    expect(payload.text).toBe(
+      'Acme &amp; &lt;Co&gt; ＊x＊ に新しいお問い合わせが届きました。',
+    );
+    expect(sent).toContain('🌙 新しいお問い合わせ');
+    expect(sent).toContain('受信日時');
+    expect(sent).not.toContain('example.com*');
+    expect(sent).not.toContain('お名前');
+  });
+
+  test('a blank site name falls back to the hostname', async () => {
+    const worker = createTestWorker({
+      env: { SLACK_WEBHOOK_URL: SLACK_URL },
+      options: { siteName: '   ' },
+    });
+    await post(worker, validBody());
+    expect(JSON.parse(external.slackCalls()[0]?.body ?? '{}').text).toBe(
+      'A new inquiry arrived on example.com.',
+    );
+  });
+
+  test('without a page path the page field is left out', async () => {
+    const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
+    const body: Record<string, unknown> = validBody();
+    delete body.pagePath;
+    expect((await post(worker, body)).status).toBe(200);
+    const sent = external.slackCalls()[0]?.body ?? '';
+    expect(sent).not.toContain('*Page*');
+    expect(sent).not.toContain('""');
   });
 
   test('a failing webhook does not change the response', async () => {
