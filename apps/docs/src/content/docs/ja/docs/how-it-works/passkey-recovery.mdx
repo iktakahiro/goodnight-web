@@ -1,0 +1,102 @@
+---
+title: Passkeyが使えないとき、失くしたとき
+description: Passkey が使える環境、締め出されないための注意点、D1 を手で書き換えて管理画面へのアクセスを取り戻す手順を説明します。
+---
+
+管理画面は Passkey でしかログインできません。このページでは、Passkey が使える環境、締め出されないための注意点、Passkey をすべて失くしたときに[管理画面へのアクセスを取り戻す手順](#regain-admin-access)を説明します。ログインのしくみは [Passkey でのログイン](/ja/docs/how-it-works/passkeys/)にあります。
+
+## Passkeyは使えるか
+
+最近のブラウザと OS なら、たいてい使えます。Windows では、OS のバージョンと Passkey の保存先によって、使えるかどうかが変わります。
+
+- **Windows 10 以降の Chrome は、Passkey を Google パスワードマネージャーに保存できます。** 同じ Google アカウントで Chrome または Android にログインしている端末で使えます。Windows Hello は必要ありません。詳しくは [Manage passkeys in Chrome](https://support.google.com/chrome/answer/13168025) と [Passkey support on Android and Chrome](https://developers.google.com/identity/passkeys/supported-environments) を見てください。
+- **Chrome で Passkey の管理と自動入力を使うには、Windows 11 バージョン 22H2 以降が必要です。** Microsoft によると、Passkey 自体はサポート中のすべての Windows で使え、専用の管理画面は Windows 11 22H2 から提供されます。詳しくは [Support for passkeys in Windows](https://learn.microsoft.com/en-us/windows/security/identity-protection/passkeys/) を見てください。
+- **Windows Hello にだけ保存した Passkey は、同期もバックアップもされません。** PC をなくしたり、Windows を入れ直したりすると、復元できません。
+
+お使いのパソコンだけでは Passkey を作成または同期できないときは、次のどれかを使ってください。
+
+- **Passkey を保存できるパスワードマネージャーを使います。** 1Password や Bitwarden などがあります。
+- **スマートフォンやタブレットを使います。** Chrome に表示される、別の端末を使う選択肢を選び、QR コードを読み取ります。Passkey はスマートフォン側に保存されます。Windows の場合、両方の端末で Bluetooth とインターネット接続が必要です。
+- **USB セキュリティキーを使います。** 管理画面は本人確認を必須にしているので、キーには PIN の設定が必要です。Passkey はキーの中に残るため、キーを失くしたときは下の復旧手順を使ってください。
+
+## Passkeyで締め出されないために
+
+- **同期される保存先に保存します。** セットアップでブラウザが保存先を聞いてきたら、iCloud キーチェーン、Google パスワードマネージャー、1Password などのパスワードマネージャーのどれかを選んでください。
+- **先に独自ドメインを追加します。** Passkey は 1 つのドメイン、つまり Relying Party ID に結びつきます。`workers.dev` のアドレスで登録した Passkey は、独自ドメインでは使えません。[最初の管理者を作る](/ja/docs/how-it-works/first-admin/)前に、独自ドメインを追加してください。
+- **2 つ目の Passkey は、まだ追加できません。** 管理画面に追加するページはありません。用意する予定ですが、時期は決まっていません。
+
+## 管理画面へのアクセスを取り戻す [#regain-admin-access]
+
+どの Passkey でもログインできないときは、D1 データベースを手で書き換えて、セットアップを開き直せます。端末をなくしたとき、OS を入れ直したとき、Passkey を削除したとき、ドメインを移したときが対象です。
+
+<Callout type='warn'>
+  この作業には、Worker とデータベースを管理する Cloudflare
+  アカウントへのアクセス権が必要です。このアカウントが信頼の起点なので、アクセス権を持つ人は誰でもこの作業ができます。詳しくは
+  [セキュリティモデル](/ja/docs/security/#database-access)を見てください。
+</Callout>
+
+この作業は、すべてのセッションとすべての Passkey を削除します。管理者は全員ログアウトされ、古い Passkey はどれも使えなくなります。問い合わせと、`setup_closed_at` 以外の設定は変わりません。
+
+事前に次のものを用意してください。
+
+- Cloudflare アカウントにログインした Wrangler を、プロジェクトのディレクトリで実行します。以下の `DB` は、`wrangler.jsonc` にある D1 の binding 名です。データベース名でも動きます。
+- `ADMIN_EMAILS` に入っているメールアドレスを 1 つ使います。
+
+<Steps>
+
+<Step>
+
+### `SETUP_TOKEN`をもう一度設定する
+
+最初のセットアップのあとで `SETUP_TOKEN` を削除していたら、32 文字以上の値でもう一度設定します。設定がないと、セットアップ画面に `SETUP_TOKEN` がないと表示されます。Cloudflare のダッシュボードからも設定できます。
+
+```sh
+openssl rand -base64 32
+npx wrangler secret put SETUP_TOKEN
+```
+
+</Step>
+
+<Step>
+
+### セッション、Passkey、セットアップの完了記録を削除する
+
+```sh
+npx wrangler d1 execute DB --remote --command "DELETE FROM session; DELETE FROM passkey; DELETE FROM settings WHERE key = 'setup_closed_at';"
+```
+
+3 つの文は、この順番ですべて実行してください。
+
+- **セッションを最初に消します。** セットアップが開く時点で、古いセッションを残さないためです。セッションが残っていると、そのセッションが `SETUP_TOKEN` なしで、セットアップ画面から Passkey を登録できてしまいます。
+- **Passkey だけを削除しても開きません。** `settings.setup_closed_at` が残るので、セットアップは閉じたままです。
+- **`setup_closed_at` だけを削除しても開きません。** Passkey が 1 つでも残っていればセットアップは閉じたままで、古い Passkey でそのままログインできます。
+
+</Step>
+
+<Step>
+
+### セットアップをやり直す
+
+Passkey を結びつけたいドメインで `https://<your domain>/admin/` を開きます。`/admin` の前に Cloudflare Access がある場合は、先に Access でログインしてください。`SETUP_TOKEN` と `ADMIN_EMAILS` のアドレスを入力して **次へ** を選び、同期される保存先に Passkey を登録します。
+
+前と同じアドレスなら、セットアップは今あるユーザーをそのまま使います。`ADMIN_EMAILS` にある別のアドレスなら、新しいユーザーを作り、古いユーザーは Passkey のないままデータベースに残ります。古いユーザーは管理画面を使えません。
+
+新しい Passkey を保存すると、セットアップはまた閉じて、`/api/setup` は 403 を返します。
+
+</Step>
+
+<Step>
+
+### 後処理
+
+`SETUP_TOKEN` をもう一度削除します。パスワードマネージャーやブラウザに、このサイトの古い Passkey が残っていたら、それも削除してください。残っているものを選ぶと、「このサイトに登録されていない Passkey です」というエラーでログインに失敗します。
+
+</Step>
+
+</Steps>
+
+## 確認したこと
+
+この手順は、`wrangler dev` 上のローカルの D1 データベースと、Chrome の仮想認証器を使って確認しました。実行後はセットアップが開き、同じアドレスで新しい Passkey を登録でき、管理 API が使えました。以前のセッションは 401 になり、古い Passkey ではログインできませんでした。上の 2 つの部分的な削除では、セットアップは開きませんでした。
+
+実際にデプロイした Cloudflare の Worker に対する実行と、`--remote` での実行は確認していません。別のドメインへの移行も、ローカルの検証は `localhost` でしか動かせないため、試せていません。

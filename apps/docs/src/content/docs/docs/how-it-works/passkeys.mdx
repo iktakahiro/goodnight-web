@@ -15,7 +15,7 @@ Admins sign in at `/admin/login` with a [passkey](/docs/glossary/#passkey) inste
 
 - **A passkey belongs to one domain.** Register passkeys after you add your own domain. A passkey registered on a `workers.dev` address does not work on your domain.
 - **Use a passkey that syncs.** The admin screen has no page to add a second passkey yet. When your browser asks where to save the passkey during setup, pick a provider that syncs it across your devices, such as iCloud Keychain, Google Password Manager, or a password manager app. Then losing one device does not lock you out.
-- **Losing the passkey everywhere locks you out.** There is no procedure yet to get the admin back, and setup does not open again (see [First admin setup](/docs/how-it-works/first-admin/)).
+- **Losing the passkey everywhere locks you out.** Setup does not open again by itself (see [First admin setup](/docs/how-it-works/first-admin/)). Getting the admin back takes a manual change in the D1 database. See [When you cannot use or have lost your passkey](/docs/how-it-works/passkey-recovery/).
 - **A second admin cannot be added.** Once setup has closed, a user without a passkey cannot register one.
 
 ## What it does

@@ -108,7 +108,7 @@ The user record, its sessions, and its passkeys stay in D1, so adding the addres
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
 ```
 
-This does not open setup again: `settings.setup_closed_at` stays.
+This does not open setup again: `settings.setup_closed_at` stays. To open setup on purpose, for example after losing every passkey, follow [When you cannot use or have lost your passkey](/docs/how-it-works/passkey-recovery/).
 
 ## Contact form
 

@@ -73,7 +73,7 @@ The database tables are already there, because the `deploy` script applies the D
 
 A passkey works only on the domain it was registered on (its WebAuthn relying party ID). A passkey registered on a `workers.dev` address stops working when you move the admin screen to your own domain.
 
-Setup closes when the first passkey is registered, so you cannot register a new passkey on the new domain either. There is no recovery procedure for this yet, so add your domain before you create the first admin.
+Setup closes when the first passkey is registered, so you cannot register a new passkey on the new domain either. Reopening setup takes a manual change in the database ([When you cannot use or have lost your passkey](/docs/how-it-works/passkey-recovery/)), so add your domain before you create the first admin.
 
 1. In the Cloudflare dashboard, add a custom domain to the Worker.
 2. Turn off the `workers.dev` address and preview URLs. The admin screen is then reachable only on your domain.
@@ -98,7 +98,7 @@ The admin screen works only over `https://`.
 
 1. Open `https://<your domain>/admin/`. No admin exists yet, so the setup screen (`/admin/setup`) opens.
 2. Enter the value of `SETUP_TOKEN` as the **Setup token** and an address from `ADMIN_EMAILS` as the **Email address**, then select **Continue**.
-3. Select **Register a passkey** and create the passkey with your browser or password manager. Save it where it syncs across your devices, such as iCloud Keychain, Google Password Manager, or a password manager app. The admin screen has no page to add a second passkey yet ([Passkey sign-in](/docs/how-it-works/passkeys/)).
+3. Select **Register a passkey** and create the passkey with your browser or password manager. Save it where it syncs across your devices, such as iCloud Keychain, Google Password Manager, or a password manager app. The admin screen has no page to add a second passkey yet ([Passkey sign-in](/docs/how-it-works/passkeys/)). If your browser or computer cannot keep a passkey, or you lose it, see [When you cannot use or have lost your passkey](/docs/how-it-works/passkey-recovery/).
 
 <AdminScreen
   name='setup'
