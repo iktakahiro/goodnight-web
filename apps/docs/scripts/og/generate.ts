@@ -9,6 +9,14 @@
  */
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
+import {
+  fivePointStar,
+  nightColors,
+  sparklePath,
+  townShapes,
+  townSize,
+  type Rect,
+} from '../../src/site/night-art.ts';
 import { openGraphSize } from '../../src/site/open-graph.ts';
 import { readOgCopy, type OgCopy } from './copy.ts';
 import { glyphsFor } from './glyphs.ts';
@@ -30,55 +38,24 @@ function titleLine(line: string, highlight: string): string {
   return `${escapeHtml(line.slice(0, start))}<em>${escapeHtml(highlight)}<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path d="M3 8.5C60 4.5 120 3.5 180 5s90 2.5 117 1.5" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg></em>${escapeHtml(line.slice(start + highlight.length))}`;
 }
 
-type House = {
-  x: number;
-  width: number;
-  wall: number;
-  roof: 'gable' | 'shed' | 'flat';
-  rise: number;
-  /** Lit windows, as [dx, dy] from the wall's top-left corner. */
-  lit?: [number, number][];
-  chimney?: boolean;
-};
-
-const houses: House[] = [
-  { x: -8, width: 92, wall: 52, roof: 'gable', rise: 32, lit: [[58, 18]] },
-  { x: 92, width: 62, wall: 76, roof: 'shed', rise: 16 },
-  { x: 162, width: 84, wall: 44, roof: 'gable', rise: 38, chimney: true },
-  { x: 254, width: 58, wall: 90, roof: 'gable', rise: 26, lit: [[22, 30]] },
-  { x: 320, width: 74, wall: 60, roof: 'flat', rise: 0, lit: [[16, 20]] },
-  { x: 402, width: 88, wall: 42, roof: 'gable', rise: 34 },
-  { x: 498, width: 60, wall: 72, roof: 'gable', rise: 24, chimney: true },
-  { x: 566, width: 84, wall: 50, roof: 'shed', rise: 14, lit: [[50, 18]] },
-];
-
 /** A row of flat house silhouettes along the bottom edge, one fixed layout. */
 function town(): string {
-  const base = 630;
-  const shapes = houses.map((house) => {
-    const top = base - house.wall;
-    const left = house.x;
-    const right = house.x + house.width;
-    const middle = house.x + house.width / 2;
-    const overhang = 4;
+  const rect = (r: Rect) =>
+    `<rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}"/>`;
+  const shapes = townShapes().map((house) => {
     const roof =
-      house.roof === 'gable'
-        ? `<polygon points="${left - overhang},${top} ${middle},${top - house.rise} ${right + overhang},${top}"/>`
-        : house.roof === 'shed'
-          ? `<polygon points="${left - overhang},${top} ${left - overhang},${top - house.rise} ${right + overhang},${top - house.rise * 0.2} ${right + overhang},${top}"/>`
-          : `<rect x="${left - 2}" y="${top - 4}" width="${house.width + 4}" height="4"/>`;
-    const chimney = house.chimney
-      ? `<rect x="${right - 22}" y="${top - house.rise - 2}" width="9" height="${house.rise + 2}"/>`
-      : '';
-    const windows = (house.lit ?? [])
+      house.roof.kind === 'polygon'
+        ? `<polygon points="${house.roof.points}"/>`
+        : rect(house.roof);
+    const windows = house.windows
       .map(
-        ([dx, dy]) =>
-          `<rect x="${left + dx}" y="${top + dy}" width="8" height="11" fill="#f2c987" opacity="0.8"/>`,
+        (w) =>
+          `<rect x="${w.x}" y="${w.y}" width="${w.width}" height="${w.height}" fill="${nightColors.litWindow}" opacity="0.8"/>`,
       )
       .join('');
-    return `<g><rect x="${left}" y="${top}" width="${house.width}" height="${house.wall}"/>${roof}${chimney}${windows}</g>`;
+    return `<g>${rect(house.wall)}${roof}${house.chimney ? rect(house.chimney) : ''}${windows}</g>`;
   });
-  return `<svg class="town" width="660" height="140" viewBox="0 490 660 140" fill="#150b2b">${shapes.join('')}</svg>`;
+  return `<svg class="town" width="${townSize.width}" height="${townSize.height}" viewBox="0 ${townSize.base - townSize.height} ${townSize.width} ${townSize.height}" fill="${nightColors.house}">${shapes.join('')}</svg>`;
 }
 
 /**
@@ -88,7 +65,17 @@ function town(): string {
  * Each star keeps clear of the logo, the text, the screenshot, and the other
  * stars, counting its own size.
  */
-function scatterStars(seed: number) {
+function scatterStars({
+  seed,
+  sparkle,
+  five,
+  fill,
+}: {
+  seed: number;
+  sparkle: string;
+  five: string;
+  fill: string;
+}) {
   let state = seed * 2654435761;
   const random = () => {
     state = (state + 0x6d2b79f5) | 0;
@@ -108,13 +95,6 @@ function scatterStars(seed: number) {
     range.selectNodeContents(el);
     boxes.push(range.getBoundingClientRect());
   }
-  // A unit star has a radius of 1 around the origin.
-  const sparkle = 'M0-1Q.1-.1 1 0Q.1.1 0 1Q-.1.1-1 0Q-.1-.1 0-1Z';
-  const five = Array.from({ length: 10 }, (_, i) => {
-    const r = i % 2 === 0 ? 1 : 0.46;
-    const angle = (Math.PI / 5) * i - Math.PI / 2;
-    return `${(Math.cos(angle) * r).toFixed(3)},${(Math.sin(angle) * r).toFixed(3)}`;
-  }).join(' ');
   // Diameters in pixels, largest first so they get the room they need.
   const sizes = [
     34, 30, 26, 24, 22, 20, 20, 18, 18, 16, 16, 14, 14, 14, 12, 12, 12, 10, 10,
@@ -154,7 +134,7 @@ function scatterStars(seed: number) {
   });
   const sky = document.getElementById('sky');
   if (sky)
-    sky.innerHTML = `<svg width="1200" height="630" viewBox="0 0 1200 630" fill="#efe9ff">${marks}</svg>`;
+    sky.innerHTML = `<svg width="1200" height="630" viewBox="0 0 1200 630" fill="${fill}">${marks}</svg>`;
 }
 
 async function page(copy: OgCopy): Promise<string> {
@@ -231,7 +211,12 @@ try {
     const tab = await context.newPage();
     await tab.setContent(await page(copy), { waitUntil: 'load' });
     await tab.evaluate(() => document.fonts.ready);
-    await tab.evaluate(scatterStars, copy.locale === 'ja' ? 1 : 2);
+    await tab.evaluate(scatterStars, {
+      seed: copy.locale === 'ja' ? 1 : 2,
+      sparkle: sparklePath,
+      five: fivePointStar,
+      fill: nightColors.star,
+    });
     const png = await tab.screenshot({ type: 'png' });
     await Bun.write(`${docs}/public/${copy.output}`, png);
     console.log(`${copy.output}: ${(png.length / 1024).toFixed(0)} KB`);

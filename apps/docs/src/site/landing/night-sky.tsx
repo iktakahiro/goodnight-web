@@ -1,3 +1,12 @@
+import {
+  fivePointStar,
+  nightColors,
+  sparklePath,
+  townShapes,
+  townSize,
+  type Rect,
+} from '../night-art';
+
 /**
  * Stars: the left edge in percent of the band, the edge they sit near, the
  * distance from that edge in rem, and a size. Stars stay in the band's top
@@ -19,27 +28,164 @@ const stars = {
     [52, 'bottom', 1.5, 'm'],
     [86, 'bottom', 3, 's'],
   ],
-  closing: [
-    [14, 'top', 2.5, 's'],
-    [31, 'top', 1.25, 'm'],
-    [68, 'top', 3.25, 's'],
-    [84, 'top', 1.5, 'm'],
-    [10, 'side', 13, 's'],
-    [90, 'side', 16, 's'],
-    [24, 'bottom', 1.75, 'm'],
-    [77, 'bottom', 2.75, 's'],
-  ],
 } as const;
 
 /**
- * The decoration of a night band: a few still stars and, on the architecture
- * band, a crescent moon. Nothing moves, and the whole layer is hidden from
- * assistive tools.
+ * The closing band's stars: left edge in percent, then the distance from the
+ * top (or bottom) in rem for the margin ones, or the top in percent of the
+ * band for the side ones; then the diameter in pixels, whether it is a
+ * five-point star, and the opacity. The always-shown stars stay in the margins above the
+ * logo and between the buttons and the houses. The side stars stay inside the
+ * gutters, shown only on screens wide enough to leave the text clear.
  */
-export function NightSky({ variant }: { variant: keyof typeof stars }) {
+const marks = {
+  margin: [
+    [9, 'top', 2, 16, false, 0.55],
+    [30, 'top', 0.9, 10, false, 0.4],
+    [52, 'top', 1.8, 12, true, 0.35],
+    [74, 'top', 0.8, 8, false, 0.5],
+    [91, 'top', 2.3, 12, false, 0.6],
+    [20, 'bottom', 5.6, 14, false, 0.45],
+    [58, 'bottom', 5.1, 8, false, 0.3],
+    [80, 'bottom', 6.4, 10, false, 0.5],
+  ],
+  side: [
+    [5, 12, 26, false, 0.6],
+    [14, 24, 14, false, 0.4],
+    [8, 36, 10, true, 0.3],
+    [7, 55, 34, false, 0.5],
+    [4, 58, 12, false, 0.45],
+    [12, 66, 18, true, 0.35],
+    [17, 8, 10, false, 0.3],
+    [3, 30, 8, false, 0.35],
+    [92, 10, 20, true, 0.5],
+    [84, 22, 34, false, 0.45],
+    [95, 34, 14, false, 0.6],
+    [94, 47, 24, false, 0.5],
+    [96, 56, 10, false, 0.35],
+    [83, 62, 12, false, 0.3],
+    [91, 66, 16, false, 0.4],
+    [86, 6, 8, false, 0.35],
+  ],
+} as const;
+
+function Mark({ five, size }: { five: boolean; size: number }) {
+  return (
+    <svg
+      viewBox='-1 -1 2 2'
+      width={size}
+      height={size}
+      fill={nightColors.star}
+      focusable='false'
+    >
+      {five ? (
+        <polygon points={fivePointStar} transform='rotate(-8)' />
+      ) : (
+        <path d={sparklePath} />
+      )}
+    </svg>
+  );
+}
+
+function rect(r: Rect, key?: string, fill?: string, opacity?: number) {
+  return (
+    <rect
+      key={key}
+      x={r.x}
+      y={r.y}
+      width={r.width}
+      height={r.height}
+      fill={fill}
+      opacity={opacity}
+    />
+  );
+}
+
+/** Four runs of the houses side by side, every other run mirrored. */
+function Town() {
+  const shapes = townShapes();
+  const tiles = 4;
+  return (
+    <svg
+      className='night-town'
+      viewBox={`0 ${townSize.base - townSize.height} ${townSize.width * tiles} ${townSize.height}`}
+      fill={nightColors.house}
+      focusable='false'
+    >
+      {Array.from({ length: tiles }, (_, tile) => (
+        <g
+          key={tile}
+          transform={
+            tile % 2 === 0
+              ? `translate(${townSize.width * tile} 0)`
+              : `translate(${townSize.width * (tile + 1)} 0) scale(-1 1)`
+          }
+        >
+          {shapes.map((house) => (
+            <g key={house.wall.x}>
+              {rect(house.wall)}
+              {house.roof.kind === 'polygon' ? (
+                <polygon points={house.roof.points} />
+              ) : (
+                rect(house.roof)
+              )}
+              {house.chimney ? rect(house.chimney) : null}
+              {house.windows.map((window, w) =>
+                rect(window, String(w), nightColors.litWindow, 0.8),
+              )}
+            </g>
+          ))}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * The decoration of the closing band: scattered star marks and a row of
+ * house silhouettes along the bottom edge, the same art as the share image.
+ * Nothing moves, and the whole layer is hidden from assistive tools.
+ */
+function ClosingSky() {
+  return (
+    <div className='night-sky night-sky-closing' aria-hidden='true'>
+      {marks.margin.map(([left, edge, offset, size, five, opacity]) => (
+        <span
+          key={`m-${left}-${edge}`}
+          className='night-mark'
+          style={{
+            left: `${left}%`,
+            [edge]: `${offset}rem`,
+            opacity,
+          }}
+        >
+          <Mark five={five} size={size} />
+        </span>
+      ))}
+      {marks.side.map(([left, top, size, five, opacity]) => (
+        <span
+          key={`s-${left}-${top}`}
+          className='night-mark night-mark-side'
+          style={{ left: `${left}%`, top: `${top}%`, opacity }}
+        >
+          <Mark five={five} size={size} />
+        </span>
+      ))}
+      <Town />
+    </div>
+  );
+}
+
+/**
+ * The decoration of a night band: on the architecture band, a few still stars
+ * and a crescent moon; on the closing band, ClosingSky. Nothing moves, and the
+ * whole layer is hidden from assistive tools.
+ */
+export function NightSky({ variant }: { variant: 'architecture' | 'closing' }) {
+  if (variant === 'closing') return <ClosingSky />;
   return (
     <div className={`night-sky night-sky-${variant}`} aria-hidden='true'>
-      {stars[variant].map(([left, edge, offset, size]) => (
+      {stars.architecture.map(([left, edge, offset, size]) => (
         <i
           key={`${left}-${edge}`}
           className={`night-star night-star-${size} night-star-${edge}`}
@@ -49,11 +195,9 @@ export function NightSky({ variant }: { variant: keyof typeof stars }) {
           }}
         />
       ))}
-      {variant === 'architecture' ? (
-        <svg className='night-moon' viewBox='0 0 24 24' focusable='false'>
-          <path d='M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z' />
-        </svg>
-      ) : null}
+      <svg className='night-moon' viewBox='0 0 24 24' focusable='false'>
+        <path d='M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z' />
+      </svg>
     </div>
   );
 }
