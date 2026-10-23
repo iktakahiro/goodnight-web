@@ -5,6 +5,7 @@ import { Highlighter } from '../../components/magicui/highlighter';
 import type { PageMetadata } from '../source';
 import { sitePath } from '../paths';
 import { DeployButton } from './deploy-button';
+import { NightSky } from './night-sky';
 import { ThemedImage } from './themed-image';
 import { WindowBar } from './window-bar';
 import '../../styles/landing.css';
@@ -98,6 +99,7 @@ export function LandingHero({ page }: { page: PageMetadata }) {
   if (!hero) return null;
   return (
     <header className='landing-hero'>
+      <NightSky variant='hero' />
       <div className='landing-wrap'>
         <p className='hero-eyebrow'>{hero.eyebrow}</p>
         <h1 className='hero-title'>

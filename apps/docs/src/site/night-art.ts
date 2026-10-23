@@ -1,6 +1,6 @@
 /**
  * The night artwork shared by the share images (`scripts/og/generate.ts`) and
- * the closing band of the top page: star marks and a row of house
+ * the closing band and hero of the top page: star marks and a row of house
  * silhouettes. This file holds only the shapes and colors, so both can draw
  * the same art.
  */
@@ -9,6 +9,14 @@ export const nightColors = {
   star: '#efe9ff',
   house: '#150b2b',
   litWindow: '#f2c987',
+} as const;
+
+/**
+ * The same stars on a white page (the top page hero in the light theme): a
+ * mid lavender, since the night color would vanish on white.
+ */
+export const dayColors = {
+  star: '#8d68d0',
 } as const;
 
 /** A four-point sparkle with concave sides, as a path of radius 1 around the origin. */

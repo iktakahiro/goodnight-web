@@ -1,4 +1,6 @@
+import type { CSSProperties } from 'react';
 import {
+  dayColors,
   fivePointStar,
   nightColors,
   sparklePath,
@@ -69,13 +71,21 @@ const marks = {
   ],
 } as const;
 
-function Mark({ five, size }: { five: boolean; size: number }) {
+function Mark({
+  five,
+  size,
+  fill = nightColors.star,
+}: {
+  five: boolean;
+  size: number;
+  fill?: string;
+}) {
   return (
     <svg
       viewBox='-1 -1 2 2'
       width={size}
       height={size}
-      fill={nightColors.star}
+      fill={fill}
       focusable='false'
     >
       {five ? (
@@ -177,12 +187,84 @@ function ClosingSky() {
 }
 
 /**
- * The decoration of a night band: on the architecture band, a few still stars
- * and a crescent moon; on the closing band, ClosingSky. Nothing moves, and the
- * whole layer is hidden from assistive tools.
+ * The hero's stars, in the same form as `marks`, positioned from the top of the
+ * hero in rem. They sit in the top margin and, on screens wide enough to have
+ * gutters (`side`), beside the text block. A narrow screen gets only the
+ * first few, so the hero is never busier than the closing band.
  */
-export function NightSky({ variant }: { variant: 'architecture' | 'closing' }) {
+const heroMarks = {
+  margin: [
+    [9, 0.5, 10, false, 0.5],
+    [32, 0.6, 8, false, 0.35],
+    [66, 0.5, 8, true, 0.4],
+    [90, 0.6, 12, false, 0.55],
+  ],
+  side: [
+    [5, 4, 22, false, 0.55],
+    [15, 9, 10, false, 0.35],
+    [9, 15, 12, true, 0.4],
+    [4, 21, 8, false, 0.35],
+    [15, 26, 16, false, 0.45],
+    [92, 6, 14, false, 0.5],
+    [91, 11.5, 8, false, 0.3],
+    [95, 17, 10, true, 0.4],
+    [88, 24, 20, false, 0.5],
+  ],
+} as const;
+
+/**
+ * The hero's stars: the closing band's marks without the houses. They are
+ * lavender-violet on the white page of the light theme and pale lavender in
+ * the dark theme (see `.night-sky-hero` in landing.css). Nothing moves, and the
+ * layer is hidden from assistive tools.
+ */
+function HeroSky() {
+  return (
+    <div
+      className='night-sky night-sky-hero'
+      aria-hidden='true'
+      style={
+        {
+          '--star-day': dayColors.star,
+          '--star-night': nightColors.star,
+        } as CSSProperties
+      }
+    >
+      {heroMarks.margin.map(([left, top, size, five, opacity]) => (
+        <span
+          key={`m-${left}`}
+          className='night-mark'
+          style={{ left: `${left}%`, top: `${top}rem`, opacity }}
+        >
+          <Mark five={five} size={size} fill='currentColor' />
+        </span>
+      ))}
+      {heroMarks.side.map(([left, top, size, five, opacity]) => (
+        <span
+          key={`s-${left}-${top}`}
+          className='night-mark night-mark-side'
+          style={{ left: `${left}%`, top: `${top}rem`, opacity }}
+        >
+          <Mark five={five} size={size} fill='currentColor' />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The decoration of a night band: on the architecture band, a few still stars
+ * and a crescent moon; on the closing band, ClosingSky; on the hero, only the
+ * stars (HeroSky). Nothing moves, and the whole layer is hidden from assistive
+ * tools.
+ */
+export function NightSky({
+  variant,
+}: {
+  variant: 'architecture' | 'closing' | 'hero';
+}) {
   if (variant === 'closing') return <ClosingSky />;
+  if (variant === 'hero') return <HeroSky />;
   return (
     <div className={`night-sky night-sky-${variant}`} aria-hidden='true'>
       {stars.architecture.map(([left, edge, offset, size]) => (
