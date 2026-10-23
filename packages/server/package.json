@@ -1,15 +1,35 @@
 {
   "name": "@goodnight-web/server",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Worker factory, contact API, passkey admin auth, admin API, and D1 migrations for goodnight-web sites.",
+  "keywords": [
+    "astro",
+    "cloudflare",
+    "contact-form",
+    "d1",
+    "hono",
+    "passkey",
+    "workers"
+  ],
+  "homepage": "https://goodnight-web.dev",
+  "bugs": {
+    "url": "https://github.com/iktakahiro/goodnight-web/issues"
+  },
   "license": "MIT",
+  "author": "Takahiro Ikeuchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iktakahiro/goodnight-web.git",
+    "directory": "packages/server"
+  },
   "files": [
     "src",
     "!src/**/*.test.ts",
     "!src/testing",
     "migrations",
-    "!migrations/meta"
+    "!migrations/meta",
+    "README.md",
+    "LICENSE"
   ],
   "type": "module",
   "exports": {
@@ -19,8 +39,12 @@
     "./messages": "./src/messages.ts",
     "./admin-messages.json": "./src/features/admin-ui/admin-messages.gen.json"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "vite build --config admin-ui/vite.config.ts && bun scripts/build-admin-module.ts && bun scripts/build-admin-messages.ts",
+    "prepack": "bun run build",
     "type-check": "tsc -p tsconfig.json && tsc -p admin-ui/tsconfig.json",
     "test": "bun test src admin-ui/src",
     "test:e2e": "bun e2e/run.ts",
@@ -32,10 +56,15 @@
     "db:check": "bun scripts/check-migrations.ts"
   },
   "dependencies": {
+    "@better-auth/core": "1.7.12",
     "@better-auth/passkey": "1.7.12",
+    "@better-auth/utils": "0.5.0",
+    "@better-fetch/fetch": "1.3.2",
     "better-auth": "1.7.12",
+    "better-call": "1.4.4",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.13",
+    "nanostores": "1.5.5",
     "zod": "4.6.7"
   },
   "devDependencies": {

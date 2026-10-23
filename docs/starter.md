@@ -4,8 +4,12 @@ The starter is the Astro site that users copy and own. This document is for
 maintainers. The user-facing rules are in the starter's own `AGENTS.md` and
 `README.md`.
 
-The starter depends on `@goodnight-web/server` through `workspace:*`. Its
-`src/worker.ts` calls `createGoodnightWorker()`, and `wrangler.jsonc` has the
+The starter pins `@goodnight-web/server` to an exact version
+(`"@goodnight-web/server": "0.1.0"`). In this repository bun links the
+workspace package, because the version equals the one in
+`packages/server/package.json`. When the folder is copied out alone, the same
+line installs the package from npm. `bun run check:release` fails if the two
+versions differ. Its `src/worker.ts` calls `createGoodnightWorker()`, and `wrangler.jsonc` has the
 bindings the server needs.
 
 ## Layout
@@ -67,7 +71,8 @@ added only when a page needs real interactivity.
   `TURNSTILE_SITE_KEY`, empty by default.
 - The D1 binding has no `database_id`. `wrangler dev`, `d1 migrations apply
   --local`, and `deploy --dry-run` work without it. That the Deploy button
-  creates the database and fills in the ID is not verified yet (M2).
+  creates the database and fills in the ID is not verified yet: it needs the
+  public repository and the package on npm.
 - Secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`,
   `IP_HASH_SECRET`, `TURNSTILE_SECRET`, optional `SLACK_WEBHOOK_URL`) are
   listed with comments in `.dev.vars.example`. `package.json`
@@ -160,9 +165,9 @@ Known limits:
 `.github/workflows/visibility-check.yml` runs on `push` and
 `workflow_dispatch` with `permissions: {}`. It fails with a Japanese and
 English `::error::` annotation and job summary when
-`github.event.repository.private` is not `true`. It skips
-`iktakahiro/goodnight-web-starter`, the public repository users copy from.
-Change that name if the public repository moves.
+`github.event.repository.private` is not `true`. It lives in
+`templates/starter/.github`, so GitHub does not run it in this repository; it
+runs only in the copies that the Deploy button creates.
 
 ## Dependabot
 
@@ -171,19 +176,51 @@ Change that name if the public repository moves.
 minor and patch updates are a second group. Security updates are not
 delayed by the cooldown.
 
-## When the starter is copied out (M2)
+## When the starter is copied out
 
-The release workflow that syncs `templates/starter` to the public repository
-has to:
+The Deploy to Cloudflare button points at the folder, not at a separate
+repository:
+`https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web/tree/main/templates/starter`.
+Cloudflare treats the subdirectory as the root of the new repository, so the
+folder must work alone (the documented limit for subdirectory URLs: the app
+"must be fully isolated within that subdirectory, including any
+dependencies"). There is no sync workflow and no second repository.
 
-- replace `workspace:*` for `@goodnight-web/*` with the published exact
-  version;
-- generate a `package-lock.json`, because users install with npm and
-  Dependabot's npm ecosystem reads it;
-- leave out `*.test.ts` files from `.github/scripts`;
-- decide whether `e2e/` and the `playwright` dev dependency ship to users
-  (they are useful for AI tools that change the contact form);
-- keep the repository name in `visibility-check.yml` in step.
+What makes it work:
+
+- `@goodnight-web/server` is pinned to an exact version that is published on
+  npm ([releasing.md](releasing.md)). Bump the server version and the
+  starter's pin in the same pull request; `bun run check:release` (part of
+  `validate` and CI) checks that the pin equals the server version, that
+  neither package uses `workspace:`, `file:`, or `link:`, and that the
+  tarball has everything the Worker needs.
+- The server package ships TypeScript source (`exports` point to `src/*.ts`).
+  Astro and wrangler bundle it from `node_modules` without trouble.
+  `src/features/admin-ui/admin-files.gen.ts` and `admin-messages.gen.json` are
+  generated and git-ignored; `prepack` runs the package build, so `npm pack`,
+  `bun pm pack`, and publishing always include them.
+- `better-auth` and `@better-auth/passkey` have exact-version peer
+  dependencies (`@better-auth/core`, `better-call`, and others). Bun
+  resolves them silently, but npm ran for minutes at 100 % CPU and
+  then failed with `ERESOLVE`, because the starter has no lockfile when it is
+  copied. The server package therefore lists those peers as exact
+  dependencies. Move them together with `better-auth`.
+- The starter's `.github/dependabot.yml` and workflows use root-relative
+  paths (`/`, root `package.json`), which is right for a repository root.
+  The `e2e` folder and `.github/scripts/update-check.test.ts` are copied
+  too; they are harmless.
+- The starter has no lockfile. Cloudflare installs with npm, and Dependabot
+  works from `package.json`. A `package-lock.json` can be added after the
+  first publish (`npm install --package-lock-only` in a copy outside this
+  repository); it must be kept in step with `package.json`.
+
+How it was checked: `templates/starter` was copied to a directory outside the
+repository, `@goodnight-web/server` was installed from the tarball made by
+`bun pm pack`, and `npm install`, `astro build`, `astro check`,
+`wrangler deploy --dry-run`, `wrangler d1 migrations apply DB --local`, and
+`node e2e/run.ts` all passed. The real button flow (repository creation,
+resource provisioning, Workers Builds) can be tested only with a public
+repository and a published package.
 
 ## End-to-end test
 

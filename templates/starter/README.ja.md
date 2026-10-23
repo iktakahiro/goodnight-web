@@ -24,7 +24,7 @@ API、問い合わせを読むための管理画面を配信し、1つの D1 デ
 
 ## デプロイ
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web-starter)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web/tree/main/templates/starter)
 
 1. 上の **Deploy to Cloudflare** ボタンを押します。
 2. 設定画面で **Create private Git repository** にチェックを入れます。

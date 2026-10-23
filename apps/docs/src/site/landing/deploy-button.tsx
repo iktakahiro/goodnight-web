@@ -1,16 +1,16 @@
 import { sitePath } from '../paths';
 
 /**
- * The public starter repository that the Deploy to Cloudflare button copies
- * (docs/starter.md). A subdirectory of the monorepo would not build, because
- * `templates/starter` depends on workspace packages.
- *
- * TODO: the repository is not public yet. Confirm its name before release.
+ * The folder of the public goodnight-web repository that the Deploy to
+ * Cloudflare button copies (docs/starter.md). Cloudflare treats this
+ * subdirectory as the root of the new repository, so `templates/starter`
+ * must stay installable on its own: it pins `@goodnight-web/server` to an
+ * exact version that is published on npm (`bun run check:release`).
  */
 export const starterRepositoryUrl =
-  'https://github.com/iktakahiro/goodnight-web-starter';
+  'https://github.com/iktakahiro/goodnight-web/tree/main/templates/starter';
 
-/** Deploy to Cloudflare link for the public starter repository. */
+/** Deploy to Cloudflare link for the starter folder. */
 export const deployToCloudflareUrl = `https://deploy.workers.cloudflare.com/?url=${starterRepositoryUrl}`;
 
 /**

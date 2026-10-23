@@ -34,6 +34,18 @@ updates:
       # Update them together so the lockfile keeps one of each.
       fumadocs:
         patterns: ['fumadocs-*', 'lucide-react']
+      # packages/server lists the exact peer dependencies of
+      # @better-auth/passkey (better-auth, @better-auth/core, better-call,
+      # @better-fetch/fetch) as dependencies, so that `npm install` of the
+      # published package resolves without ERESOLVE (docs/starter.md). They
+      # must move together, or the tree gets two versions of better-call.
+      better-auth:
+        patterns:
+          - 'better-auth'
+          - '@better-auth/*'
+          - 'auth'
+          - 'better-call'
+          - '@better-fetch/*'
       minor-and-patch:
         update-types: [minor, patch]
     commit-message:

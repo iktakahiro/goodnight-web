@@ -22,7 +22,7 @@ maintain. What remains is reviewing and merging update pull requests (see
 
 ## Deploy
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web-starter)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web/tree/main/templates/starter)
 
 1. Click **Deploy to Cloudflare** above.
 2. In the setup form, tick **Create private Git repository**. If you leave it

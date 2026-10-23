@@ -12,6 +12,14 @@ stores the inquiries.
 
 [日本語](README.ja.md)
 
+## Deploy
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web/tree/main/templates/starter)
+
+The button copies the starter (`templates/starter`) into a new repository in
+your GitHub account and deploys it to your Cloudflare account. See the
+[starter README](templates/starter/README.md) for the settings and secrets.
+
 ## Goal
 
 - Run a small company's website without maintaining a server, a language
@@ -34,7 +42,7 @@ Everything user-facing is available in Japanese and English.
 | `packages/server`            | `@goodnight-web/server`: Worker, contact API, admin API and UI, migrations |
 | `packages/astro`             | `@goodnight-web/astro`: optional Astro integration, added only if needed   |
 | `packages/typescript-config` | Shared TypeScript presets                                                  |
-| `templates/starter`          | The Astro site that users copy and edit                                    |
+| `templates/starter`          | The Astro site that users copy and edit (what the Deploy button copies)    |
 | `apps/docs`                  | Documentation site                                                         |
 | `docs`                       | Developer documentation                                                    |
 | `brand`                      | Logo, favicon, and app icon files and their build script                   |

@@ -38,6 +38,11 @@ jobs:
         run: bun run test
       - name: Build
         run: bun run build
+      # The server package can be packed and the starter pins its exact
+      # version, so the Deploy to Cloudflare button (which copies
+      # templates/starter alone) installs it from npm. Needs the build.
+      - name: Release check (package contents and starter pin)
+        run: bun run check:release
 
       # Deploy check: runs `turbo run deploy:check`, which runs
       # `wrangler deploy --dry-run` in each workspace that defines the script:

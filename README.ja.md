@@ -9,6 +9,12 @@ goodnight-web は、Webサイト、ブログ、問い合わせフォームをま
 
 [English](README.md)
 
+## デプロイ
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web/tree/main/templates/starter)
+
+このボタンは、スターター（`templates/starter`）を、あなたの GitHub アカウントの新しいリポジトリにコピーして、あなたの Cloudflare アカウントにデプロイします。設定とシークレットは[スターターの README](templates/starter/README.ja.md) を参照してください。
+
 ## 目的
 
 - サーバー、言語のランタイム、データベースサーバーを自分で保守せずに、小さな会社のWebサイトを運用できるようにする。
