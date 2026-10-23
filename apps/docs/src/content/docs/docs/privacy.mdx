@@ -46,7 +46,9 @@ When you add a field that collects another kind of personal data, also update th
 
 ### Retention
 
-Inquiries are deleted after the retention period, 180 days by default. See [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/).
+Inquiries older than the retention period (180 days by default) are deleted by a cleanup that runs at most once an hour during normal requests: a new inquiry, the admin list, or a sign-in attempt. So an inquiry is deleted some time after the period ends, not on the exact day, and on a site with no requests nothing is deleted until the next one. Suspected spam follows the same rule. The template says this. See [Deleting old inquiries without Cron](/docs/how-it-works/data-pruning/).
+
+`form_definitions.created_by` keeps the email address of the admin who saved each form version. The table is append-only, so the address stays even after that admin is removed. It is your admin's address, not a visitor's.
 
 ## Data is stored outside Japan
 

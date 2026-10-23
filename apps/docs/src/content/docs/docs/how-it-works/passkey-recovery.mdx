@@ -59,15 +59,17 @@ npx wrangler secret put SETUP_TOKEN
 
 <Step>
 
-### Clear sessions, passkeys, and the setup lock
+### Clear passkeys, sessions, and the setup lock
 
 ```sh
-npx wrangler d1 execute DB --remote --command "DELETE FROM session; DELETE FROM passkey; DELETE FROM settings WHERE key = 'setup_closed_at';"
+npx wrangler d1 execute DB --remote --command "DELETE FROM passkey; DELETE FROM session; DELETE FROM settings WHERE key = 'setup_closed_at';"
 ```
 
 Run all three statements, in this order:
 
-- **Sessions go first**, so no old session is left when setup opens. A session that survives can register a passkey on the setup screen without `SETUP_TOKEN`.
+- **Passkeys go first**, so the old passkey cannot sign in and create a new session while the command runs. Setup is still closed at this point.
+- **Sessions go next**, so no old session is left when setup opens. A session that survives can register a passkey on the setup screen without `SETUP_TOKEN`.
+- **The setup lock goes last**, which opens setup.
 - **Deleting only the passkeys does not work.** `settings.setup_closed_at` stays, so setup stays closed.
 - **Deleting only `setup_closed_at` does not work.** Setup stays closed while any passkey exists, and the old passkey still signs in.
 
@@ -97,6 +99,6 @@ Delete the `SETUP_TOKEN` secret again. Also delete the old passkey for this site
 
 ## What was verified
 
-These steps were run against a local D1 database with `wrangler dev` and a virtual authenticator in Chrome. After the change, setup was open, a new passkey could be registered with the same address, and the admin API worked again. Earlier sessions got 401, and the old passkey could not sign in. The two partial deletions above did not reopen setup.
+These steps were run against a local D1 database with `wrangler dev` and a virtual authenticator in Chrome. The statements were later put in the order shown above (passkeys before sessions); the reordered command was run with `wrangler d1 execute --local` and in the server's tests (`passkey-recovery.http.test.ts`) with the same results. After the change, setup was open, a new passkey could be registered with the same address, and the admin API worked again. Earlier sessions got 401, and the old passkey could not sign in. The two partial deletions above did not reopen setup.
 
 These steps were not run against a deployed Cloudflare Worker or with `--remote`. A move from one domain to another could not be tested locally either, because the local check can run only on `localhost`.

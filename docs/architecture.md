@@ -534,6 +534,17 @@ cookie `Path` would not help, because same-origin script can still fetch
   logs redacted messages, and Better Auth rethrows endpoint errors to the
   app's `onError` instead of logging them itself, so no submitted values or
   tokens reach the logs ([0005](decisions/0005-drizzle-orm.md)).
+- **Restores and rollbacks.** There are no down migrations; a Worker rolled
+  back in the dashboard runs against the newer, additive schema. A D1 Time
+  Travel restore brings back passkeys and sessions that the passkey
+  recovery or admin removal SQL deleted, and a restore to before the first
+  passkey reopens setup. The docs site's database page tells operators to
+  re-check `passkey`, `session`, and `settings.setup_closed_at` after a
+  restore.
+- **Admin emails in form history.** `form_definitions.created_by` keeps the
+  address of the admin who saved each version. The table is append-only, so
+  removing an admin does not remove it; the security and privacy pages say
+  so.
 
 ## Package and starter
 

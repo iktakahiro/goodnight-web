@@ -49,11 +49,11 @@ We may post a notice of a new inquiry to our internal chat tool. The notice cont
 
 ## 6. Retention and deletion
 
-- The information in Section 1 (the inquiry record) is deleted automatically **180 days** after we receive it.
+- The information in Section 1 (the inquiry record) is kept for **180 days** after we receive it. After that, it is deleted the next time the site's automatic cleanup runs. The cleanup runs at most once an hour while the site is in use, for example when a new inquiry arrives or when we open the list of inquiries, so the deletion can happen some time after the 180 days rather than on the exact day. Inquiries flagged as possible spam are kept and deleted in the same way.
 - Because of the database's restore feature (Cloudflare D1 Time Travel), deleted information can still be restored for up to **7 days** after deletion. After that it is erased completely.
 - To ask us to delete your information before the retention period ends, contact us as described in Section 9.
 
-<!-- On a paid Cloudflare plan (Workers Paid), Time Travel keeps data for 30 days. In that case, change "7 days" to "30 days". If you change the retention period (180 days), update it here too. -->
+<!-- On a paid Cloudflare plan (Workers Paid), Time Travel keeps data for 30 days. In that case, change "7 days" to "30 days". If you change the retention period (180 days), update it here too. The cleanup needs requests to the site: on a site that gets no requests at all, nothing is deleted until the next one. -->
 
 ## 7. Sharing with third parties
 

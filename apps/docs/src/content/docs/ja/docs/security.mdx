@@ -125,6 +125,8 @@ WAF のルールは、Cloudflare アカウントに追加したドメイン（�
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
 ```
 
+このコマンドは `form_definitions.created_by` には触れません。この列には、フォームの各バージョンを保存した管理者のアドレスが残ります。このテーブルは追記しかできない（データベースのトリガーが更新と削除を拒否する）ため、アドレスはデータベースがある限り残ります。
+
 これでセットアップがまた使えるようになることはありません。`settings.setup_closed_at` は残ります。Passkey をすべて失くしたときなどに、意図してセットアップを開き直す手順は[Passkey が使えないとき、失くしたとき](/ja/docs/how-it-works/passkey-recovery/)にあります。
 
 ## 問い合わせフォーム

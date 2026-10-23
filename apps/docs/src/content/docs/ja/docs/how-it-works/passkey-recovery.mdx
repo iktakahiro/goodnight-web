@@ -59,15 +59,17 @@ npx wrangler secret put SETUP_TOKEN
 
 <Step>
 
-### セッション、Passkey、セットアップの完了記録を削除する
+### Passkey、セッション、セットアップの完了記録を削除する
 
 ```sh
-npx wrangler d1 execute DB --remote --command "DELETE FROM session; DELETE FROM passkey; DELETE FROM settings WHERE key = 'setup_closed_at';"
+npx wrangler d1 execute DB --remote --command "DELETE FROM passkey; DELETE FROM session; DELETE FROM settings WHERE key = 'setup_closed_at';"
 ```
 
 3 つの文は、この順番ですべて実行してください。
 
-- **セッションを最初に消します。** セットアップが開く時点で、古いセッションを残さないためです。セッションが残っていると、そのセッションが `SETUP_TOKEN` なしで、セットアップ画面から Passkey を登録できてしまいます。
+- **Passkey を最初に消します。** コマンドの実行中に、古い Passkey でログインして新しいセッションを作れないようにするためです。この時点では、セットアップはまだ閉じています。
+- **次にセッションを消します。** セットアップが開く時点で、古いセッションを残さないためです。セッションが残っていると、そのセッションが `SETUP_TOKEN` なしで、セットアップ画面から Passkey を登録できてしまいます。
+- **最後にセットアップの完了記録を消します。** これでセットアップが開きます。
 - **Passkey だけを削除しても開きません。** `settings.setup_closed_at` が残るので、セットアップは閉じたままです。
 - **`setup_closed_at` だけを削除しても開きません。** Passkey が 1 つでも残っていればセットアップは閉じたままで、古い Passkey でそのままログインできます。
 
@@ -97,6 +99,6 @@ Passkey を結びつけたいドメインで `https://<your domain>/admin/` を�
 
 ## 確認したこと
 
-この手順は、`wrangler dev` 上のローカルの D1 データベースと、Chrome の仮想認証器を使って確認しました。実行後はセットアップが開き、同じアドレスで新しい Passkey を登録でき、管理 API が使えました。以前のセッションは 401 になり、古い Passkey ではログインできませんでした。上の 2 つの部分的な削除では、セットアップは開きませんでした。
+この手順は、`wrangler dev` 上のローカルの D1 データベースと、Chrome の仮想認証器を使って確認しました。その後、文の順番を上のとおり（セッションより先に Passkey）に変えました。並べ替えたコマンドも、`wrangler d1 execute --local` とサーバーのテスト（`passkey-recovery.http.test.ts`）で実行し、同じ結果になりました。実行後はセットアップが開き、同じアドレスで新しい Passkey を登録でき、管理 API が使えました。以前のセッションは 401 になり、古い Passkey ではログインできませんでした。上の 2 つの部分的な削除では、セットアップは開きませんでした。
 
 実際にデプロイした Cloudflare の Worker に対する実行と、`--remote` での実行は確認していません。別のドメインへの移行も、ローカルの検証は `localhost` でしか動かせないため、試せていません。
