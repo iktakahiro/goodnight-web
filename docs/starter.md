@@ -81,6 +81,10 @@ added only when a page needs real interactivity.
   Cloudflare's documentation names no limit, but in the real form (reported
   2026-10-23) descriptions of 193 and 196 characters showed and those of 257
   or more did not.
+  `@goodnight-web/server` now accepts `APP_SECRET` in place of
+  `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET`
+  ([0010](decisions/0010-single-app-secret.md)). The starter keeps the four
+  variables until it pins a published server version with that change.
 - Scripts: `deploy` is `wrangler d1 migrations apply DB --remote && wrangler
   deploy`; `deploy:check` is `wrangler deploy --dry-run` (CI runs it through
   `turbo run deploy:check`); `preview` builds, applies migrations locally,
