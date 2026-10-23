@@ -47,6 +47,7 @@ type FormStatus =
   | 'verify'
   | 'turnstile'
   | 'rate-limited'
+  | 'too-large'
   | 'error';
 
 /** Texts from the `[data-contact-texts]` JSON in contact-form.astro. */
@@ -340,6 +341,9 @@ export async function setupContactForm(root: HTMLElement): Promise<void> {
         return;
       case 'rate_limited':
         showStatus('rate-limited');
+        return;
+      case 'payload_too_large':
+        showStatus('too-large');
         return;
       default:
         showStatus('error');

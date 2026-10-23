@@ -6,6 +6,7 @@ import {
   isDirty,
   newEditorField,
   serverErrors,
+  submissionSizeHint,
   toEditorValues,
   toUpdateBody,
   validateUpdate,
@@ -131,4 +132,11 @@ test('removed fields are listed as pending, archived ones after them', () => {
     ['f_category', true],
     ['f_budget', false],
   ]);
+});
+
+test('only a textarea shows the limit on all answers of a submission', () => {
+  expect(submissionSizeHint('textarea')).toEqual({ kb: 16, jaChars: 5400 });
+  for (const type of ['text', 'tel', 'url', 'select'] as const) {
+    expect(submissionSizeHint(type)).toBeNull();
+  }
 });

@@ -123,6 +123,22 @@ export const maxLengthLimit = (type: FormFieldType): number =>
       ? FORM_LIMITS.maxLength
       : 0;
 
+/**
+ * The limit on all answers of one submission, shown next to a textarea's
+ * maximum length: `FORM_LIMITS.valuesBytes` in KB, and about how many
+ * Japanese characters (3 bytes each in UTF-8) fit, rounded down to hundreds.
+ * `null` for other types.
+ */
+export const submissionSizeHint = (
+  type: FormFieldType,
+): { kb: number; jaChars: number } | null =>
+  type === 'textarea'
+    ? {
+        kb: FORM_LIMITS.valuesBytes / 1024,
+        jaChars: Math.floor(FORM_LIMITS.valuesBytes / 3 / 100) * 100,
+      }
+    : null;
+
 /** The default `maxLength` for a text type, or 0. */
 export const defaultMaxLength = (type: FormFieldType): number =>
   isTextFieldType(type) ? DEFAULT_MAX_LENGTH[type] : 0;

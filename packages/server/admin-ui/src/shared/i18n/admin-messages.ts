@@ -222,6 +222,8 @@ const en = {
   'form.showInList': 'Show in the inquiry list',
   'form.maxLength': 'Maximum length',
   'form.maxLengthHint': 'Up to {max} characters. Leave empty for {default}.',
+  'form.submissionSizeHint':
+    'All answers of one submission can be saved up to {size} KB in total. For Japanese text that is about {chars} characters.',
   'form.options': 'Choices',
   'form.addOption': 'Add a choice',
   'form.optionJa': 'Choice {n} (Japanese)',
@@ -513,6 +515,8 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'form.maxLength': '最大文字数',
   'form.maxLengthHint':
     '{max} 文字まで指定できます。空欄の場合は {default} 文字です。',
+  'form.submissionSizeHint':
+    '1 件の送信で保存できる回答は、全項目の合計で {size} KB までです。日本語ではおよそ {chars} 文字です。',
   'form.options': '選択肢',
   'form.addOption': '選択肢を追加',
   'form.optionJa': '選択肢 {n}（日本語）',

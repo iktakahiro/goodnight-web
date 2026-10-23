@@ -75,6 +75,8 @@ In the editor, the email and consent rows are marked **Fixed**, with a short exp
 
 A label needs text in at least one language. When one language is empty, the other one is shown.
 
+The 16 KB limit counts bytes, not characters, and covers all answers of one inquiry together. Japanese text takes 3 bytes per character, so that is about 5,400 Japanese characters in total, even when each `textarea` allows 10,000. A larger submission gets `413 payload_too_large`, and the starter's form asks the visitor to shorten the text. The admin screen shows this limit under the maximum length setting of a `textarea`.
+
 ## Field IDs
 
 When you rename a field, its answers stay connected. Values are stored under a fixed ID, not under the label.
