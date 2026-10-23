@@ -1,9 +1,9 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { storedFormDefinitionSchema } from '../features/contact-form/form-definition.ts';
-import { createTestD1 } from '../testing/sqlite-d1.ts';
+import { createTestD1, openTestSqlite } from '../testing/sqlite-d1.ts';
 
 const MIGRATIONS_DIR = join(import.meta.dir, '../../migrations');
 const files = readdirSync(MIGRATIONS_DIR)
@@ -14,6 +14,23 @@ const journal = JSON.parse(
 ) as { entries: { idx: number; tag: string }[] };
 
 describe('migrations', () => {
+  // macOS can start a bun:sqlite connection with legacy_alter_table on, which
+  // makes the 0006 rebuild of `submissions` fail. D1 never turns it on.
+  test('are applied on a connection with legacy_alter_table off, like D1', () => {
+    const { sqlite } = createTestD1();
+    expect(sqlite.query('PRAGMA legacy_alter_table').get()).toEqual({
+      legacy_alter_table: 0,
+    });
+  });
+
+  test('0006 needs legacy_alter_table off, which is how D1 runs it', () => {
+    const sqlite = openTestSqlite();
+    sqlite.exec('PRAGMA legacy_alter_table = ON');
+    expect(() => apply(sqlite, 0, files.length)).toThrow(
+      /__new_submissions\.status|main\.submissions/,
+    );
+  });
+
   test('are numbered 0000, 0001, ... in the order wrangler applies them', () => {
     expect(files.length).toBeGreaterThan(0);
     files.forEach((name, index) => {
@@ -76,7 +93,7 @@ const index = (prefix: string) =>
 
 describe('the contact fields migration (0004, 0005)', () => {
   test('moves existing submissions into fields without losing data', () => {
-    const sqlite = new Database(':memory:');
+    const sqlite = openTestSqlite();
     apply(sqlite, 0, index('0004'));
     const insert = sqlite.query(
       `INSERT INTO submissions (id, created_at, name, email, company, phone,
@@ -251,7 +268,7 @@ describe('the contact fields migration (0004, 0005)', () => {
 
 describe('the unread/read status migration (0006)', () => {
   test('maps the old statuses to unread/read and flags held and spam', () => {
-    const sqlite = new Database(':memory:');
+    const sqlite = openTestSqlite();
     apply(sqlite, 0, index('0006'));
     const insert = sqlite.query(
       `INSERT INTO submissions (id, created_at, email, status, spam_score,
