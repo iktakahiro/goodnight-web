@@ -191,7 +191,7 @@ limit ? offset ?
 ## シークレット [#secrets]
 
 - シークレット（`SETUP_TOKEN`、`ADMIN_EMAILS`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET`、`TURNSTILE_SECRET`、`SLACK_WEBHOOK_URL`）は、すべて Worker のシークレットに置きます。
-- シークレットをブラウザに返すことも、D1 に書くこともありません。Slack の Webhook URL は管理画面にも表示しません。
+- シークレットをブラウザに返すことも、D1 に書くこともありません。Slack の Webhook URL は管理画面にも表示しません。管理画面で確認できるのは、URL が設定されているかどうかと、形式が正しいかどうかだけです。
 - `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は設定されていないものとみなします。それを使うセットアップ、ログイン、問い合わせフォームは 503 を返します。
 - セットアップが完了するまでは、`GET /api/setup` が、足りない設定と短すぎる設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときは、管理画面にも表示します。
 - 管理画面に更新ボタンはありません。あなたの GitHub リポジトリに書き込めるトークンが必要になるからです。

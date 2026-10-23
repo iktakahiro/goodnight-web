@@ -191,7 +191,7 @@ The SQL text is the same for every search term, page, and page size. Only the pa
 ## Secrets [#secrets]
 
 - All secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`, `TURNSTILE_SECRET`, `SLACK_WEBHOOK_URL`) are Worker secrets.
-- Secrets are never sent to the browser and never written to D1. The admin screen does not show the Slack webhook URL.
+- Secrets are never sent to the browser and never written to D1. The admin screen does not show the Slack webhook URL. It only shows whether the URL is set and in the expected format.
 - `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` must be at least 32 characters. A shorter value counts as missing, so setup, sign-in, or the contact form returns 503.
 - While setup is open, `GET /api/setup` lists the names of the settings that are missing or too short (never the values). The admin screen also says when `IP_HASH_SECRET` is too short.
 - There is no update button in the admin screen, because it would need a token that can write to your GitHub repository.

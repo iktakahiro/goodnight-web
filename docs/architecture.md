@@ -78,7 +78,7 @@ Design decisions are recorded in [decisions/](decisions/README.md).
 | `IP_HASH_SECRET`       | secret, optional   | HMAC key for `ip_hash`; default derived                    | contact, setup, sign-in 503 \* |
 | `TURNSTILE_SECRET`     | secret             | Turnstile siteverify                                       | contact API 503                |
 | `TURNSTILE_SITE_KEY`   | variable (public)  | Turnstile widget; the form reads it from the config API    | contact API 503                |
-| `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification                |
+| `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification, admin notice  |
 | `ACCESS_AUD`           | variable, optional | Cloudflare Access audience tag(s), comma-separated         | no Access token check          |
 | `ACCESS_TEAM_DOMAIN`   | variable, optional | Cloudflare Access team domain                              | no Access token check          |
 
@@ -166,8 +166,9 @@ fields in the browser, so a form edit needs no build or deploy.
    `form_version`, `locale`, and the operational columns), then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:
-   - if the row is not suspected spam and `SLACK_WEBHOOK_URL` is a Slack
-     webhook URL,
+   - if the row is not suspected spam and `SLACK_WEBHOOK_URL` has the
+     incoming webhook form `https://hooks.slack.com/services/T…/B…/…`
+     (`isSlackWebhookUrl`: nothing after the last segment),
      post a Block Kit message to Slack and set `notified_at`. It holds the
      site name (`options.siteName`, or the request's hostname), the path of
      the page the form was on (`pagePath` without query or fragment, left
