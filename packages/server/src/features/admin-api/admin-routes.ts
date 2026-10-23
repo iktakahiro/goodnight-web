@@ -3,7 +3,7 @@ import * as z from 'zod';
 import packageJson from '../../../package.json' with { type: 'json' };
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
-import { secretState } from '../../shared/secret-length.ts';
+import { secretProblem } from '../../shared/app-secret.ts';
 import { getContactAvailability } from '../contact/contact-availability.ts';
 import {
   type FormField,
@@ -124,13 +124,15 @@ export interface AdminStatus {
   contactAvailable: boolean;
   /**
    * Names of missing settings that keep the contact API closed. A secret that
-   * is set but too short is listed here and in `contactTooShort`.
+   * is set but too short is listed here and in `contactTooShort`. When
+   * `IP_HASH_SECRET` is neither set nor derived, `APP_SECRET` is listed
+   * instead, because setting it fills the key in.
    */
   contactMissing: string[];
   /**
    * Names of secrets that are set but shorter than `MIN_SECRET_LENGTH`
-   * characters (`IP_HASH_SECRET`). The contact API stays closed until they
-   * are replaced.
+   * characters (`IP_HASH_SECRET`, or `APP_SECRET` when it stands in for
+   * it). The contact API stays closed until they are replaced.
    */
   contactTooShort: string[];
   /** `SLACK_WEBHOOK_URL` is set to a Slack incoming webhook URL. */
@@ -219,16 +221,14 @@ export const adminRoutes = new Hono<HonoEnv>()
   .get('/me', (c) => c.json(c.get('admin')))
   .get('/status', async (c) => {
     const contact = getContactAvailability(c.env);
+    const ipHash = secretProblem(c.env, 'IP_HASH_SECRET');
     const contactMissing = [
       contact.turnstileSecret ? null : 'TURNSTILE_SECRET',
       contact.turnstileSiteKey ? null : 'TURNSTILE_SITE_KEY',
-      contact.ipHashSecret ? null : 'IP_HASH_SECRET',
+      ipHash?.name ?? null,
       contact.rateLimiter ? null : 'CONTACT_RATE_LIMITER',
     ].filter((name): name is string => name !== null);
-    const contactTooShort =
-      secretState(c.env.IP_HASH_SECRET) === 'too_short'
-        ? ['IP_HASH_SECRET']
-        : [];
+    const contactTooShort = ipHash?.issue === 'too_short' ? [ipHash.name] : [];
     const [retentionDays, unreadCount] = await Promise.all([
       getRetentionDays(c.env.DB),
       countUnread(c.env.DB),

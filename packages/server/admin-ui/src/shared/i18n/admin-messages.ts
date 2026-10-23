@@ -43,12 +43,12 @@ const en = {
     'Only people who registered a passkey on this site can sign in.',
 
   'setup.lead':
-    'Enter the SETUP_TOKEN secret and an email address listed in ADMIN_EMAILS. Then register a passkey on this device.',
+    'Enter the value of the {name} secret and an email address listed in ADMIN_EMAILS. Then register a passkey on this device.',
   'setup.step1': 'Check the setup token',
   'setup.step2': 'Register a passkey',
   'setup.step3': 'Done',
   'setup.stepOf': 'Step {current} of {total}',
-  'setup.tokenHint': 'The value of the SETUP_TOKEN secret in Cloudflare.',
+  'setup.tokenHint': 'The value of the {name} secret in Cloudflare.',
   'setup.emailHint': 'An email address listed in ADMIN_EMAILS.',
   'setup.nameHint': 'Optional. Shown in the admin screen.',
   'setup.continue': 'Continue',
@@ -333,12 +333,12 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
     'このサイトに Passkey を登録した人だけがログインできます。',
 
   'setup.lead':
-    'シークレット SETUP_TOKEN の値と、ADMIN_EMAILS に含まれるメールアドレスを入力してください。そのあと、この端末に Passkey を登録します。',
+    'シークレット {name} の値と、ADMIN_EMAILS に含まれるメールアドレスを入力してください。そのあと、この端末に Passkey を登録します。',
   'setup.step1': 'セットアップトークンの確認',
   'setup.step2': 'Passkeyの登録',
   'setup.step3': '完了',
   'setup.stepOf': 'ステップ {current} / {total}',
-  'setup.tokenHint': 'Cloudflare に設定したシークレット SETUP_TOKEN の値です。',
+  'setup.tokenHint': 'Cloudflare に設定したシークレット {name} の値です。',
   'setup.emailHint': 'ADMIN_EMAILS に含まれるメールアドレスのいずれかです。',
   'setup.nameHint': '任意です。管理画面に表示されます。',
   'setup.continue': '次へ',

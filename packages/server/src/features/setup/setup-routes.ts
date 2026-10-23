@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
+import { setupTokenName } from '../../shared/app-secret.ts';
 import { timingSafeEqual } from '../../shared/crypto.ts';
 import { limitByIpHash } from '../../shared/ip-rate-limit.ts';
 import { isAllowedOrigin, readBodyWithLimit } from '../../shared/request.ts';
@@ -19,11 +20,17 @@ export interface SetupState {
   /**
    * `SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`,
    * and the `CONTACT_RATE_LIMITER` binding are set, and the three secrets
-   * are long enough.
+   * are long enough. `APP_SECRET` may stand in for the three secrets.
    */
   configured: boolean;
   /** Setup can run now: configured and no passkey was ever registered. */
   open: boolean;
+  /**
+   * The variable whose value the setup form accepts: `SETUP_TOKEN` when it
+   * is set, otherwise `APP_SECRET`. A name, never a value. `null` once setup
+   * is closed.
+   */
+  tokenName: 'SETUP_TOKEN' | 'APP_SECRET' | null;
   /**
    * The settings that keep setup off, by name. Empty once setup is closed,
    * because they no longer matter then.
@@ -38,8 +45,8 @@ const MAX_SETUP_BODY_BYTES = 4 * 1024;
  *
  * - `GET /`: {@link SetupState}.
  * - `POST /` with `{ token, email, name? }`: checks `Origin`, the rate limit,
- *   that setup is not closed, `SETUP_TOKEN` (constant-time), and
- *   `ADMIN_EMAILS`. Then it creates the user and a session cookie. The browser
+ *   that setup is not closed, `SETUP_TOKEN` (constant-time; `APP_SECRET`
+ *   when `SETUP_TOKEN` is not set), and `ADMIN_EMAILS`. Then it creates the user and a session cookie. The browser
  *   registers a passkey next, and setup closes for good.
  */
 export const setupRoutes = new Hono<HonoEnv>()
@@ -49,6 +56,7 @@ export const setupRoutes = new Hono<HonoEnv>()
     const state: SetupState = {
       configured: problems.length === 0,
       open: problems.length === 0 && !closed,
+      tokenName: closed ? null : setupTokenName(c.env),
       problems: closed ? [] : problems,
     };
     return c.json(state);

@@ -1,7 +1,8 @@
 import * as z from 'zod';
 
 /**
- * Body of `POST /api/setup`: the `SETUP_TOKEN` value, an address in
+ * Body of `POST /api/setup`: the `SETUP_TOKEN` value (`APP_SECRET` when
+ * `SETUP_TOKEN` is not set), an address in
  * `ADMIN_EMAILS`, and an optional display name. The admin UI validates its
  * setup form with the same schema before sending it.
  */

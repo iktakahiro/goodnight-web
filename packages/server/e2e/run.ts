@@ -21,12 +21,27 @@
 // with the new field, see it in the list (column toggle) and the detail, see
 // an old submission with its own labels, and restore version 1. Also checks the API rules the UI relies on, and that
 // the UI runs under the admin CSP without violations.
+//
+// E2E_SECRETS picks the secrets (see support.ts): `app-secret` (default)
+// runs everything with APP_SECRET and ADMIN_EMAILS only, then starts the
+// Worker again with an APP_SECRET of 31 characters and checks that setup,
+// sign-in, and the contact API stay off and the setup screen names
+// APP_SECRET. `legacy` runs with the four variables.
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chromium, type Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
+import {
+  APP_SECRET_LABELS,
+  deriveAppSecretKey,
+} from '../src/shared/app-secret.ts';
+import { hmacSha256Hex } from '../src/shared/crypto.ts';
+import { MIN_SECRET_LENGTH } from '../src/shared/secret-length.ts';
 import {
   ADMIN_EMAIL,
+  APP_SECRET,
+  E2E_SECRETS,
   SETUP_TOKEN,
+  SETUP_TOKEN_NAME,
   addVirtualAuthenticator,
   buildPackage,
   freshDatabase,
@@ -137,6 +152,127 @@ const contactBody = (
   elapsedMs: 15_000,
   pagePath: '/contact',
 });
+
+/**
+ * Starts the Worker with an APP_SECRET of 31 characters and no other secret:
+ * nothing is derived, so setup, sign-in, and the contact API answer 503 and
+ * the setup screen names APP_SECRET as too short. Nothing is stored.
+ */
+const checkShortAppSecret = async () => {
+  const shortStateDir = join(packageDir, '.wrangler/e2e-state-short');
+  const shortQuery = (sql: string) => queryDatabase(shortStateDir, sql);
+  await freshDatabase(shortStateDir);
+  const server = await startDevServer({
+    port,
+    stateDir: shortStateDir,
+    vars: {
+      ...testVars,
+      APP_SECRET: APP_SECRET.slice(0, MIN_SECRET_LENGTH - 1),
+    },
+  });
+  const { base } = server;
+  const call = async (path: string, init: RequestInit = {}) => {
+    const response = await fetch(`${base}${path}`, init);
+    return {
+      status: response.status,
+      body: (await response.json()) as {
+        error?: { code: string; message: string };
+      } & Record<string, unknown>,
+    };
+  };
+  const post = (path: string, body: unknown) =>
+    call(path, {
+      method: 'POST',
+      headers: { origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  let browser: Browser | null = null;
+  try {
+    const state = await call('/api/setup');
+    check(
+      'short APP_SECRET: setup reports APP_SECRET too_short only',
+      state.status === 200 &&
+        state.body.configured === false &&
+        JSON.stringify(state.body.problems) ===
+          JSON.stringify([{ name: 'APP_SECRET', issue: 'too_short' }]),
+      state,
+    );
+    for (const token of [
+      APP_SECRET.slice(0, MIN_SECRET_LENGTH - 1),
+      APP_SECRET,
+    ]) {
+      const setup = await post('/api/setup', {
+        token,
+        email: ADMIN_EMAIL,
+        name: 'Admin',
+      });
+      check(
+        `short APP_SECRET: POST /api/setup is 503 auth_unavailable (${token.length} characters)`,
+        setup.status === 503 &&
+          setup.body.error?.code === 'auth_unavailable' &&
+          setup.body.error.message.includes('APP_SECRET') &&
+          !JSON.stringify(setup).includes(token),
+        setup,
+      );
+    }
+    const session = await call('/api/auth/get-session');
+    const signIn = await post(
+      '/api/auth/passkey/generate-authenticate-options',
+      {},
+    );
+    const admin = await call('/api/admin/status');
+    check(
+      'short APP_SECRET: sign-in and the admin API are 503 auth_unavailable',
+      [session, signIn, admin].every(
+        (r) => r.status === 503 && r.body.error?.code === 'auth_unavailable',
+      ),
+      { session, signIn, admin },
+    );
+    const contact = await post(
+      '/api/contact',
+      contactBody('e2e-pass', 'Short'),
+    );
+    const form = await call('/api/contact/form');
+    check(
+      'short APP_SECRET: the contact API is 503 contact_unavailable',
+      contact.status === 503 &&
+        contact.body.error?.code === 'contact_unavailable' &&
+        form.body.available === false,
+      { contact, form: form.body.available },
+    );
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ locale: 'en-US' });
+    currentPage = page;
+    await step(
+      'short APP_SECRET: the setup screen names APP_SECRET',
+      async () => {
+        await page.goto(`${base}/admin/setup`);
+        await page
+          .getByRole('heading', { name: ui('en', 'setup.unavailableTitle') })
+          .waitFor();
+        await page
+          .getByTestId('setup-problems')
+          .getByText(
+            ui('en', 'setup.problemTooShort', {
+              name: 'APP_SECRET',
+              min: MIN_SECRET_LENGTH,
+            }),
+          )
+          .waitFor();
+      },
+    );
+    const users = await shortQuery('SELECT COUNT(*) AS n FROM user');
+    const rows = await shortQuery('SELECT COUNT(*) AS n FROM submissions');
+    check(
+      'short APP_SECRET: nothing is stored',
+      users[0]?.n === 0 && rows[0]?.n === 0,
+      { users, rows },
+    );
+  } finally {
+    await browser?.close();
+    await server.stop();
+  }
+};
 
 const main = async () => {
   await buildPackage();
@@ -255,6 +391,26 @@ const main = async () => {
       /^[0-9a-f]{64}$/.test(String(stored[0]?.ip_hash)),
       stored[0]?.ip_hash,
     );
+    // workerd derives the same key as this process: the stored hash is the
+    // HMAC of the local client address with IP_HASH_SECRET, or with the key
+    // derived from APP_SECRET.
+    const ipKey =
+      E2E_SECRETS === 'legacy'
+        ? (testVars.IP_HASH_SECRET ?? '')
+        : await deriveAppSecretKey(
+            APP_SECRET,
+            APP_SECRET_LABELS.IP_HASH_SECRET,
+          );
+    const localHashes = await Promise.all(
+      ['127.0.0.1', '::1', '::ffff:127.0.0.1', 'unknown'].map((ip) =>
+        hmacSha256Hex(ipKey, ip),
+      ),
+    );
+    check(
+      `ip_hash is keyed with ${E2E_SECRETS === 'legacy' ? 'IP_HASH_SECRET' : 'the key derived from APP_SECRET'}`,
+      localHashes.includes(String(stored[0]?.ip_hash)),
+      stored[0]?.ip_hash,
+    );
     const id = String(stored[0]?.id);
     const before = await gnw(page, 'call', '/api/admin/submissions');
     check('admin list is 401 before sign-in', before.status === 401, before);
@@ -265,6 +421,11 @@ const main = async () => {
       await page.waitForURL(`${base}/admin/setup`);
       await page
         .getByRole('heading', { name: ui('en', 'admin.setup.title') })
+        .waitFor();
+    });
+    await step(`the setup screen asks for ${SETUP_TOKEN_NAME}`, async () => {
+      await page
+        .getByText(ui('en', 'setup.tokenHint', { name: SETUP_TOKEN_NAME }))
         .waitFor();
     });
     await step('the favicons and the touch icon are served', async () => {
@@ -1038,6 +1199,7 @@ const main = async () => {
     await browser.close();
     await server.stop();
   }
+  if (E2E_SECRETS === 'app-secret') await checkShortAppSecret();
   console.log(
     failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`,
   );

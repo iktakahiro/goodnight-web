@@ -10,6 +10,7 @@ import { setupRoutes } from './features/setup/setup-routes.ts';
 import type { HonoEnv } from './hono-env.ts';
 import { resolveOptions, type GoodnightWorkerOptions } from './options.ts';
 import { apiError } from './shared/api-error.ts';
+import { resolveAppSecret } from './shared/app-secret.ts';
 import { safeErrorMessage } from './shared/log-error.ts';
 
 /**
@@ -40,11 +41,16 @@ import { safeErrorMessage } from './shared/log-error.ts';
  * The admin UI, the admin API, setup, and Better Auth require HTTPS (plain
  * HTTP is allowed on `localhost`), and a valid Cloudflare Access token when
  * `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` are set.
+ *
+ * Before any route runs, `c.env` is replaced by the resolved env, in which
+ * `APP_SECRET` stands in for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and
+ * `IP_HASH_SECRET` when they are not set (`resolveAppSecret`).
  */
 export const createGoodnightWorker = (options: GoodnightWorkerOptions = {}) => {
   const resolved = resolveOptions(options);
   const app = new Hono<HonoEnv>();
   app.use('*', async (c, next) => {
+    c.env = await resolveAppSecret(c.env);
     c.set('options', resolved);
     await next();
   });

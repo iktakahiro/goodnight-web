@@ -14,16 +14,43 @@ export const packageDir = resolve(import.meta.dir, '..');
 export const wranglerConfig = join(packageDir, 'e2e/wrangler.jsonc');
 const wrangler = join(packageDir, 'node_modules/.bin/wrangler');
 
+/**
+ * Which secrets the test Worker gets, from `E2E_SECRETS`: `app-secret` (the
+ * default) sets `APP_SECRET` and `ADMIN_EMAILS` only, as a new site does;
+ * `legacy` sets the four variables `SETUP_TOKEN`, `ADMIN_EMAILS`,
+ * `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` instead.
+ */
+export const E2E_SECRETS = ((): 'app-secret' | 'legacy' => {
+  const mode = process.env.E2E_SECRETS ?? 'app-secret';
+  if (mode === 'app-secret' || mode === 'legacy') return mode;
+  throw new Error(`E2E_SECRETS must be app-secret or legacy, not ${mode}`);
+})();
+
 /** Secrets for the test Worker. Test values only. */
-export const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdefghij';
+export const APP_SECRET = 'e2e-app-secret-0123456789abcdefghijklmn';
 export const ADMIN_EMAIL = 'admin@example.com';
-export const testVars: Readonly<Record<string, string>> = {
-  SETUP_TOKEN,
-  ADMIN_EMAILS: ADMIN_EMAIL,
-  BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
-  IP_HASH_SECRET: 'e2e-ip-hash-secret-0123456789abcdef',
-  TURNSTILE_SECRET: 'e2e-turnstile-secret',
-};
+/** The variable whose value the setup screen asks for. */
+export const SETUP_TOKEN_NAME =
+  E2E_SECRETS === 'legacy' ? 'SETUP_TOKEN' : 'APP_SECRET';
+/** The value entered on the setup screen: `SETUP_TOKEN` or `APP_SECRET`. */
+export const SETUP_TOKEN =
+  E2E_SECRETS === 'legacy'
+    ? 'e2e-setup-token-0123456789abcdefghij'
+    : APP_SECRET;
+export const testVars: Readonly<Record<string, string>> =
+  E2E_SECRETS === 'legacy'
+    ? {
+        SETUP_TOKEN,
+        ADMIN_EMAILS: ADMIN_EMAIL,
+        BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789abcdef',
+        IP_HASH_SECRET: 'e2e-ip-hash-secret-0123456789abcdef',
+        TURNSTILE_SECRET: 'e2e-turnstile-secret',
+      }
+    : {
+        APP_SECRET,
+        ADMIN_EMAILS: ADMIN_EMAIL,
+        TURNSTILE_SECRET: 'e2e-turnstile-secret',
+      };
 
 /**
  * An admin UI string from the message catalog, with `{name}` placeholders

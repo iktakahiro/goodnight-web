@@ -10,6 +10,7 @@ import {
   setupInputSchema,
   type SetupInput,
 } from '../../../../src/features/setup/setup-schema.ts';
+import type { SetupState } from '../../../../src/features/setup/setup-routes.ts';
 import type { SetupProblem } from '../../../../src/features/setup/setup-state.ts';
 import { MIN_SECRET_LENGTH } from '../../../../src/shared/secret-length.ts';
 import { ApiError, apiFetch } from '../../shared/api/api-client.ts';
@@ -43,11 +44,14 @@ type Step =
   | { name: 'loading' }
   | { name: 'unavailable'; problems: SetupProblem[] }
   | { name: 'closed'; signedIn: boolean }
-  | { name: 'token' }
+  | { name: 'token'; tokenName: TokenName }
   | { name: 'passkey' }
   | { name: 'done' };
 
 const STEPS = ['setup.step1', 'setup.step2', 'setup.step3'] as const;
+
+/** The secret the setup form asks for (`SetupState.tokenName`). */
+type TokenName = NonNullable<SetupState['tokenName']>;
 
 const StepIndicator = ({ current }: { current: 1 | 2 | 3 }) => {
   const { t } = useI18n();
@@ -94,8 +98,17 @@ type SetupFieldName = 'token' | 'email';
 
 const EMPTY_SETUP_INPUT: SetupInput = { token: '', email: '', name: '' };
 
-/** Step 1: `SETUP_TOKEN`, an address in `ADMIN_EMAILS`, and a name. */
-const TokenStep = ({ onDone }: { onDone: () => void }) => {
+/**
+ * Step 1: the setup token (`SETUP_TOKEN`, or `APP_SECRET` when
+ * `SETUP_TOKEN` is not set), an address in `ADMIN_EMAILS`, and a name.
+ */
+const TokenStep = ({
+  tokenName,
+  onDone,
+}: {
+  tokenName: TokenName;
+  onDone: () => void;
+}) => {
   const { t } = useI18n();
   // Errors from the API that belong to one field, cleared when it changes.
   const [serverErrors, setServerErrors] = useState<
@@ -171,7 +184,9 @@ const TokenStep = ({ onDone }: { onDone: () => void }) => {
                 onChange={(event) => field.handleChange(event.target.value)}
                 onBlur={field.handleBlur}
               />
-              <FieldDescription>{t('setup.tokenHint')}</FieldDescription>
+              <FieldDescription>
+                {t('setup.tokenHint', { name: tokenName })}
+              </FieldDescription>
               {error ? <FieldError match>{error}</FieldError> : null}
             </Field>
           );
@@ -324,7 +339,8 @@ export const SetupPage = () => {
       else if (!state.open)
         setStep({ name: 'closed', signedIn: session === 'signed-in' });
       else if (session === 'needs-passkey') setStep({ name: 'passkey' });
-      else setStep({ name: 'token' });
+      else
+        setStep({ name: 'token', tokenName: state.tokenName ?? 'SETUP_TOKEN' });
     });
     return () => {
       active = false;
@@ -414,13 +430,18 @@ export const SetupPage = () => {
                   : t('setup.doneTitle')}
             </CardTitle>
             {step.name === 'token' ? (
-              <CardDescription>{t('setup.lead')}</CardDescription>
+              <CardDescription>
+                {t('setup.lead', { name: step.tokenName })}
+              </CardDescription>
             ) : null}
           </div>
         </CardHeader>
         <CardContent>
           {step.name === 'token' ? (
-            <TokenStep onDone={() => setStep({ name: 'passkey' })} />
+            <TokenStep
+              tokenName={step.tokenName}
+              onDone={() => setStep({ name: 'passkey' })}
+            />
           ) : step.name === 'passkey' ? (
             <PasskeyStep onDone={() => setStep({ name: 'done' })} />
           ) : (

@@ -6,6 +6,11 @@ import type { D1Database, Fetcher, RateLimit } from '@cloudflare/workers-types';
  * Only `DB` is required for the Worker to start. Each feature checks the
  * settings it needs on every request and turns itself off (fails closed) when
  * one is missing. Secrets are never returned to the browser or written to D1.
+ *
+ * `APP_SECRET` can stand in for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and
+ * `IP_HASH_SECRET`, so a site needs only `APP_SECRET` and `ADMIN_EMAILS`.
+ * The Worker resolves this once per request, before any route runs, and
+ * every route reads the resolved values (docs/decisions/0010).
  */
 export interface GoodnightEnv {
   /** D1 database with the migrations from `@goodnight-web/server/migrations`. */
@@ -15,17 +20,33 @@ export interface GoodnightEnv {
   /** Rate Limiting binding for contact submissions and setup attempts. */
   CONTACT_RATE_LIMITER?: RateLimit;
   /**
+   * Root secret of the site. At least 32 characters. When `BETTER_AUTH_SECRET`
+   * or `IP_HASH_SECRET` is unset or empty, its key is derived from this value
+   * with HKDF-SHA-256 and a fixed label per purpose. When `SETUP_TOKEN` is
+   * unset or empty, this value is the setup token. Keep it after setup:
+   * changing or removing it signs every admin out and changes IP hashes.
+   */
+  APP_SECRET?: string;
+  /**
    * Secret that must be presented to create the first admin. At least 32
-   * characters.
+   * characters. Optional when `APP_SECRET` is set: without it, setup accepts
+   * `APP_SECRET`. When set, only this value is accepted.
    */
   SETUP_TOKEN?: string;
   /** Comma-separated list of addresses that may be admins. */
   ADMIN_EMAILS?: string;
-  /** Better Auth signing secret. At least 32 characters. */
+  /**
+   * Better Auth signing secret. At least 32 characters. Optional when
+   * `APP_SECRET` is set: without it, the key is derived from `APP_SECRET`.
+   * When set, it is used instead, and a value that is too short keeps sign-in
+   * off.
+   */
   BETTER_AUTH_SECRET?: string;
   /**
    * HMAC key for `ip_hash`. At least 32 characters. Raw IP addresses are
-   * never stored.
+   * never stored. Optional when `APP_SECRET` is set: without it, the key is
+   * derived from `APP_SECRET`. When set, it is used instead, and a value that
+   * is too short keeps the contact API and setup off.
    */
   IP_HASH_SECRET?: string;
   /** Turnstile secret key for server-side verification. */

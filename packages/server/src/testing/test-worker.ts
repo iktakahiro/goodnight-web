@@ -11,7 +11,7 @@ export const ORIGIN = 'https://example.com';
 /** Client IP used by test requests. Must never appear in the database. */
 export const CLIENT_IP = '203.0.113.42';
 
-/** Secrets for tests. */
+/** Secrets for tests: the four-variable setup. */
 export const SECRETS = {
   SETUP_TOKEN: 'test-setup-token-0123456789abcdefghij',
   ADMIN_EMAILS: 'admin@example.com, Second@Example.com',
@@ -20,6 +20,23 @@ export const SECRETS = {
   TURNSTILE_SECRET: 'test-turnstile-secret',
   TURNSTILE_SITE_KEY: 'test-site-key',
 } as const;
+
+/** `APP_SECRET` for tests. */
+export const APP_SECRET = 'test-app-secret-0123456789abcdefghijklmn';
+
+/**
+ * Secrets for tests: the two-value setup. `APP_SECRET` stands in for
+ * `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET`.
+ */
+export const APP_SECRET_ONLY = {
+  APP_SECRET,
+  ADMIN_EMAILS: SECRETS.ADMIN_EMAILS,
+  TURNSTILE_SECRET: SECRETS.TURNSTILE_SECRET,
+  TURNSTILE_SITE_KEY: SECRETS.TURNSTILE_SITE_KEY,
+} as const;
+
+/** Which secrets a test Worker starts with. */
+export type TestSecrets = 'legacy' | 'app-secret';
 
 /** In-memory stand-in for the Rate Limiting binding. */
 export const createTestRateLimiter = (limit = 5) => {
@@ -39,6 +56,11 @@ export const createTestRateLimiter = (limit = 5) => {
 /** Test harness: a Worker, its env, and helpers to call it. */
 export interface TestWorker {
   env: GoodnightEnv;
+  /**
+   * The value setup accepts: `SETUP_TOKEN` when it is set, otherwise
+   * `APP_SECRET`.
+   */
+  setupToken: string;
   sqlite: Database;
   rateLimitKeys: string[];
   /** Holds the next D1 statement matching `pattern` (see `createTestD1`). */
@@ -49,28 +71,35 @@ export interface TestWorker {
 
 /**
  * Creates a Worker with an in-memory D1 and every setting present. Pass
- * `env` overrides (`undefined` removes a setting).
+ * `env` overrides (`undefined` removes a setting). `secrets` picks the
+ * four-variable setup ({@link SECRETS}, the default) or `APP_SECRET` alone
+ * ({@link APP_SECRET_ONLY}).
  */
 export const createTestWorker = ({
   env: overrides = {},
   options,
   rateLimit = 5,
+  secrets = 'legacy',
 }: {
   env?: Partial<Record<keyof GoodnightEnv, unknown>>;
   options?: GoodnightWorkerOptions;
   rateLimit?: number;
+  secrets?: TestSecrets;
 } = {}): TestWorker => {
   const { d1, sqlite, pauseAt } = createTestD1();
   const { limiter, keys } = createTestRateLimiter(rateLimit);
   const env = {
     DB: d1,
     CONTACT_RATE_LIMITER: limiter,
-    ...SECRETS,
+    ...(secrets === 'legacy' ? SECRETS : APP_SECRET_ONLY),
     ...overrides,
   } as GoodnightEnv;
   const app = createGoodnightWorker(options);
   return {
     env,
+    get setupToken() {
+      return env.SETUP_TOKEN || (env.APP_SECRET ?? '');
+    },
     sqlite,
     rateLimitKeys: keys,
     pauseAt,
