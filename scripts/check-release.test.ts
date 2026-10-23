@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   checkPackedManifest,
   checkServerManifest,
+  checkStarterLockfile,
   checkStarterManifest,
   checkTarballFiles,
   parsePackJson,
@@ -165,5 +166,130 @@ describe('tarballArgument', () => {
   test('fails without a path', () => {
     expect(() => tarballArgument(['--tarball'], {})).toThrow('.tgz');
     expect(() => tarballArgument(['--tarball', '--x'], {})).toThrow('.tgz');
+  });
+});
+
+describe('checkStarterLockfile', () => {
+  const starter: PackageJson = {
+    dependencies: { '@goodnight-web/server': '0.1.0', astro: '7.4.1' },
+    devDependencies: { wrangler: '4.151.3' },
+  };
+  const entry = (name: string, version: string) => ({
+    version,
+    resolved: `https://registry.npmjs.org/${name}/-/${name.split('/').pop()}-${version}.tgz`,
+    integrity: 'sha512-abc',
+  });
+  const lock = (packages: Record<string, unknown> = {}) => ({
+    name: 'goodnight-web-starter',
+    lockfileVersion: 3,
+    packages: {
+      '': {
+        name: 'goodnight-web-starter',
+        dependencies: { astro: '7.4.1', '@goodnight-web/server': '0.1.0' },
+        devDependencies: { wrangler: '4.151.3' },
+      },
+      'node_modules/@goodnight-web/server': entry(
+        '@goodnight-web/server',
+        '0.1.0',
+      ),
+      'node_modules/astro': entry('astro', '7.4.1'),
+      'node_modules/wrangler': entry('wrangler', '4.151.3'),
+      'node_modules/x/node_modules/bundled': {
+        version: '1.0.0',
+        inBundle: true,
+      },
+      ...packages,
+    },
+  });
+
+  test('accepts a lockfile in step with package.json', () => {
+    expect(checkStarterLockfile(lock(), starter, '0.1.0')).toEqual([]);
+  });
+
+  test('requires the file', () => {
+    expect(checkStarterLockfile(undefined, starter, '0.1.0')).toHaveLength(1);
+  });
+
+  test('rejects dependencies that differ from package.json', () => {
+    const problems = checkStarterLockfile(
+      lock(),
+      { ...starter, devDependencies: { wrangler: '4.152.0' } },
+      '0.1.0',
+    );
+    expect(problems.join('\n')).toContain('devDependencies differ');
+  });
+
+  test('rejects a locked server version other than the pin and the package', () => {
+    expect(
+      checkStarterLockfile(
+        lock({
+          'node_modules/@goodnight-web/server': entry(
+            '@goodnight-web/server',
+            '0.0.9',
+          ),
+        }),
+        starter,
+        '0.1.0',
+      ).join('\n'),
+    ).toContain('locks @goodnight-web/server 0.0.9');
+    expect(checkStarterLockfile(lock(), starter, '0.2.0')).toHaveLength(1);
+  });
+
+  test.each([
+    ['a workspace link', { resolved: 'packages/server', link: true }],
+    ['a file: version', { ...entry('a', '1.0.0'), version: 'file:../a' }],
+    [
+      'a git URL',
+      {
+        version: '1.0.0',
+        resolved: 'git+https://github.com/a/a.git',
+        integrity: 'sha512-x',
+      },
+    ],
+    [
+      'another registry',
+      {
+        version: '1.0.0',
+        resolved: 'https://registry.example/a/-/a-1.0.0.tgz',
+        integrity: 'sha512-x',
+      },
+    ],
+    [
+      'plain http',
+      {
+        version: '1.0.0',
+        resolved: 'http://registry.npmjs.org/a/-/a-1.0.0.tgz',
+        integrity: 'sha512-x',
+      },
+    ],
+    [
+      'no integrity',
+      {
+        version: '1.0.0',
+        resolved: 'https://registry.npmjs.org/a/-/a-1.0.0.tgz',
+      },
+    ],
+    [
+      'a sha1 integrity',
+      {
+        version: '1.0.0',
+        resolved: 'https://registry.npmjs.org/a/-/a-1.0.0.tgz',
+        integrity: 'sha1-x',
+      },
+    ],
+  ])('rejects %s', (_name, bad) => {
+    const problems = checkStarterLockfile(
+      lock({ 'node_modules/a': bad }),
+      starter,
+      '0.1.0',
+    );
+    expect(problems.length).toBeGreaterThan(0);
+    expect(problems.join('\n')).toContain('node_modules/a');
+  });
+
+  test('rejects an old lockfile version', () => {
+    expect(
+      checkStarterLockfile({ ...lock(), lockfileVersion: 1 }, starter, '0.1.0'),
+    ).toHaveLength(1);
   });
 });

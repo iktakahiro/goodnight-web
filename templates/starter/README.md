@@ -147,6 +147,14 @@ npm run build
 npm run dev
 ```
 
+`package-lock.json` records the exact version of every package. Cloudflare
+installs with `npm ci` from it, so the first deploy and every later build get
+exactly the committed packages. Do not edit versions in `package.json` by
+hand without updating the lockfile: run `npm install` (or
+`npm install <package>@<version>`) and commit `package.json` and
+`package-lock.json` together. If they do not match, `npm ci` and the build
+fail.
+
 `npm run dev` shows the pages only. To try the contact form and the admin
 screen on your computer, copy `.dev.vars.example` to `.dev.vars`, fill it
 in, and run `npm run preview`. It builds the site, creates the tables in a
@@ -163,7 +171,7 @@ computer, but the server rejects them: Turnstile then reports the hostname
 ## Updates
 
 Dependabot opens pull requests that update packages (`.github/dependabot.yml`).
-goodnight-web updates (`@goodnight-web/*`) come in one pull request, after a
+It updates `package.json` and `package-lock.json` together. goodnight-web updates (`@goodnight-web/*`) come in one pull request, after a
 5-day cooldown. Security updates are not delayed.
 
 The **Update check** workflow comments on every pull request:

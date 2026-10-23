@@ -151,6 +151,14 @@ npm run build
 npm run dev
 ```
 
+`package-lock.json` には、すべてのパッケージの正確なバージョンが記録されて
+います。Cloudflare はこのファイルから `npm ci` でインストールするので、最初の
+デプロイも、その後のビルドも、コミットされたとおりのパッケージを使います。
+`package.json` のバージョンを手で書き換えるときは、lockfile も更新して
+ください。`npm install`（または `npm install <パッケージ>@<バージョン>`）を
+実行し、`package.json` と `package-lock.json` を一緒にコミットします。
+2 つが合っていないと、`npm ci` とビルドが失敗します。
+
 `npm run dev` で確認できるのはページだけです。お問い合わせフォームと
 管理画面を手元で試すには、`.dev.vars.example` を `.dev.vars` にコピーして
 値を入れ、`npm run preview` を実行します。サイトをビルドし、手元の
@@ -168,7 +176,8 @@ Cloudflare の Turnstile テスト用キー（サイトキー
 ## 更新
 
 Dependabot が、パッケージを更新するプルリクエストを作ります
-（`.github/dependabot.yml`）。goodnight-web の更新（`@goodnight-web/*`）は、
+（`.github/dependabot.yml`）。`package.json` と `package-lock.json` を一緒に
+更新します。goodnight-web の更新（`@goodnight-web/*`）は、
 公開から5日待ってから、1つのプルリクエストにまとめて届きます。
 セキュリティの更新は待ちません。
 

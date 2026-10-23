@@ -184,7 +184,8 @@ copies that were created as public.
 `.github/dependabot.yml` uses the npm ecosystem, weekly, with
 `cooldown.default-days: 5`. `@goodnight-web/*` is one group; other packages'
 minor and patch updates are a second group. Security updates are not
-delayed by the cooldown.
+delayed by the cooldown. Each pull request updates `package.json` and
+`package-lock.json` together.
 
 ## When the starter is copied out
 
@@ -212,17 +213,41 @@ What makes it work:
 - `better-auth` and `@better-auth/passkey` have exact-version peer
   dependencies (`@better-auth/core`, `better-call`, and others). Bun
   resolves them silently, but npm ran for minutes at 100 % CPU and
-  then failed with `ERESOLVE`, because the starter has no lockfile when it is
-  copied. The server package therefore lists those peers as exact
+  then failed with `ERESOLVE` when the starter had no lockfile. The server package therefore lists those peers as exact
   dependencies. Move them together with `better-auth`.
 - The starter's `.github/dependabot.yml` and workflows use root-relative
   paths (`/`, root `package.json`), which is right for a repository root.
   The `e2e` folder and `.github/scripts/update-check.test.ts` are copied
   too; they are harmless.
-- The starter has no lockfile. Cloudflare installs with npm, and Dependabot
-  works from `package.json`. A `package-lock.json` can be added after the
-  first publish (`npm install --package-lock-only` in a copy outside this
-  repository); it must be kept in step with `package.json`.
+- The starter has a `package-lock.json`. Workers Builds runs `npm ci` when
+  the file exists (npm 10.9.2 in the current build image), so the first
+  Deploy installs exactly the committed tree, and later builds install the
+  same tree until a pull request changes it. It was generated with npm
+  10.9.2 from the starter's `package.json` in a directory outside this
+  repository, against the published `@goodnight-web/server`, so the
+  workspace link never reaches it: every entry resolves to
+  `https://registry.npmjs.org/` with a sha512 integrity, and there are no
+  `link`, `file:`, or workspace entries. Every package in it except
+  `@goodnight-web/server` itself was older than 48 hours when it was locked
+  (the same release-age rule as `bunfig.toml`); see
+  [releasing.md](releasing.md) for the commands.
+- Dependabot (npm ecosystem) updates `package-lock.json` together with
+  `package.json`, with the same 5-day cooldown. A site owner who edits
+  `package.json` by hand must run `npm install` and commit both files, or
+  `npm ci` fails; the starter README and `AGENTS.md` say so.
+- The lockfile is regenerated after each server release (for example after
+  0.9.1 is published), in the same change that bumps the starter's pin.
+  The new version must be on npm before the lockfile can resolve it.
+- `bun run check:release` checks the lockfile offline: it exists, its root
+  `dependencies` and `devDependencies` equal `package.json`, it locks the
+  pinned `@goodnight-web/server` version (which must equal the server
+  package version), and every entry comes from the npm registry with a
+  sha512 integrity. CI also runs `npm ci --dry-run --ignore-scripts` (npm
+  10.9.2) on a copy of `package.json` and `package-lock.json`, which fails
+  when the two are out of step.
+- In this monorepo, bun reads only `bun.lock` and ignores
+  `package-lock.json`, so `bun install --frozen-lockfile` and the
+  workspaces are unchanged. oxfmt leaves the file as npm wrote it.
 
 How it was checked: `templates/starter` was copied to a directory outside the
 repository, `@goodnight-web/server` was installed from the tarball made by

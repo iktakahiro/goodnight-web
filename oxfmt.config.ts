@@ -26,5 +26,7 @@ export default defineConfig({
     '.agents/skills/**',
     '.claude/skills/**',
     'bun.lock',
+    // npm writes the starter lockfile (docs/starter.md).
+    'templates/starter/package-lock.json',
   ],
 });

@@ -34,6 +34,14 @@ The Deploy to Cloudflare button copies the `templates/starter` folder of the pub
 
 Your copy does not follow the goodnight-web repository. The server code reaches you through the npm package instead. See [Getting started](/docs/getting-started/).
 
+### The lockfile [#lockfile]
+
+The starter includes `package-lock.json`, which records the exact version and checksum of every package the site installs. Workers Builds installs with `npm ci` from it, so the first deploy installs exactly the committed packages, and so does every later build until a pull request changes the file.
+
+- Dependabot updates `package.json` and `package-lock.json` together.
+- Do not edit versions in `package.json` by hand without updating the lockfile. Run `npm install` (or `npm install <package>@<version>`) and commit both files. If they do not match, `npm ci` stops and the build fails.
+- Do not edit `package-lock.json` by hand.
+
 ## Your repository must be private [#private-repository]
 
 Keep your copy of the site in a **private** repository. On GitHub, open **Settings > General > Danger Zone > Change visibility** and choose private.
@@ -64,7 +72,7 @@ The workflow needs no token and no permissions. The workflow lives in the starte
        update-types: [minor, patch]
    ```
 
-3. Dependabot opens one pull request in your repository.
+3. Dependabot opens one pull request in your repository. It changes `package.json` and `package-lock.json`.
 4. Workers Builds builds the pull request and shows a preview.
 5. You check the preview and merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
 

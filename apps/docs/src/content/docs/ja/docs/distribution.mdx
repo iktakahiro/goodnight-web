@@ -34,6 +34,14 @@ Deploy to Cloudflare ボタンは、公開されている goodnight-web リポ�
 
 あなたのコピーは、goodnight-web リポジトリの変更を追いかけません。サーバーのコードは、npm パッケージを通して届きます。手順は[はじめかた](/ja/docs/getting-started/)を参照してください。
 
+### lockfile [#lockfile]
+
+starter には `package-lock.json` が入っています。サイトがインストールするすべてのパッケージについて、正確なバージョンとチェックサムを記録したファイルです。Workers Builds はこのファイルから `npm ci` でインストールします。そのため、最初のデプロイではコミットされたとおりのパッケージが入り、その後のビルドも、PR がこのファイルを変えるまで同じパッケージを使います。
+
+- Dependabot は、`package.json` と `package-lock.json` を一緒に更新します。
+- `package.json` のバージョンを手で書き換えるときは、lockfile も更新してください。`npm install`（または `npm install <パッケージ>@<バージョン>`）を実行し、2 つのファイルを一緒にコミットします。2 つが合っていないと、`npm ci` が止まり、ビルドが失敗します。
+- `package-lock.json` を手で編集しないでください。
+
 ## リポジトリは private にする [#private-repository]
 
 サイトのコピーは、**private** リポジトリに置いてください。GitHub では **Settings > General > Danger Zone > Change visibility** を開き、private を選びます。
@@ -64,7 +72,7 @@ starter の `.github/workflows/visibility-check.yml` は、push のたびに動�
        update-types: [minor, patch]
    ```
 
-3. Dependabot が、あなたのリポジトリに PR を 1 つ作ります。
+3. Dependabot が、あなたのリポジトリに PR を 1 つ作ります。変更するのは `package.json` と `package-lock.json` です。
 4. Workers Builds がその PR をビルドし、プレビューを表示します。
 5. プレビューを確認して、マージします。`deploy` スクリプトは `wrangler d1 migrations apply DB --remote && wrangler deploy` を実行します。新しいコードが動く前に、データベースのマイグレーションが済みます。
 

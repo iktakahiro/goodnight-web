@@ -71,6 +71,10 @@ request from every visitor, and the privacy policy would need to mention it.
 - `@goodnight-web/*` packages: do not edit files in `node_modules`, do not
   copy their code into this repository, and do not change their version by
   hand. Updates arrive as pull requests from Dependabot.
+- `package-lock.json`: Cloudflare installs with `npm ci` from it. Do not edit
+  it by hand. When you add, remove, or change a package, use `npm install`
+  so `package.json` and `package-lock.json` change together, and commit
+  both.
 - `.github/workflows/` and `.github/scripts/`: these check update pull
   requests and the repository visibility.
 - The `data-*` attributes in `src/features/contact/contact-form.astro`
