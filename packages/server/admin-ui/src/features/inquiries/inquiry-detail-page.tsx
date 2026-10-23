@@ -23,7 +23,7 @@ import type { AdminFieldEntry } from '../../../../src/features/admin-api/admin-v
 import { ApiError } from '../../shared/api/api-client.ts';
 import { errorMessage } from '../../shared/api/error-message.ts';
 import { useAsync } from '../../shared/api/use-async.ts';
-import { formatDateTime } from '../../shared/i18n/format.ts';
+import { formatCountry, formatDateTime } from '../../shared/i18n/format.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import {
   AlertDialog,
@@ -527,7 +527,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                   icon={<PlanetEarth aria-hidden='true' />}
                   label={t('detail.country')}
                 >
-                  {item.country}
+                  {formatCountry(item.country, locale)}
                 </InfoRow>
               ) : null}
             </dl>
