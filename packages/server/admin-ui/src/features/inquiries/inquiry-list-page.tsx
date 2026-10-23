@@ -422,6 +422,7 @@ export const InquiryListPage = () => {
     void navigate({
       to: '/',
       search: listSearch({ ...query, page: 1, ...next }),
+      resetScroll: next.view === undefined,
     });
 
   // A field picked in the filter before its answer is chosen.
@@ -561,7 +562,7 @@ export const InquiryListPage = () => {
         className='flex flex-col gap-4'
       >
         <div className='flex flex-wrap items-center justify-between gap-3'>
-          <div className='-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0'>
+          <div className='max-w-full min-w-0 pb-1'>
             <TabsList aria-label={t('list.filterLabel')}>
               {LIST_VIEWS.map((view) => {
                 const count =
