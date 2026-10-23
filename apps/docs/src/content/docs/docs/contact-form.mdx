@@ -228,7 +228,7 @@ The export holds inquiries sent with the form version that was current when it s
 - **One JSON column instead of one column per field.** A column per field would need a schema migration for every form edit, and migrations ship only with package releases. A JSON column with values keyed by field ID needs none.
 - **Fixed IDs and versions keep data apart.** Labels change and fields come and go. Values are keyed by an ID that is never reused, and every inquiry records its version. So answers to different questions never share a column, and every inquiry can be shown as the visitor saw the form.
 - **Email is fixed.** Every inquiry needs a way to reply. Keeping it as a real column lets the list search it and the detail page offer a **Reply by email** button, whatever the other fields are.
-- **Slack stays free of personal data.** Notifications contain only "1 new inquiry", the received time, and a link, whatever fields the form has. See [Slack notifications](/docs/how-it-works/notifications/).
+- **Slack stays free of personal data.** Notifications contain only the site name, the page path, the received time, and a link, whatever fields the form has. See [Slack notifications](/docs/how-it-works/notifications/).
 
 ## Details for developers
 

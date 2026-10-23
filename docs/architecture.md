@@ -39,7 +39,7 @@ Design decisions are recorded in [decisions/](decisions/README.md).
   `/api/*`, `/admin`, and `/admin/*` reach Hono (`run_worker_first`). The
   bare `/admin` must be listed: `/admin/*` does not match it.
 - **Hono** routes the API. `createGoodnightWorker(options)` takes options
-  from the site (locale, Turnstile hostnames) and reads bindings and secrets from `env` on every request.
+  from the site (locale, site name, Turnstile hostnames) and reads bindings and secrets from `env` on every request.
   Its first middleware replaces `c.env` with the resolved env, in which
   `APP_SECRET` stands in for the secrets that are not set (see "Secrets and
   bindings" below). Requests it does not handle go to the `ASSETS` binding.
@@ -78,7 +78,7 @@ Design decisions are recorded in [decisions/](decisions/README.md).
 | `IP_HASH_SECRET`       | secret, optional   | HMAC key for `ip_hash`; default derived                    | contact, setup, sign-in 503 \* |
 | `TURNSTILE_SECRET`     | secret             | Turnstile siteverify                                       | contact API 503                |
 | `TURNSTILE_SITE_KEY`   | variable (public)  | Turnstile widget; the form reads it from the config API    | contact API 503                |
-| `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification                |
+| `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification, admin notice  |
 | `ACCESS_AUD`           | variable, optional | Cloudflare Access audience tag(s), comma-separated         | no Access token check          |
 | `ACCESS_TEAM_DOMAIN`   | variable, optional | Cloudflare Access team domain                              | no Access token check          |
 
@@ -166,11 +166,18 @@ fields in the browser, so a form edit needs no build or deploy.
    `form_version`, `locale`, and the operational columns), then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:
-   - if the row is not suspected spam and `SLACK_WEBHOOK_URL` is a Slack
-     webhook URL,
-     post "1 new inquiry", the received time (a Slack date token), and the
-     admin URL to Slack and set `notified_at`. No field value is sent, not
-     even a select answer, so nothing the visitor typed reaches Slack.
+   - if the row is not suspected spam and `SLACK_WEBHOOK_URL` has the
+     incoming webhook form `https://hooks.slack.com/services/T…/B…/…`
+     (`isSlackWebhookUrl`: nothing after the last segment),
+     post a Block Kit message to Slack and set `notified_at`. It holds the
+     site name (`options.siteName`, or the request's hostname), the path of
+     the page the form was on (`pagePath` without query or fragment, left
+     out when absent), the received time (a Slack date token with
+     `{date_num} {time}` and a UTC fallback), and a button to the admin URL.
+     The site name and path are escaped so they cannot format text, link,
+     or mention, and are cut to 80 and 100 characters. No field value is
+     sent, not even a select answer, and no email, IP, or user agent, so
+     nothing the visitor typed reaches Slack.
      There is no retry; the unread count in the admin UI covers missed
      notifications.
    - prune old rows (see below).

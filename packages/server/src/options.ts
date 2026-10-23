@@ -12,6 +12,13 @@ export interface GoodnightWorkerOptions {
    * neither `ja` nor `en`. Defaults to `en`.
    */
   locale?: Locale;
+  /**
+   * The site name shown in Slack notifications, such as `My Company`.
+   * Defaults to the hostname of the request (`example.com`). An empty or
+   * blank value counts as not set. Slack shows it as plain text, cut to 80
+   * characters.
+   */
+  siteName?: string;
   /** Contact API settings. */
   contact?: {
     /**
@@ -25,6 +32,8 @@ export interface GoodnightWorkerOptions {
 /** Options with defaults applied. */
 export interface ResolvedOptions {
   locale: Locale;
+  /** Trimmed; `undefined` when not set or blank. */
+  siteName: string | undefined;
   contact: {
     turnstileHostnames: readonly string[] | undefined;
   };
@@ -35,6 +44,7 @@ export const resolveOptions = (
   options: GoodnightWorkerOptions = {},
 ): ResolvedOptions => ({
   locale: options.locale ?? 'en',
+  siteName: options.siteName?.trim() || undefined,
   contact: {
     turnstileHostnames: options.contact?.turnstileHostnames,
   },

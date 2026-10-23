@@ -13,8 +13,9 @@ export default createGoodnightWorker({ locale: 'ja' });
 ```
 
 Options: `locale` (`ja` or `en`: Slack messages, CSV headers when none is
-asked for, and API messages when `Accept-Language` matches neither) and
-`contact.turnstileHostnames` (hostnames accepted from Turnstile siteverify;
+asked for, and API messages when `Accept-Language` matches neither),
+`siteName` (the site name in Slack messages; defaults to the request's
+hostname), and `contact.turnstileHostnames` (hostnames accepted from Turnstile siteverify;
 defaults to the request's hostname).
 
 The contact form fields are not options. Admins edit them in the admin UI
@@ -32,7 +33,8 @@ version, so old inquiries keep their own labels. The documentation site's
 - a Rate Limiting binding `CONTACT_RATE_LIMITER`
 - the variable `TURNSTILE_SITE_KEY` and the secrets `APP_SECRET` (32
   characters or more), `ADMIN_EMAILS`, `TURNSTILE_SECRET`, and optionally
-  `SLACK_WEBHOOK_URL`
+  `SLACK_WEBHOOK_URL` (`https://hooks.slack.com/services/T…/B…/…`;
+  another value is ignored, and the admin list shows a warning)
 
 `APP_SECRET` stands in for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and
 `IP_HASH_SECRET`. When `BETTER_AUTH_SECRET` or `IP_HASH_SECRET` is not set,

@@ -59,7 +59,7 @@ The inquiry list in the admin screen shows 50 inquiries per page, sorted by rece
    - Simple rules add to a spam score. A score of 3 or more, or a filled honeypot, flags the submission as suspected spam. A flagged submission is still saved, with the status `unread`.
 6. **Save, then respond.** The row is inserted into D1. The visitor gets a 200 response only after the insert succeeds. Nothing after this step can change the response.
 7. **After the response (in `ctx.waitUntil`).**
-   - If the submission is not suspected spam and a Slack webhook is set, the Worker posts a notice of 1 new inquiry with the received time and the admin URL, and records `notified_at`.
+   - If the submission is not suspected spam and a Slack webhook is set, the Worker posts a notice with the site name, the page path, the received time, and the admin URL, and records `notified_at`.
    - If the last cleanup was more than an hour ago, the Worker deletes inquiries older than the retention period (180 days by default) and expired passkey challenges.
 
 The contact API fails closed. In any of these cases it returns 503, and the form says "The contact form is not available yet":
