@@ -556,6 +556,14 @@ html:has(.landing):not(.dark) {
 .landing-section > .landing-wrap > p:has(+ p) {
   margin-bottom: 1rem;
 }
+/* The lede sits right above the architecture diagram; the follow-up under the
+   diagram is short and leads into the note. */
+.landing-section > .landing-wrap > p:has(+ .arch) {
+  margin-bottom: 0;
+}
+.landing-section > .landing-wrap > .arch + p {
+  margin: 2.5rem 0 0;
+}
 .landing-section > .landing-wrap > .feature-note {
   max-width: 40em;
   margin-top: 1.75rem;
