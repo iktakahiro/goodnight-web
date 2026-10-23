@@ -1,6 +1,6 @@
 {
   "name": "@goodnight-web/server",
-  "version": "0.1.0",
+  "version": "0.9.1",
   "description": "Worker factory, contact API, passkey admin auth, admin API, and D1 migrations for goodnight-web sites.",
   "keywords": [
     "astro",

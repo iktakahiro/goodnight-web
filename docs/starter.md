@@ -5,7 +5,7 @@ maintainers. The user-facing rules are in the starter's own `AGENTS.md` and
 `README.md`.
 
 The starter pins `@goodnight-web/server` to an exact version
-(`"@goodnight-web/server": "0.1.0"`). In this repository bun links the
+(`"@goodnight-web/server": "0.9.1"`). In this repository bun links the
 workspace package, because the version equals the one in
 `packages/server/package.json`. When the folder is copied out alone, the same
 line installs the package from npm. `bun run check:release` fails if the two

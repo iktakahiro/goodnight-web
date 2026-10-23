@@ -14,7 +14,7 @@
     "test:e2e": "node e2e/run.ts"
   },
   "dependencies": {
-    "@goodnight-web/server": "0.1.0",
+    "@goodnight-web/server": "0.9.1",
     "astro": "7.4.1"
   },
   "devDependencies": {
