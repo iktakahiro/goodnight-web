@@ -14,7 +14,7 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 - 管理用のパスに Cloudflare Access を設定します。任意ですが、強く推奨します（[Cloudflare Access](#cloudflare-access)）。
 - 独自ドメインで動くようになったら、`workers.dev` とプレビュー URL を無効にします。
 - ゾーンの **Always Use HTTPS** を有効にします（[HTTPS](#https)）。
-- リポジトリは private にし、公式アップデートのコメントが付いた PR だけをマージします（[更新とリポジトリ](#updates)）。
+- リポジトリは private にし、公式アップデートのコメントが付き、更新チェックが成功している PR だけをマージします（[更新とリポジトリ](#updates)）。
 
 ## 原則
 
@@ -210,7 +210,7 @@ limit ? offset ?
 
 ## 更新とリポジトリ [#updates]
 
-- 修正は Dependabot の PR で届きます。公式アップデートのコメントが付いた PR だけをマージしてください。[配布と更新のしくみ](/ja/docs/distribution/)を参照してください。
+- 修正は Dependabot の PR で届きます。公式アップデートのコメントが付き、`goodnight-web/update-check` のチェックが成功している PR だけをマージしてください。[配布と更新のしくみ](/ja/docs/distribution/)を参照してください。
 - リポジトリは private にしてください。public の間は、starter の公開範囲チェックが失敗します。
 - goodnight-web 自体の依存関係は少なくし、バージョンを固定しています。
 

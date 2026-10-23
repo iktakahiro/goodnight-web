@@ -14,7 +14,7 @@ This page explains what goodnight-web protects and how, and what you need to do 
 - Put Cloudflare Access on the admin paths. It is optional but strongly recommended ([Cloudflare Access](#cloudflare-access)).
 - Turn off `workers.dev` and preview URLs once your own domain works.
 - Turn on **Always Use HTTPS** for your zone ([HTTPS](#https)).
-- Keep your repository private, and merge only pull requests that have the official update comment ([Updates and your repository](#updates)).
+- Keep your repository private, and merge only pull requests that have the official update comment and a passing update check ([Updates and your repository](#updates)).
 
 ## Principles
 
@@ -210,7 +210,7 @@ The SQL text is the same for every search term, page, and page size. Only the pa
 
 ## Updates and your repository [#updates]
 
-- Fixes arrive as Dependabot pull requests. Merge only pull requests that have the official update comment. See [Distribution and updates](/docs/distribution/).
+- Fixes arrive as Dependabot pull requests. Merge only pull requests that have the official update comment and a passing `goodnight-web/update-check` check. See [Distribution and updates](/docs/distribution/).
 - Keep your repository private. The starter's visibility check fails while it is public.
 - goodnight-web has few dependencies of its own and pins them to exact versions.
 

@@ -80,14 +80,14 @@ There is no one-click update in the admin screen. It would need a token that can
 
 ### The update check workflow [#the-update-check-workflow]
 
-**Merge only pull requests that have the official update comment.** A pull request that says "update" is not always an update from goodnight-web.
+**Merge only pull requests that have the official update comment and a passing `goodnight-web/update-check` check.** A pull request that says "update" is not always an update from goodnight-web.
 
-The starter's `.github/workflows/update-check.yml` comments on every pull request. The comment is in Japanese and English. The workflow updates the same comment instead of adding new ones.
+The starter's `.github/workflows/update-check.yml` comments on every pull request. The comment is in Japanese and English. The workflow updates the same comment instead of adding new ones. It also sets a commit status named `goodnight-web/update-check` on the pull request's latest commit: it passes only for an official update. Anyone can paste the text of the comment into a pull request, but only the workflow can set the status, and it belongs to one commit. The status has not been tested on GitHub yet.
 
-| Result          | Comment                                                                                |
-| --------------- | -------------------------------------------------------------------------------------- |
-| Official update | "Official goodnight-web update" / "Safe to merge after checking the preview."          |
-| Anything else   | "This is not an official update" / "If you don't understand the changes, don't merge." |
+| Result          | Comment                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Official update | "Official goodnight-web update" / "Safe to merge. If a build result is shown, check it first." |
+| Anything else   | "This is not an official update" / "If you don't understand the changes, don't merge."         |
 
 #### What counts as official
 
@@ -95,14 +95,15 @@ A pull request counts as an **official update** only if all of these are true:
 
 - The author is `dependabot[bot]` and the account type is `Bot`.
 - The branch is in your own repository, not in a fork.
+- Every commit in the pull request was authored and committed by `dependabot[bot]`. A commit that someone else pushed to the Dependabot branch, or a commit made in the GitHub web interface, makes it not official.
 - The only changed files are `package.json` and lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`). Each of them is modified, not added or removed.
 - In `package.json`, every changed line is the version of a `@goodnight-web/*` dependency.
 
-The lockfile may change in other ways. A new `@goodnight-web/server` version can bring new versions of the packages it uses (for example `hono`), and those changes appear only in the lockfile.
+The lockfile may change in other ways. A new `@goodnight-web/server` version can bring new versions of the packages it uses (for example `hono`), and those changes appear only in the lockfile. But every package added to `package-lock.json` must come from `https://registry.npmjs.org/` with a sha512 checksum. A Git URL, a local path, a link, plain `http://`, or another host makes the pull request not official.
 
 The packages your site depends on directly are listed in `package.json`. That diff is checked line by line.
 
-If the check cannot see every change, the pull request is not counted as official. For example, GitHub may omit or truncate the `package.json` diff, or the list of changed files may be incomplete.
+If the check cannot see every change, the pull request is not counted as official. For example, GitHub may omit or truncate the `package.json` or `package-lock.json` diff, or the list of changed files or commits may be incomplete.
 
 #### Inside the script
 
@@ -113,7 +114,7 @@ The script `.github/scripts/update-check.cjs` collects a reason for every rule t
 const user = pullRequest.user;
 if (!user || user.login !== OFFICIAL_AUTHOR || user.type !== 'Bot') {
   reasons.push(
-    `author is not ${OFFICIAL_AUTHOR}: ${user ? user.login : 'unknown'}`,
+    `author is not ${OFFICIAL_AUTHOR}: ${user ? clean(user.login) : 'unknown'}`,
   );
 }
 
@@ -122,7 +123,7 @@ const headRepo = pullRequest.head.repo
   : null;
 if (headRepo !== pullRequest.base.repo.full_name) {
   reasons.push(
-    `branch is not in this repository: ${headRepo ?? 'deleted repository'}`,
+    `branch is not in this repository: ${headRepo === null ? 'deleted repository' : clean(headRepo)}`,
   );
 }
 ```
@@ -133,15 +134,15 @@ Then every changed line in `package.json` must be an `@goodnight-web/*` entry se
 for (const change of packageJsonChanges(hunks)) {
   if (change.name === null) {
     reasons.push(
-      `package.json: change outside a dependency entry: ${change.line}`,
+      `package.json: change outside a dependency entry: ${clean(change.line)}`,
     );
   } else if (!change.name.startsWith(OFFICIAL_SCOPE)) {
     reasons.push(
-      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${change.name}`,
+      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${clean(change.name)}`,
     );
   } else if (change.invalidSpec) {
     reasons.push(
-      `package.json: ${change.name} is not set to a version number: ${change.line}`,
+      `package.json: ${clean(change.name)} is not set to a version number: ${clean(change.line)}`,
     );
   } else {
     officialChanges += 1;

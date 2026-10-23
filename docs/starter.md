@@ -123,34 +123,55 @@ added only when a page needs real interactivity.
 `.github/workflows/update-check.yml` runs on `pull_request_target`
 (`opened`, `synchronize`, `reopened`) and posts one comment, found by the
 hidden marker `<!-- goodnight-web:update-check -->` and the
-`github-actions[bot]` author, and updated in place.
+`github-actions[bot]` author, and updated in place. It also sets the commit
+status `goodnight-web/update-check` on the head commit: `success` only for an
+official update, `failure` otherwise, and `error` when the pull request could
+not be read. A comment can be copied into a pull request body; the status is
+bound to the commit and can be set only with the workflow token.
 
 - It checks out only `.github/scripts` from the base commit
   (`pull_request.base.sha`, `persist-credentials: false`) and loads
   `.github/scripts/update-check.cjs` with `actions/github-script`. Code from
   the pull request is never checked out or run.
-- Permissions: `contents: read` (checkout of a private repository) and
-  `pull-requests: write` (the comment).
+- Permissions: `contents: read` (checkout of a private repository),
+  `pull-requests: write` (the comment), and `statuses: write` (the commit
+  status).
 - A pull request is official only if all of these hold: the author is
   `dependabot[bot]` with type `Bot`; the head repository is the base
-  repository; the changed files are only root `package.json`,
+  repository; every commit listed by `pulls.listCommits` has the GitHub
+  author and committer `dependabot[bot]` (a commit pushed by a collaborator,
+  a commit with no linked account, and a commit made in the web interface,
+  whose committer is `web-flow`, all fail); the changed files are only root `package.json`,
   `package-lock.json`, `bun.lock`, or `pnpm-lock.yaml`, all with status
-  `modified`; `package.json` is one of them; and every changed
+  `modified`; `package.json` is one of them; every changed
   `package.json` line is an `@goodnight-web/*` entry set to a version
-  number.
+  number; and the `package-lock.json` diff passes the lockfile check below.
 - The check fails closed. The pull request is not official when the file
   list may be incomplete (its length differs from the event's
   `changed_files`, or it reaches the API limit of 3000 files), when the
-  file list cannot be read (the comment is set to the warning and the job
-  fails), or when the `package.json` diff is missing, malformed, cut short
-  within a hunk, or does not add up to the file's `additions` and
-  `deletions` (a left-out hunk).
-- Lockfile contents are not checked (decision by the dev lead, 2026-10-22).
-  A new `@goodnight-web/server` version can change its own dependencies (for
-  example `hono`), and those changes appear only in the lockfile. The
-  site's direct dependencies are in `package.json`, which is checked line by
-  line. Dependabot generates the lockfile from the registry, and a pull
-  request from a fork or another author is never official.
+  commit list may be incomplete (its length differs from the event's
+  `commits`, or it reaches the API limit of 250 commits), when either list
+  cannot be read (the comment is set to the warning, the status to `error`,
+  and the job fails), or when the `package.json` or `package-lock.json` diff
+  is missing, malformed, cut short within a hunk, or does not add up to the
+  file's `additions` and `deletions` (a left-out hunk).
+- Lockfile check (replaces the 2026-10-22 decision not to check lockfile
+  contents, now that the starter commits `package-lock.json`). A new
+  `@goodnight-web/server` version can change its own dependencies (for
+  example `hono`), and those changes appear only in the lockfile, so other
+  packages may change there. But every changed line of `package-lock.json`
+  must look like lockfile JSON, every added `"resolved"` must start with
+  `https://registry.npmjs.org/`, every added `"integrity"` must be
+  `sha512-...`, and no added line may be `"link": true` or hold a `git+`,
+  `git:`, `github:`, `file:`, `link:`, `http://`, or other-host URL
+  (funding links excepted). `bun.lock` and `pnpm-lock.yaml` get the same URL
+  checks on added lines. The lockfile is not re-resolved against the
+  registry.
+- Text from the pull request that the script quotes (file names, lines,
+  logins) has control and format characters, CR and LF included, replaced
+  with `?`, and each reason is a code span in the comment, so a crafted file
+  name cannot add Markdown after the heading or a workflow command to the
+  log.
 - Tests: `templates/starter/.github/scripts/update-check.test.ts`, run by the
   root `bun run test`. The root `tsconfig.json` type-checks the module with
   `checkJs`.
@@ -158,7 +179,10 @@ hidden marker `<!-- goodnight-web:update-check -->` and the
 Known limits:
 
 - Not tested on GitHub yet: `pull_request_target` for Dependabot pull
-  requests with `pull-requests: write`, and the comment flow.
+  requests with `pull-requests: write`, the comment flow, the commit status
+  flow with `statuses: write`, and the committer GitHub records for
+  Dependabot's own commits (expected to be `dependabot[bot]`; if it is
+  another account, every update gets the warning, which fails closed).
 - The workflow pins `actions/checkout` (v7.0.1) and `actions/github-script`
   by SHA.
   The starter's Dependabot config covers npm only, so these pins do not get

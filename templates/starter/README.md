@@ -171,20 +171,24 @@ computer, but the server rejects them: Turnstile then reports the hostname
 ## Updates
 
 Dependabot opens pull requests that update packages (`.github/dependabot.yml`).
-It updates `package.json` and `package-lock.json` together. goodnight-web updates (`@goodnight-web/*`) come in one pull request, after a
-5-day cooldown. Security updates are not delayed.
+It updates `package.json` and `package-lock.json` together. goodnight-web
+updates (`@goodnight-web/*`) come in one pull request, after a 5-day
+cooldown. Security updates are not delayed.
 
-The **Update check** workflow comments on every pull request:
+The **Update check** workflow comments on every pull request and sets the
+check `goodnight-web/update-check` on its latest commit:
 
-- "Official goodnight-web update": the pull request was opened by Dependabot
-  in this repository, changes only `package.json` and the lockfile, and
-  changes only `@goodnight-web/*` versions in `package.json`. The lockfile
-  may also change packages that `@goodnight-web/*` uses. Check the preview,
-  then merge.
+- "Official goodnight-web update" and a passing check: the pull request was
+  opened by Dependabot in this repository, every commit in it was made by
+  Dependabot, it changes only `package.json` and the lockfile, and it changes
+  only `@goodnight-web/*` versions in `package.json`. The lockfile may also
+  change packages that `@goodnight-web/*` uses, but only to packages from
+  the npm registry. Safe to merge.
 - "This is not an official update": anything else. If you don't understand
   the changes, don't merge.
 
-**Merge only pull requests that have the official update comment.** Updates
+**Merge only pull requests that have the official update comment and a
+passing `goodnight-web/update-check` check.** Updates
 of other packages (such as Astro) also come from Dependabot and get the
 warning comment; ask someone who can review them.
 

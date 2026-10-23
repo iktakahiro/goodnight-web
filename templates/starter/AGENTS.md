@@ -137,11 +137,13 @@ network access to Cloudflare Turnstile).
 ## Updates and pull requests
 
 - Merge only pull requests that have the "official goodnight-web update"
-  comment from the Update check workflow. The workflow gives that comment
-  only to a Dependabot pull request from this repository that changes only
-  `package.json` and the lockfile, and only `@goodnight-web/*` versions in
-  `package.json`. The lockfile may also change packages that
-  `@goodnight-web/*` uses. If a pull request has the warning
+  comment from the Update check workflow and a successful
+  `goodnight-web/update-check` status. The workflow gives them only to a
+  Dependabot pull request from this repository whose commits were all made
+  by Dependabot, that changes only `package.json` and the lockfile, and only
+  `@goodnight-web/*` versions in `package.json`. The lockfile may also change
+  packages that `@goodnight-web/*` uses, from the npm registry only. If a
+  pull request has the warning
   comment, do not merge it unless a person who understands the change has
   reviewed it.
 - Do not merge pull requests on your own. Tell the person what the pull
