@@ -14,7 +14,8 @@
 
 /* The project palette: a violet primary on neutral backgrounds. The admin
    screen (packages/server/admin-ui/src/styles.css) uses the same colors. The
-   light theme is the default; Fumadocs switches to .dark. */
+   :root block is the light theme; Fumadocs adds .dark for the dark theme,
+   which follows the system setting until the reader picks one. */
 :root {
   --color-fd-background: #f7f7f8;
   --color-fd-foreground: #1b1f3f;

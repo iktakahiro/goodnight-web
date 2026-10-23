@@ -54,7 +54,7 @@ function Root() {
         <RootProvider
           components={{ Link: SiteLink }}
           search={{ enabled: false }}
-          theme={{ defaultTheme: 'light' }}
+          theme={{ defaultTheme: 'system' }}
           i18n={i18nProvider(translations, locale)}
         >
           <Outlet />
