@@ -5,6 +5,22 @@ import type { D1Database } from '@cloudflare/workers-types';
 
 const MIGRATIONS_DIR = join(import.meta.dir, '../../migrations');
 
+/**
+ * An empty in-memory database that alters tables the way D1 does.
+ *
+ * `bun:sqlite` on macOS can start a connection with `legacy_alter_table` on.
+ * Then migration 0006 cannot rename its rebuilt `submissions`, because a CHECK
+ * constraint still names `__new_submissions`. The rename fails after the old
+ * table is dropped, and every test that applies the migrations fails with
+ * `no such table: main.submissions`. D1 never turns it
+ * on, so each test connection turns it off.
+ */
+export const openTestSqlite = (): Database => {
+  const sqlite = new Database(':memory:');
+  sqlite.exec('PRAGMA legacy_alter_table = OFF');
+  return sqlite;
+};
+
 type Value = SQLQueryBindings;
 
 // D1 refuses a statement with more bound parameters than this.
@@ -134,7 +150,7 @@ export const createTestD1 = (): {
   sqlite: Database;
   pauseAt: (pattern: RegExp) => StatementPause;
 } => {
-  const sqlite = new Database(':memory:');
+  const sqlite = openTestSqlite();
   const pauses: PendingPause[] = [];
   const gate: Gate = async (sql) => {
     const index = pauses.findIndex(({ pattern }) => pattern.test(sql));
