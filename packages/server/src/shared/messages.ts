@@ -8,6 +8,8 @@ const en = {
   // API errors. The key after `error.` is the `code` in error responses.
   'error.contact_unavailable':
     'The contact form is not available yet. Please try again later.',
+  'error.contact_busy':
+    'The contact form is receiving too many messages right now. Please try again later.',
   'error.forbidden_origin':
     'This request came from a page that is not allowed.',
   'error.unsupported_media_type': 'Send the request as JSON.',
@@ -28,7 +30,7 @@ const en = {
   'error.forbidden': 'Your account cannot use the admin screen.',
   'error.passkey_required': 'Register a passkey to continue.',
   'error.auth_unavailable':
-    'Sign-in is not configured. Set APP_SECRET (at least 32 characters) for this site. If BETTER_AUTH_SECRET is set, it must also be at least 32 characters.',
+    'Sign-in is not configured. Set APP_SECRET (at least 32 characters) for this site. If BETTER_AUTH_SECRET is set, it must also be at least 32 characters, and do not set BETTER_AUTH_TRUSTED_ORIGINS or BETTER_AUTH_SECRETS.',
   'error.setup_unavailable':
     'Setup is not configured. Set APP_SECRET (at least 32 characters) and ADMIN_EMAILS for this site. If SETUP_TOKEN, BETTER_AUTH_SECRET, or IP_HASH_SECRET is set, it must also be at least 32 characters.',
   'error.setup_closed': 'Setup is already complete.',
@@ -96,6 +98,8 @@ export type MessageCatalog = Readonly<Record<MessageKey, string>>;
 const ja: MessageCatalog = {
   'error.contact_unavailable':
     'お問い合わせフォームは準備中です。時間をおいてお試しください。',
+  'error.contact_busy':
+    'ただいまお問い合わせが集中しているため、受け付けられません。時間をおいてお試しください。',
   'error.forbidden_origin': '許可されていないページからの送信です。',
   'error.unsupported_media_type': 'JSON 形式で送信してください。',
   'error.payload_too_large': '送信内容が長すぎます。',
@@ -118,7 +122,7 @@ const ja: MessageCatalog = {
   'error.forbidden': 'このアカウントでは管理画面を使えません。',
   'error.passkey_required': 'Passkey を登録してください。',
   'error.auth_unavailable':
-    'ログインに必要な設定がありません。このサイトに APP_SECRET（32 文字以上）を設定してください。BETTER_AUTH_SECRET を設定している場合は、それも 32 文字以上にしてください。',
+    'ログインに必要な設定がありません。このサイトに APP_SECRET（32 文字以上）を設定してください。BETTER_AUTH_SECRET を設定している場合は、それも 32 文字以上にしてください。BETTER_AUTH_TRUSTED_ORIGINS と BETTER_AUTH_SECRETS は設定しないでください。',
   'error.setup_unavailable':
     'セットアップに必要な設定がありません。このサイトに APP_SECRET（32 文字以上）と ADMIN_EMAILS を設定してください。SETUP_TOKEN、BETTER_AUTH_SECRET、IP_HASH_SECRET を設定している場合は、それも 32 文字以上にしてください。',
   'error.setup_closed': 'セットアップは完了しています。',

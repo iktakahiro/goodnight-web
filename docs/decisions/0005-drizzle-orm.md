@@ -22,8 +22,10 @@ Goals:
 - The deploy path for users stays the same: `wrangler d1 migrations apply DB`
   with `migrations_dir` inside `node_modules`.
 
-Nothing is published yet, so the old migration history (`0001_better_auth`,
-`0002_submissions_settings`, `0003_setup_closed`) is replaced by a new one.
+Nothing was published when this was decided, so the old migration history
+(`0001_better_auth`, `0002_submissions_settings`, `0003_setup_closed`) was
+replaced by a new one. `@goodnight-web/server` 0.1.0 has been published on
+npm since 2026-10-23, so its migrations are released and must not change.
 
 ## Versions
 

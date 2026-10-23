@@ -19,7 +19,8 @@
 // switch -> delete with confirmation -> the form editor: open every saved
 // field, discard a change, add a field and remove one, save version 2, submit
 // with the new field, see it in the list (column toggle) and the detail, see
-// an old submission with its own labels, and restore version 1. Also checks the API rules the UI relies on, and that
+// an old submission with its own labels, and restore version 1. Also checks
+// the API rules the UI relies on (such as the /api/auth body cap), and that
 // the UI runs under the admin CSP without violations.
 //
 // E2E_SECRETS picks the secrets (see support.ts): `app-secret` (default)
@@ -412,6 +413,21 @@ const main = async () => {
       stored[0]?.ip_hash,
     );
     const id = String(stored[0]?.id);
+    const bigAuth = await gnw(
+      page,
+      'call',
+      '/api/auth/passkey/verify-authentication',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ response: 'x'.repeat(70 * 1024) }),
+      },
+    );
+    check(
+      'an auth body over 64 KiB gets 413',
+      bigAuth.status === 413,
+      bigAuth.status,
+    );
     const before = await gnw(page, 'call', '/api/admin/submissions');
     check('admin list is 401 before sign-in', before.status === 401, before);
 

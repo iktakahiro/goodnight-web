@@ -6,6 +6,8 @@ export interface ExternalCall {
   url: string;
   body: string;
   form: FormData | null;
+  /** The `redirect` option the call was made with. */
+  redirect?: RequestRedirect | undefined;
 }
 
 /** Siteverify result for a valid token on `example.com` with action `contact`. */
@@ -41,7 +43,7 @@ export const mockExternalFetch = ({
     }
     if (url.startsWith('https://hooks.slack.com/')) {
       const text = typeof body === 'string' ? body : '';
-      calls.push({ url, body: text, form: null });
+      calls.push({ url, body: text, form: null, redirect: init?.redirect });
       return slack(text);
     }
     throw new Error(`unexpected fetch: ${url}`);

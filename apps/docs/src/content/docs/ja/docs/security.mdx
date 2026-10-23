@@ -12,9 +12,9 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 - セットアップが終わったら `SETUP_TOKEN` を削除します。もう使いません。
 - Cloudflare アカウントの 2 要素認証を有効にします（[データベースがネットワークに公開されない理由](#database-access)）。
 - 管理用のパスに Cloudflare Access を設定します。任意ですが、強く推奨します（[Cloudflare Access](#cloudflare-access)）。
-- 独自ドメインで動くようになったら、`workers.dev` とプレビュー URL を無効にします。
+- 独自ドメインで動くようになったら、`wrangler.jsonc` で `"workers_dev": false` にしてコミットします。プレビュー URL は最初から無効です（`"preview_urls": false`）。
 - ゾーンの **Always Use HTTPS** を有効にします（[HTTPS](#https)）。
-- リポジトリは private にし、公式アップデートのコメントが付いた PR だけをマージします（[更新とリポジトリ](#updates)）。
+- リポジトリは private にし、公式アップデートのコメントが付き、更新チェックが成功している PR だけをマージします（[更新とリポジトリ](#updates)）。
 
 ## 原則
 
@@ -25,20 +25,33 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 
 ## 管理画面
 
-| 項目                           | 扱い                                                                                                                                                                                                                                                                                                                  |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ログイン                       | Better Auth の Passkey だけです。メールとパスワードでのログインは無効です。パスワードのハッシュ処理は、Workers 無料プランの CPU 上限を超えることがあります（[better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)）。[Passkey でのログイン](/ja/docs/how-it-works/passkeys/)を参照してください。 |
-| セッション                     | 管理 API が受け付けるのは、そのユーザーの最初の Passkey 以降に作られたセッションだけです。セットアップで作られたセッションは管理者のセッションになりません。[セッションとセットアップ](#sessions-and-setup)を参照してください。                                                                                       |
-| `ADMIN_EMAILS`                 | リクエストのたびに読み直します。アドレスを外すと、次のリクエストからそのセッションは使えません。[管理者を外す](#removing-an-admin)を参照してください。                                                                                                                                                                |
-| HTTPS                          | 管理画面、管理 API、セットアップ、ログインは `https://` でだけ動きます。[HTTPS](#https) を参照してください。                                                                                                                                                                                                          |
-| Cloudflare Access              | 任意ですが、強く推奨します。50 ユーザーまで無料です。[Cloudflare Access](#cloudflare-access) を参照してください。                                                                                                                                                                                                     |
-| 最初の管理者                   | `SETUP_TOKEN` と、`ADMIN_EMAILS` にあるメールアドレスが必要です。最初の Passkey を登録するとセットアップは完了し、それ以降は使えません。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照してください。                                                                                                  |
-| Cloudflare WAF                 | 任意です。設定したルールで、ドメインへのリクエストを制限します。[Cloudflare WAF](#cloudflare-waf) を参照してください。                                                                                                                                                                                                |
-| `workers.dev` とプレビュー URL | Access のポリシーから漏れやすいアドレスです。独自ドメインで動くようになったら無効にしてください。Access がなくても、管理画面には Passkey でのログインが必要です。                                                                                                                                                     |
-| CSRF                           | `Origin` の確認と `SameSite` の Cookie で防ぎます。                                                                                                                                                                                                                                                                   |
-| ヘッダー                       | Worker の応答に Content Security Policy などのセキュリティヘッダーを付けます。パスを正規化してから決めるので、`/%61dmin`、`//admin`、`/admin/..%2f` にも `/admin` と同じヘッダーが付きます。                                                                                                                          |
+| 項目                           | 扱い                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ログイン                       | Better Auth の Passkey だけです。メールとパスワードでのログインは無効です。パスワードのハッシュ処理は、Workers 無料プランの CPU 上限を超えることがあります（[better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)）。[Passkey でのログイン](/ja/docs/how-it-works/passkeys/)を参照してください。                             |
+| セッション                     | 管理 API が受け付けるのは、そのユーザーの最初の Passkey 以降に作られたセッションだけです。セットアップで作られたセッションは管理者のセッションになりません。[セッションとセットアップ](#sessions-and-setup)を参照してください。                                                                                                                   |
+| `ADMIN_EMAILS`                 | リクエストのたびに読み直します。アドレスを外すと、次のリクエストからそのセッションでは管理 API を使えず、そのリクエストでセッションも削除します。[管理者を外す](#removing-an-admin)を参照してください。                                                                                                                                           |
+| HTTPS                          | 管理画面、管理 API、セットアップ、ログイン、問い合わせ API は `https://` でだけ動きます。[HTTPS](#https) を参照してください。                                                                                                                                                                                                                     |
+| Cloudflare Access              | 任意ですが、強く推奨します。50 ユーザーまで無料です。[Cloudflare Access](#cloudflare-access) を参照してください。                                                                                                                                                                                                                                 |
+| 最初の管理者                   | `SETUP_TOKEN` と、`ADMIN_EMAILS` にあるメールアドレスが必要です。最初の Passkey を登録するとセットアップは完了し、それ以降は使えません。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照してください。                                                                                                                              |
+| Cloudflare WAF                 | 任意です。設定したルールで、ドメインへのリクエストを制限します。[Cloudflare WAF](#cloudflare-waf) を参照してください。                                                                                                                                                                                                                            |
+| `workers.dev` とプレビュー URL | Access のポリシーから漏れやすいアドレスです。プレビュー URL は starter の `wrangler.jsonc` で無効にしてあります。`workers.dev` は、独自ドメインを追加した後に同じファイルで `"workers_dev": false` にするまで有効です。ダッシュボードで切り替えても、次のデプロイで元に戻ります。Access がなくても、管理画面には Passkey でのログインが必要です。 |
+| リクエストの大きさ             | ログインのリクエスト（`/api/auth/*`）は `application/json` で送る必要があり、本文は 64 KiB までです。セットアップと、管理 API での問い合わせの更新は 4 KiB までです。これより大きい本文には、読み取る前に 413 を返します。Better Auth には渡しません。                                                                                            |
+| CSRF                           | `Origin` の確認と `SameSite` の Cookie で防ぎます。                                                                                                                                                                                                                                                                                               |
+| ヘッダー                       | Worker の応答に Content Security Policy などのセキュリティヘッダーを付けます。パスを正規化してから決めるので、`/%61dmin`、`//admin`、`/admin/..%2f` にも `/admin` と同じヘッダーが付きます。                                                                                                                                                      |
 
 管理画面のページ自体はセッションなしでも読み込めます。ただし、データの取得には必ずセッションが必要です。
+
+### 公開ページと管理画面は同じオリジン [#shared-origin]
+
+サイトのページ、管理画面、管理 API は、同じオリジン（たとえば `https://example.com`）から配信されます。そのため、ブラウザは公開ページのスクリプトを、管理画面のスクリプトと同じものとして扱います。管理者がログインしている間、そうしたスクリプトは管理者のセッションで管理 API を呼び出し、問い合わせやフォームを読んだり、書き出したり、削除したり、変更したりできます。`HttpOnly` の Cookie と `Origin` の確認では、同じオリジンで動くスクリプトは止められません。
+
+starter は、このリスクを次のように小さくしています。
+
+- ページはご自身のリポジトリからビルドされます。ほかのオリジンから読み込むのは Cloudflare Turnstile だけです。
+- `public/_headers` が、すべてのページに Content Security Policy を付けます。スクリプトはサイト自身と `https://challenges.cloudflare.com` からだけ許可し、インラインのスクリプトは許可せず、ほかのサイトへの埋め込みを禁止します（`frame-ancestors 'none'`）。そのために、Astro はすべてのスクリプトを `/_astro/` の下のファイルに書き出します。管理画面と API には、Worker がより厳しいヘッダーを付けます。
+- starter の `AGENTS.md` は、頼まれない限り、外部のスクリプト、埋め込み、スクリプトを含む HTML を追加しないよう AI ツールに伝えます。
+
+アクセス解析のタグ、チャットのウィジェット、タグマネージャー、スクリプトを読み込む埋め込みを追加すると、それらはこの権限で動きます。信頼できるものだけを追加し、そのオリジンをご自身で `public/_headers` に加えてください。完全に分けるには、管理画面に別のホスト名（たとえば `admin.example.com`）を使い、`/admin`、`/api/admin/*`、`/api/setup`、`/api/auth/*` だけを配信して、公開ページは配信しない構成にするしかありません。
 
 ### セッションとセットアップ [#sessions-and-setup]
 
@@ -51,13 +64,13 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 
 ### HTTPS [#https]
 
-平文の HTTP では、セットアップトークン、セッションの Cookie、Passkey のやり取りが暗号化されずに流れます。そこで、`/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` では `https://` を必須にします。
+平文の HTTP では、セットアップトークン、セッションの Cookie、Passkey のやり取り、訪問者が問い合わせフォームに入力した値が暗号化されずに流れます。そこで、`/admin`、`/admin/*` と、`/api/` の下のすべてのパスでは `https://` を必須にします。管理 API、セットアップ、ログイン、問い合わせ API が対象です。
 
 - `http://` での `GET` と `HEAD` は、同じ URL の `https://` にリダイレクトします（308）。
 - `http://` でのそれ以外のメソッドには、コード `https_required` の 403 を返します。本文はもう送られてしまっているので、リダイレクトしません。
 - `wrangler dev` で使えるように、`localhost`、`127.0.0.1`、`[::1]` は対象外です。
 
-サイトと問い合わせフォームは対象外です。これらも HTTPS に限るには、ゾーンの **Always Use HTTPS** を有効にしてください（Cloudflare ダッシュボード > SSL/TLS > Edge Certificates）。
+そのため、`http://` で開いたページの問い合わせフォームは、読み込みも送信もできません。静的なページはこの決まりの対象外です。すべてのページを HTTPS で配信するには、ゾーンの **Always Use HTTPS** を有効にしてください（Cloudflare ダッシュボード > SSL/TLS > Edge Certificates）。
 
 ### Cloudflare Access [#cloudflare-access]
 
@@ -79,7 +92,7 @@ Worker にも Access のトークンを確認させるには、次の 2 つを�
 | `ACCESS_AUD`         | Access アプリケーションの **Application Audience (AUD) Tag**。カンマで区切って複数指定できます。 |
 | `ACCESS_TEAM_DOMAIN` | チームドメイン。たとえば `your-team.cloudflareaccess.com` です。                                 |
 
-両方あると、Worker は上のパスで `Cf-Access-Jwt-Assertion` ヘッダーを確認します。最初の管理者を作るセットアップにも、正しいトークンが必要になります。確認するのは、RS256 の署名、発行者、aud、`exp`、`nbf` です（[Cloudflare: JWT の検証](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)）。署名の鍵は `https://<チームドメイン>/cdn-cgi/access/certs` から取得し、Worker が 1 時間キャッシュします。
+両方あると、Worker は上のパスで `Cf-Access-Jwt-Assertion` ヘッダーを確認します。最初の管理者を作るセットアップにも、正しいトークンが必要になります。確認するのは、RS256 の署名、発行者、aud、`exp`、`nbf` です（[Cloudflare: JWT の検証](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)）。署名の鍵は `https://<チームドメイン>/cdn-cgi/access/certs` から取得し、Worker が 1 時間キャッシュします。取得に失敗したときは 10 秒間は取得し直さず、その間のリクエストには 503 を返します。
 
 - トークンがない、または正しくないときは 403（`access_denied`）を返します。
 - 2 つの設定の片方しかないとき、`ACCESS_TEAM_DOMAIN` がホスト名だけの形でないとき、署名の鍵を取得できないときは、これらのパスは 503（`access_unavailable`）を返します。
@@ -100,13 +113,19 @@ WAF のルールは、Cloudflare アカウントに追加したドメイン（�
 
 ### 管理者を外す [#removing-an-admin]
 
-管理者を外すには、`ADMIN_EMAILS` からそのアドレスを消します。Worker はリクエストのたびに `ADMIN_EMAILS` を読むので、そのセッションは次のリクエストから 403 になります。Passkey でログインし直しても使えません。
+管理者を外すには、`ADMIN_EMAILS` からそのアドレスを消します。Worker はリクエストのたびに `ADMIN_EMAILS` を読むので、その管理者が次に管理 API へ送るリクエストは 403 になります。同じリクエストで、そのユーザーのセッションをすべて削除します。そのリクエストまでは、セッションは D1 に残ります。先にアドレスを戻すと、そのセッションはまた使えます。今すぐ終わらせるには、下のコマンドを実行してください。Passkey でログインし直しても使えません。次の管理 API へのリクエストがそのセッションを拒否し、同じように削除します。
 
-ユーザー、セッション、Passkey は D1 に残ります。そのため、同じアドレスを戻すとまた使えます。完全に消すには、次のコマンドを自分で実行してください（アドレスは置き換えます）。
+この確認の対象は管理 API（`/api/admin/*`）です。Passkey の追加など、`/api/auth/*` の下にある Better Auth 自身のエンドポイントは `ADMIN_EMAILS` を読みません。ただし、そこでできることでは、問い合わせやフォームには届きません。
+
+管理 API へのリクエストでは、セッションの有効期限を延ばしません。延ばすのは Better Auth 自身のセッションのエンドポイントだけです。そのため、外された管理者が管理 API を使ってセッションを保ち続けることはできません。
+
+ユーザーと Passkey は D1 に残ります。そのため、同じアドレスを戻すと、同じ Passkey でまたログインできます。削除済みのセッションは戻りません。ユーザーと Passkey を完全に消すには、次のコマンドをご自身で実行してください（アドレスは置き換えます）。
 
 ```sh
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
 ```
+
+このコマンドは `form_definitions.created_by` には触れません。この列には、フォームの各バージョンを保存した管理者のアドレスが残ります。このテーブルは追記しかできない（データベースのトリガーが更新と削除を拒否する）ため、アドレスはデータベースがある限り残ります。
 
 これでセットアップがまた使えるようになることはありません。`settings.setup_closed_at` は残ります。Passkey をすべて失くしたときなどに、意図してセットアップを開き直す手順は[Passkey が使えないとき、失くしたとき](/ja/docs/how-it-works/passkey-recovery/)にあります。
 
@@ -116,7 +135,8 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id
 
 - 本文を読む前に、`Origin`、`Content-Type`、本文のサイズを確認します。
 - Turnstile をサーバー側で検証し、`hostname` と `action` も確認します。
-- Rate Limiting binding で、`ip_hash` ごとに送信回数を制限します。
+- Rate Limiting binding で、ハッシュにした IP アドレスごとに送信回数を制限します。IPv6 では /64 のプレフィックスごとに数えます。
+- 保存する送信は、すべての送信者の合計で 1 時間に 500 件までです。それを超えると、API は 503（`contact_busy`）を返し、何も保存しません。同時に届いたリクエストは、上限をわずかに超えることがあります。
 - honeypot 欄が埋まっていても、応答は変えません。その送信も Turnstile、回数制限、検証を通ったときだけ、スパムの疑いとして保存します。honeypot 欄の値そのものは保存しません。
 - スパムスコアが高い送信にも、スパムの疑いの印を付けます。スパムの疑いは Slack に通知せず、管理画面では分けて表示します。
 - ページに API キーを入れません。ブラウザが読めるキーは秘密ではなく、守っているという誤解を生むだけです。
@@ -192,18 +212,19 @@ limit ? offset ?
 
 - シークレット（`SETUP_TOKEN`、`ADMIN_EMAILS`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET`、`TURNSTILE_SECRET`、`SLACK_WEBHOOK_URL`）は、すべて Worker のシークレットに置きます。
 - シークレットをブラウザに返すことも、D1 に書くこともありません。Slack の Webhook URL は管理画面にも表示しません。管理画面で確認できるのは、URL が設定されているかどうかと、形式が正しいかどうかだけです。
-- `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は設定されていないものとみなします。それを使うセットアップ、ログイン、問い合わせフォームは 503 を返します。
-- セットアップが完了するまでは、`GET /api/setup` が、足りない設定と短すぎる設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときは、管理画面にも表示します。
+- `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は設定されていないものとみなします。それを使うセットアップ、ログイン、問い合わせフォームは 503 を返します。使われている文字が 10 種類より少ない値や、短い文字列を繰り返しただけの値も同じ扱いです。この確認は、仮の値や手で打った値を見つけるための簡単なもので、ランダムさを測るものではありません。値は `openssl rand -base64 32` で作ってください。goodnight-web も Deploy ボタンの設定フォームも、値を作りません。
+- セットアップが完了するまでは、`GET /api/setup` が、足りない設定、短すぎる設定、ランダムさが足りない設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときや、ランダムさが足りないときは、管理画面にも表示します。
+- Better Auth は、Worker の環境変数のいくつかを自分で読みます。goodnight-web は Origin と CSRF の確認を明示的に有効にしているため、`TEST` や `NODE_ENV` という名前の変数があっても、確認は止まりません。`BETTER_AUTH_TRUSTED_ORIGINS` と `BETTER_AUTH_SECRETS` は、信頼する Origin を増やしたり `BETTER_AUTH_SECRET` を置き換えたりする変数です。どちらかが設定されている間、ログインは 503 を返します。
 - 管理画面に更新ボタンはありません。あなたの GitHub リポジトリに書き込めるトークンが必要になるからです。
 
 ## CSV の書き出し
 
 - 1 回のクエリで 200 行ずつ読み、順に送り出します。テーブルが大きくても、1 つのファイルとして Worker のメモリに載ることはありません。
-- 表計算アプリがセルを数式として実行しないようにします。空白を除いた最初の文字が `=`、`+`、`-`、`@` のセルと、タブや復帰文字で始まるセルには、先頭に `'` を付けます。表計算アプリは、その値を文字として表示します。
+- 表計算アプリがセルを数式として実行しないようにします。目に見える最初の文字が `=`、`+`、`-`、`@` のセルと、タブや復帰文字で始まるセルには、先頭に `'` を付けます。表計算アプリは、その値を文字として表示します。前にある空白と、ゼロ幅スペースや双方向制御文字のような見えない文字は読み飛ばします。全角の `＝`、`＋`、`－`、`＠` も対象です。
 
 ## 更新とリポジトリ [#updates]
 
-- 修正は Dependabot の PR で届きます。公式アップデートのコメントが付いた PR だけをマージしてください。[配布と更新のしくみ](/ja/docs/distribution/)を参照してください。
+- 修正は Dependabot の PR で届きます。公式アップデートのコメントが付き、`goodnight-web/update-check` のチェックが成功している PR だけをマージしてください。[配布と更新のしくみ](/ja/docs/distribution/)を参照してください。
 - リポジトリは private にしてください。public の間は、starter の公開範囲チェックが失敗します。
 - goodnight-web 自体の依存関係は少なくし、バージョンを固定しています。
 

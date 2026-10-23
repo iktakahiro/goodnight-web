@@ -322,7 +322,16 @@ async function withoutTurnstile(browser: Browser): Promise<void> {
     viewport: { width: 1280, height: 800 },
   });
 
-  await page.goto(`${base}/`);
+  const home = await page.goto(`${base}/`);
+  const csp = home?.headers()['content-security-policy'] ?? '';
+  check(
+    'public pages get the site CSP and headers from public/_headers',
+    csp.includes("script-src 'self' https://challenges.cloudflare.com") &&
+      csp.includes("frame-ancestors 'none'") &&
+      !csp.includes("'unsafe-eval'") &&
+      home?.headers()['x-content-type-options'] === 'nosniff',
+    home?.headers(),
+  );
   check(
     'home page renders in Japanese',
     (await page.getAttribute('html', 'lang')) === 'ja' &&
@@ -426,6 +435,12 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 800 },
   });
+  const cspViolations: string[] = [];
+  page.on('console', (message) => {
+    if (/content security policy/i.test(message.text())) {
+      cspViolations.push(message.text());
+    }
+  });
   const definition = await loadForm();
   const picked = pickFields(definition);
   await page.goto(`${base}/contact/`);
@@ -518,6 +533,11 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
   const sent = page.locator('[data-contact-sent]');
   await sent.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
   check('contact form shows the thank-you message', await sent.isVisible());
+  check(
+    'the contact page and Turnstile run under the site CSP',
+    cspViolations.length === 0,
+    cspViolations,
+  );
 
   const rows = await query(
     'SELECT email, fields, form_version, locale, status, suspected_spam, spam_reasons, ip_hash, page_path FROM submissions',

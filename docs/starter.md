@@ -69,6 +69,33 @@ added only when a page needs real interactivity.
   binding `CONTACT_RATE_LIMITER` (5 per 60 s, namespace `1001`,
   [0003](decisions/0003-rate-limit-binding.md)); and the variable
   `TURNSTILE_SITE_KEY`, empty by default.
+- `workers_dev: true` and `preview_urls: false`, both explicit. A new site
+  has no custom domain, so workers.dev is the only way to reach `/admin` for
+  setup. After a custom domain is attached, the owner sets
+  `"workers_dev": false` in the file and commits: wrangler 4.151.3 turns
+  workers.dev on at every deploy when the config has no routes and the key is
+  unset, so a dashboard toggle does not last. Preview URLs give each
+  uploaded version a public address that shares the production D1 and
+  secrets; when the key is unset Cloudflare enables them whenever workers.dev
+  is on. With them off, a pull request that Workers Builds builds (if the
+  owner keeps non-production branch builds on) gets a build result but no
+  public address. Owners review an update with the Update check comment and
+  status, the build result, and `npm run preview` locally.
+- `public/_headers` gives the static pages a Content Security Policy
+  (`script-src 'self' https://challenges.cloudflare.com`, `frame-src` the
+  same Turnstile origin, `connect-src 'self'`, `style-src 'self'`,
+  `style-src-attr 'unsafe-inline'` for the theme colors set as a `style`
+  attribute on `<html>`, `object-src 'none'`, `base-uri 'self'`,
+  `form-action 'self'`, `frame-ancestors 'none'`), `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, and `Permissions-Policy`. No
+  HSTS: that is left to the zone. Workers Static Assets applies it to asset
+  responses only; the Worker's own headers cover `/api/*` and `/admin*`.
+  `astro.config.ts` sets `build.inlineStylesheets: 'never'` and
+  `vite.build.assetsInlineLimit: 0`, so Astro writes every script to
+  `/_astro/` and the policy needs no `'unsafe-inline'` for scripts (a static
+  file cannot carry per-page hashes). The starter e2e test checks the header
+  on `/` under `wrangler dev` and that the contact page with Turnstile logs
+  no CSP violation; `scripts/static-headers.test.ts` checks the file.
 - The D1 binding has no `database_id`. `wrangler dev`, `d1 migrations apply
   --local`, and `deploy --dry-run` work without it. Cloudflare creates the
   database and writes the ID when the Deploy button first deploys the site.
@@ -127,34 +154,58 @@ added only when a page needs real interactivity.
 `.github/workflows/update-check.yml` runs on `pull_request_target`
 (`opened`, `synchronize`, `reopened`) and posts one comment, found by the
 hidden marker `<!-- goodnight-web:update-check -->` and the
-`github-actions[bot]` author, and updated in place.
+`github-actions[bot]` author, and updated in place. It also sets the commit
+status `goodnight-web/update-check` on the head commit: `success` only for an
+official update, `failure` otherwise, and `error` when the pull request could
+not be read. A comment can be copied into a pull request body; the status is
+bound to the commit, and setting it takes write access to the repository
+(the workflow token has it).
 
 - It checks out only `.github/scripts` from the base commit
   (`pull_request.base.sha`, `persist-credentials: false`) and loads
   `.github/scripts/update-check.cjs` with `actions/github-script`. Code from
   the pull request is never checked out or run.
-- Permissions: `contents: read` (checkout of a private repository) and
-  `pull-requests: write` (the comment).
+- Permissions: `contents: read` (checkout of a private repository),
+  `pull-requests: write` (the comment), and `statuses: write` (the commit
+  status).
 - A pull request is official only if all of these hold: the author is
   `dependabot[bot]` with type `Bot`; the head repository is the base
-  repository; the changed files are only root `package.json`,
+  repository; every commit listed by `pulls.listCommits` has the GitHub
+  author and committer `dependabot[bot]` (a commit pushed by a collaborator,
+  a commit with no linked account, and a commit made in the web interface,
+  whose committer is `web-flow`, all fail; so does a commit whose
+  signature GitHub does not show as verified, and a last listed commit that is
+  not the `head.sha` of the event); the changed files are only root `package.json`,
   `package-lock.json`, `bun.lock`, or `pnpm-lock.yaml`, all with status
-  `modified`; `package.json` is one of them; and every changed
+  `modified`; `package.json` is one of them; every changed
   `package.json` line is an `@goodnight-web/*` entry set to a version
-  number.
+  number; and the `package-lock.json` diff passes the lockfile check below.
 - The check fails closed. The pull request is not official when the file
   list may be incomplete (its length differs from the event's
   `changed_files`, or it reaches the API limit of 3000 files), when the
-  file list cannot be read (the comment is set to the warning and the job
-  fails), or when the `package.json` diff is missing, malformed, cut short
-  within a hunk, or does not add up to the file's `additions` and
-  `deletions` (a left-out hunk).
-- Lockfile contents are not checked (decision by the dev lead, 2026-10-22).
-  A new `@goodnight-web/server` version can change its own dependencies (for
-  example `hono`), and those changes appear only in the lockfile. The
-  site's direct dependencies are in `package.json`, which is checked line by
-  line. Dependabot generates the lockfile from the registry, and a pull
-  request from a fork or another author is never official.
+  commit list may be incomplete (its length differs from the event's
+  `commits`, or it reaches the API limit of 250 commits), when either list
+  cannot be read (the comment is set to the warning, the status to `error`,
+  and the job fails), or when the `package.json` or `package-lock.json` diff
+  is missing, malformed, cut short within a hunk, or does not add up to the
+  file's `additions` and `deletions` (a left-out hunk).
+- Lockfile check (replaces the 2026-10-22 decision not to check lockfile
+  contents, now that the starter commits `package-lock.json`). A new
+  `@goodnight-web/server` version can change its own dependencies (for
+  example `hono`), and those changes appear only in the lockfile, so other
+  packages may change there. But every changed line of `package-lock.json`
+  must look like lockfile JSON, every added `"resolved"` must start with
+  `https://registry.npmjs.org/`, every added `"integrity"` must be
+  `sha512-...`, and no added line may be `"link": true` or hold a `git+`,
+  `git:`, `github:`, `file:`, `link:`, `http://`, or other-host URL
+  (funding links excepted). `bun.lock` and `pnpm-lock.yaml` get the same URL
+  checks on added lines. The lockfile is not re-resolved against the
+  registry.
+- Text from the pull request that the script quotes (file names, lines,
+  logins) has control and format characters, CR and LF included, replaced
+  with `?`, and each reason is a code span in the comment, so a crafted file
+  name cannot add Markdown after the heading or a workflow command to the
+  log.
 - Tests: `templates/starter/.github/scripts/update-check.test.ts`, run by the
   root `bun run test`. The root `tsconfig.json` type-checks the module with
   `checkJs`.
@@ -162,7 +213,10 @@ hidden marker `<!-- goodnight-web:update-check -->` and the
 Known limits:
 
 - Not tested on GitHub yet: `pull_request_target` for Dependabot pull
-  requests with `pull-requests: write`, and the comment flow.
+  requests with `pull-requests: write`, the comment flow, the commit status
+  flow with `statuses: write`, and the committer GitHub records for
+  Dependabot's own commits (expected to be `dependabot[bot]`, and expected to be signed; if not,
+  every update gets the warning, which fails closed).
 - The workflow pins `actions/checkout` (v7.0.1) and `actions/github-script`
   by SHA.
   The starter's Dependabot config covers npm only, so these pins do not get
@@ -188,7 +242,8 @@ copies that were created as public.
 `.github/dependabot.yml` uses the npm ecosystem, weekly, with
 `cooldown.default-days: 5`. `@goodnight-web/*` is one group; other packages'
 minor and patch updates are a second group. Security updates are not
-delayed by the cooldown.
+delayed by the cooldown. Each pull request updates `package.json` and
+`package-lock.json` together.
 
 ## When the starter is copied out
 
@@ -216,25 +271,50 @@ What makes it work:
 - `better-auth` and `@better-auth/passkey` have exact-version peer
   dependencies (`@better-auth/core`, `better-call`, and others). Bun
   resolves them silently, but npm ran for minutes at 100 % CPU and
-  then failed with `ERESOLVE`, because the starter has no lockfile when it is
-  copied. The server package therefore lists those peers as exact
+  then failed with `ERESOLVE` when the starter had no lockfile. The server package therefore lists those peers as exact
   dependencies. Move them together with `better-auth`.
 - The starter's `.github/dependabot.yml` and workflows use root-relative
   paths (`/`, root `package.json`), which is right for a repository root.
   The `e2e` folder and `.github/scripts/update-check.test.ts` are copied
   too; they are harmless.
-- The starter has no lockfile. Cloudflare installs with npm, and Dependabot
-  works from `package.json`. A `package-lock.json` can be added after the
-  first publish (`npm install --package-lock-only` in a copy outside this
-  repository); it must be kept in step with `package.json`.
+- The starter has a `package-lock.json`. Workers Builds runs `npm ci` when
+  the file exists (npm 10.9.2 in the current build image), so the first
+  Deploy installs exactly the committed tree, and later builds install the
+  same tree until a pull request changes it. It was generated with npm
+  10.9.2 from the starter's `package.json` in a directory outside this
+  repository, against the published `@goodnight-web/server`, so the
+  workspace link never reaches it: every entry resolves to
+  `https://registry.npmjs.org/` with a sha512 integrity, and there are no
+  `link`, `file:`, or workspace entries. Every package in it except
+  `@goodnight-web/server` itself was older than 48 hours when it was locked
+  (the same release-age rule as `bunfig.toml`); see
+  [releasing.md](releasing.md) for the commands.
+- Dependabot (npm ecosystem) updates `package-lock.json` together with
+  `package.json`, with the same 5-day cooldown. A site owner who edits
+  `package.json` by hand must run `npm install` and commit both files, or
+  `npm ci` fails; the starter README and `AGENTS.md` say so.
+- The lockfile is regenerated after each server release (for example after
+  0.9.1 is published), in the same change that bumps the starter's pin.
+  The new version must be on npm before the lockfile can resolve it.
+- `bun run check:release` checks the lockfile offline: it exists, its root
+  `dependencies` and `devDependencies` equal `package.json`, it locks the
+  pinned `@goodnight-web/server` version (which must equal the server
+  package version), and every entry comes from the npm registry with a
+  sha512 integrity. CI also runs `npm ci --dry-run --ignore-scripts` (npm
+  10.9.2) on a copy of `package.json` and `package-lock.json`, which fails
+  when the two are out of step.
+- In this monorepo, bun reads only `bun.lock` and ignores
+  `package-lock.json`, so `bun install --frozen-lockfile` and the
+  workspaces are unchanged. oxfmt leaves the file as npm wrote it.
 
 How it was checked: `templates/starter` was copied to a directory outside the
 repository, `@goodnight-web/server` was installed from the tarball made by
 `bun pm pack`, and `npm install`, `astro build`, `astro check`,
 `wrangler deploy --dry-run`, `wrangler d1 migrations apply DB --local`, and
 `node e2e/run.ts` all passed. The real button flow (repository creation,
-resource provisioning, Workers Builds) can be tested only with a public
-repository and a published package.
+resource provisioning, Workers Builds) can be tested only from a public
+repository. `@goodnight-web/server` 0.1.0 is published on npm (maintainer
+`iktakahiro`, 2026-10-23).
 
 ## End-to-end test
 

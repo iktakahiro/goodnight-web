@@ -5,6 +5,7 @@ import {
   count,
   desc,
   eq,
+  gte,
   like,
   lt,
   lte,
@@ -184,6 +185,21 @@ const filterWhere = ({
 const orderBy = (order: SubmissionOrder) => {
   const by = order === 'asc' ? asc : desc;
   return [by(submissions.createdAt), by(submissions.id)];
+};
+
+/**
+ * Counts the submissions stored at or after `since` (unix ms), suspected
+ * spam included. Uses the `created_at` index.
+ */
+export const countSubmissionsSince = async (
+  db: D1Database,
+  since: number,
+): Promise<number> => {
+  const [row] = await getDatabase(db)
+    .select({ total: count() })
+    .from(submissions)
+    .where(gte(submissions.createdAt, since));
+  return row?.total ?? 0;
 };
 
 /** Inserts a submission. Throws when D1 rejects the write. */

@@ -34,6 +34,14 @@ Deploy to Cloudflare ボタンは、公開されている goodnight-web リポ�
 
 あなたのコピーは、goodnight-web リポジトリの変更を追いかけません。サーバーのコードは、npm パッケージを通して届きます。手順は[はじめかた](/ja/docs/getting-started/)を参照してください。
 
+### lockfile [#lockfile]
+
+starter には `package-lock.json` が入っています。サイトがインストールするすべてのパッケージについて、正確なバージョンとチェックサムを記録したファイルです。Workers Builds はこのファイルから `npm ci` でインストールします。そのため、最初のデプロイではコミットされたとおりのパッケージが入り、その後のビルドも、PR がこのファイルを変えるまで同じパッケージを使います。
+
+- Dependabot は、`package.json` と `package-lock.json` を一緒に更新します。
+- `package.json` のバージョンを手で書き換えるときは、lockfile も更新してください。`npm install`（または `npm install <パッケージ>@<バージョン>`）を実行し、2 つのファイルを一緒にコミットします。2 つが合っていないと、`npm ci` が止まり、ビルドが失敗します。
+- `package-lock.json` を手で編集しないでください。
+
 ## リポジトリは private にする [#private-repository]
 
 サイトのコピーは、**private** リポジトリに置いてください。GitHub では **Settings > General > Danger Zone > Change visibility** を開き、private を選びます。
@@ -64,22 +72,24 @@ starter の `.github/workflows/visibility-check.yml` は、push のたびに動�
        update-types: [minor, patch]
    ```
 
-3. Dependabot が、あなたのリポジトリに PR を 1 つ作ります。
-4. Workers Builds がその PR をビルドし、プレビューを表示します。
-5. プレビューを確認して、マージします。`deploy` スクリプトは `wrangler d1 migrations apply DB --remote && wrangler deploy` を実行します。新しいコードが動く前に、データベースのマイグレーションが済みます。
+3. Dependabot が、あなたのリポジトリに PR を 1 つ作ります。変更するのは `package.json` と `package-lock.json` です。
+4. Workers Builds が本番以外のブランチもビルドする設定（Cloudflare ダッシュボードの、Worker のビルド設定）になっていれば、その PR をビルドし、ビルドが通ったかどうかを表示します。公開のアドレスは作られません。starter はプレビュー URL を無効にしているからです（`wrangler.jsonc` の `"preview_urls": false`）。
+5. PR を確認します。見るのは、更新チェックのコメントとステータス、ビルドの結果（あれば）、変更内容です。マージする前に試したいときは、PR のブランチを手元に取り出し、`npm run preview` を実行します。確認が済んだらマージします。`deploy` スクリプトは `wrangler d1 migrations apply DB --remote && wrangler deploy` を実行します。新しいコードが動く前に、データベースのマイグレーションが済みます。
+
+プレビュー URL を無効にしているのは、プレビューの各バージョンが、マージ前の状態のまま、本番の D1 データベースとシークレットを使って公開のアドレスで動くからです。必要な場合は、そのことを理解したうえで `"preview_urls": true` にしてください。
 
 管理画面からのワンクリック更新はありません。ワンクリックで更新するには、あなたの GitHub リポジトリに書き込めるトークンを Worker に持たせる必要があります。goodnight-web は、Worker にその権限を持たせません。
 
 ### 更新チェックのワークフロー [#the-update-check-workflow]
 
-**公式のアップデートのコメントが付いた PR だけをマージしてください。** 「update」と書かれた PR が、goodnight-web からの更新とは限りません。
+**公式のアップデートのコメントが付き、`goodnight-web/update-check` のチェックが成功している PR だけをマージしてください。** 「update」と書かれた PR が、goodnight-web からの更新とは限りません。
 
-starter の `.github/workflows/update-check.yml` は、すべての PR にコメントを付けます。コメントは日本語と英語です。新しいコメントを増やさず、同じコメントを更新します。
+starter の `.github/workflows/update-check.yml` は、すべての PR にコメントを付けます。コメントは日本語と英語です。新しいコメントを増やさず、同じコメントを更新します。あわせて、PR の最新のコミットに `goodnight-web/update-check` というコミットステータスを付けます。成功になるのは公式のアップデートのときだけです。コメントの文面は誰でも PR に貼り付けられますが、ステータスを付けるにはリポジトリへの書き込み権限が必要です（このワークフローのトークンにはあります）。ステータスは 1 つのコミットに結び付きます。ステータスの動作は、まだ GitHub 上で確かめていません。
 
-| 判定               | コメント                                                                                     |
-| ------------------ | -------------------------------------------------------------------------------------------- |
-| 公式のアップデート | 「goodnight-web の公式アップデートです」「プレビューを確認してからマージしてください。」     |
-| それ以外           | 「公式のアップデートではありません」「変更内容がわからない場合は、マージしないでください。」 |
+| 判定               | コメント                                                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 公式のアップデート | 「goodnight-web の公式アップデートです」「マージして問題ありません。ビルドの結果が表示されていれば、確認してからマージしてください。」 |
+| それ以外           | 「公式のアップデートではありません」「変更内容がわからない場合は、マージしないでください。」                                           |
 
 #### 公式とみなす条件
 
@@ -87,14 +97,15 @@ starter の `.github/workflows/update-check.yml` は、すべての PR にコメ
 
 - 作成者が `dependabot[bot]` で、アカウントの種類が `Bot` である。
 - ブランチが fork ではなく、あなた自身のリポジトリにある。
+- PR のすべてのコミットの作成者とコミッターが `dependabot[bot]` で、GitHub が署名を検証済みと表示している。ほかの人が Dependabot のブランチに push したコミットや、GitHub の画面で作ったコミットがあると、公式とみなしません。
 - 変更されたファイルが `package.json` と lockfile（`bun.lock`、`package-lock.json`、`pnpm-lock.yaml`）だけである。どれも追加や削除ではなく、変更である。
 - `package.json` で変更された行が、すべて `@goodnight-web/*` の依存関係のバージョンである。
 
-lockfile は、ほかの部分が変わってもかまいません。`@goodnight-web/server` を更新すると、それが使うパッケージ（たとえば `hono`）のバージョンも上がることがあります。その変更は lockfile にだけ現れます。
+lockfile は、ほかの部分が変わってもかまいません。`@goodnight-web/server` を更新すると、それが使うパッケージ（たとえば `hono`）のバージョンも上がることがあります。その変更は lockfile にだけ現れます。ただし、`package-lock.json` に加わるパッケージは、すべて `https://registry.npmjs.org/` から取得し、sha512 のチェックサムを持つものでなければなりません。Git の URL、手元のパス、リンク、`http://`、ほかのホストがあると、公式とみなしません。
 
 サイトが直接使うパッケージは、`package.json` に書かれています。こちらの差分は 1 行ずつ確認します。
 
-すべての変更を確認できない PR は、公式とみなしません。たとえば、GitHub が `package.json` の差分を省略したり途中で切ったりした場合や、変更ファイルの一覧が欠けているおそれがある場合です。
+すべての変更を確認できない PR は、公式とみなしません。たとえば、GitHub が `package.json` や `package-lock.json` の差分を省略したり途中で切ったりした場合や、変更ファイルやコミットの一覧が欠けているおそれがある場合です。
 
 #### スクリプトの中身
 
@@ -105,7 +116,7 @@ lockfile は、ほかの部分が変わってもかまいません。`@goodnight
 const user = pullRequest.user;
 if (!user || user.login !== OFFICIAL_AUTHOR || user.type !== 'Bot') {
   reasons.push(
-    `author is not ${OFFICIAL_AUTHOR}: ${user ? user.login : 'unknown'}`,
+    `author is not ${OFFICIAL_AUTHOR}: ${user ? clean(user.login) : 'unknown'}`,
   );
 }
 
@@ -114,7 +125,7 @@ const headRepo = pullRequest.head.repo
   : null;
 if (headRepo !== pullRequest.base.repo.full_name) {
   reasons.push(
-    `branch is not in this repository: ${headRepo ?? 'deleted repository'}`,
+    `branch is not in this repository: ${headRepo === null ? 'deleted repository' : clean(headRepo)}`,
   );
 }
 ```
@@ -125,15 +136,15 @@ if (headRepo !== pullRequest.base.repo.full_name) {
 for (const change of packageJsonChanges(hunks)) {
   if (change.name === null) {
     reasons.push(
-      `package.json: change outside a dependency entry: ${change.line}`,
+      `package.json: change outside a dependency entry: ${clean(change.line)}`,
     );
   } else if (!change.name.startsWith(OFFICIAL_SCOPE)) {
     reasons.push(
-      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${change.name}`,
+      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${clean(change.name)}`,
     );
   } else if (change.invalidSpec) {
     reasons.push(
-      `package.json: ${change.name} is not set to a version number: ${change.line}`,
+      `package.json: ${clean(change.name)} is not set to a version number: ${clean(change.line)}`,
     );
   } else {
     officialChanges += 1;

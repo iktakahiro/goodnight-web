@@ -1,0 +1,10 @@
+# Response headers for the documentation site, applied by Workers Static
+# Assets. The site has no sign-in, cookies, or user data; these headers are
+# defense in depth. There is no script-src policy: the prerendered pages
+# carry inline hydration scripts.
+/*
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { runSetup, signInAsAdmin } from '../../testing/admin-session.ts';
+import {
+  passkeySignIn,
+  runSetup,
+  signInAsAdmin,
+} from '../../testing/admin-session.ts';
 import {
   CookieJar,
   SoftAuthenticator,
@@ -18,6 +22,7 @@ import {
   updateSubmission,
 } from '../submissions/submission-store.ts';
 import type { SubmissionStatus } from '../submissions/submission-status.ts';
+import { SUBMISSION_UPDATE_MAX_BODY_BYTES } from './admin-routes.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -58,6 +63,7 @@ const ENDPOINTS: [string, string][] = [
   ['GET', '/api/admin/submissions/abc'],
   ['PATCH', '/api/admin/submissions/abc'],
   ['DELETE', '/api/admin/submissions/abc'],
+  ['POST', '/api/admin/submissions/abc/read'],
   ['GET', '/api/admin/submissions.csv'],
   ['GET', '/api/admin/form'],
   ['PUT', '/api/admin/form'],
@@ -152,6 +158,70 @@ describe('admin API without a valid admin session', () => {
       ).toEqual({ n: 1 });
     },
   );
+
+  test('a removed admin loses every session, also after the address is added back', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    const userId = (
+      worker.sqlite.query('SELECT id FROM user').get() as { id: string }
+    ).id;
+    const other = await passkeySignIn(worker, userId);
+    const sessions = () =>
+      worker.sqlite.query('SELECT COUNT(*) AS n FROM session').get();
+    // The setup session is still there too.
+    expect(sessions()).toEqual({ n: 3 });
+    worker.env.ADMIN_EMAILS = 'second@example.com';
+    const response = await worker.fetch('/api/admin/me', {
+      headers: { cookie },
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe('forbidden');
+    expect(sessions()).toEqual({ n: 0 });
+    worker.env.ADMIN_EMAILS = 'admin@example.com';
+    for (const old of [cookie, other]) {
+      const again = await worker.fetch('/api/admin/me', {
+        headers: { cookie: old },
+      });
+      expect(again.status).toBe(401);
+    }
+  });
+
+  test('a failed session cleanup does not change the 403', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    worker.env.ADMIN_EMAILS = 'second@example.com';
+    const pause = worker.pauseAt(/^delete from "session"/i);
+    void pause.reached.then(() => pause.release(new Error('D1 down')));
+    const logs = captureConsole();
+    let response: Response;
+    let logged: string;
+    try {
+      response = await worker.fetch('/api/admin/me', { headers: { cookie } });
+      logged = logs.text();
+    } finally {
+      logs.restore();
+    }
+    expect(response.status).toBe(403);
+    expect(logged).toContain('session cleanup failed');
+  });
+
+  test('admin API reads do not extend the session', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    // Make the session old enough that Better Auth would refresh it.
+    const soon = Date.now() + 60 * 60 * 1000;
+    worker.sqlite.exec(`UPDATE session SET expires_at = ${soon}`);
+    expect(
+      (await worker.fetch('/api/admin/me', { headers: { cookie } })).status,
+    ).toBe(200);
+    // Every session keeps its expiry, including the one the cookie belongs to
+    // (`signInAsAdmin` leaves a setup session next to it).
+    const rows = worker.sqlite
+      .query('SELECT expires_at AS e FROM session')
+      .all();
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows).toEqual(rows.map(() => ({ e: soon })));
+  });
 
   test('a removed address gets no admin access from a new passkey sign-in', async () => {
     const worker = createTestWorker();
@@ -343,9 +413,23 @@ describe('admin API with an admin session', () => {
     expect(response.status).toBe(400);
   });
 
-  test('the detail view marks an unread submission as read', async () => {
+  test('the detail view changes nothing', async () => {
     await seed(worker, 'abc');
     const detail = await (await get('/api/admin/submissions/abc')).json();
+    expect(detail).toMatchObject({ id: 'abc', status: 'unread', readAt: null });
+    expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
+      status: 'unread',
+      readAt: null,
+    });
+    const list = await (await get('/api/admin/submissions')).json();
+    expect(list.unreadCount).toBe(1);
+  });
+
+  test('POST /submissions/:id/read marks an unread submission as read', async () => {
+    await seed(worker, 'abc');
+    const detail = await (
+      await send('POST', '/api/admin/submissions/abc/read')
+    ).json();
     expect(detail).toMatchObject({
       id: 'abc',
       status: 'read',
@@ -366,12 +450,31 @@ describe('admin API with an admin session', () => {
     expect(detail).not.toHaveProperty('fields');
     const list = await (await get('/api/admin/submissions')).json();
     expect(list.unreadCount).toBe(0);
+    expect(
+      (await send('POST', '/api/admin/submissions/missing/read')).status,
+    ).toBe(404);
     expect((await get('/api/admin/submissions/missing')).status).toBe(404);
   });
 
-  test('the detail view returns the stored state', async () => {
+  test('POST /submissions/:id/read needs the site origin', async () => {
     await seed(worker, 'abc');
-    const detail = await (await get('/api/admin/submissions/abc')).json();
+    const response = await send(
+      'POST',
+      '/api/admin/submissions/abc/read',
+      undefined,
+      'https://evil.example',
+    );
+    expect(response.status).toBe(403);
+    expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
+      status: 'unread',
+    });
+  });
+
+  test('marking read returns the stored state', async () => {
+    await seed(worker, 'abc');
+    const detail = await (
+      await send('POST', '/api/admin/submissions/abc/read')
+    ).json();
     const stored = await getSubmission(worker.env.DB, 'abc');
     expect(stored).toMatchObject({ status: 'read' });
     expect(detail).toMatchObject({
@@ -381,10 +484,12 @@ describe('admin API with an admin session', () => {
     });
   });
 
-  test('the detail view keeps the read time of a read submission', async () => {
+  test('marking read keeps the read time of a read submission', async () => {
     await seed(worker, 'abc');
     await updateSubmission(worker.env.DB, 'abc', { status: 'read' }, 1234);
-    const detail = await (await get('/api/admin/submissions/abc')).json();
+    const detail = await (
+      await send('POST', '/api/admin/submissions/abc/read')
+    ).json();
     expect(detail).toMatchObject({ status: 'read', readAt: 1234 });
     expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
       status: 'read',
@@ -425,6 +530,27 @@ describe('admin API with an admin session', () => {
       status: 'read',
     });
     expect(missing.status).toBe(404);
+  });
+
+  test('PATCH rejects a body over the cap and a non-JSON type', async () => {
+    await seed(worker, 'abc');
+    const big = await worker.fetch('/api/admin/submissions/abc', {
+      method: 'PATCH',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        status: 'read',
+        pad: 'x'.repeat(SUBMISSION_UPDATE_MAX_BODY_BYTES),
+      }),
+    });
+    expect(big.status).toBe(413);
+    expect((await big.json()).error.code).toBe('payload_too_large');
+    const text = await worker.fetch('/api/admin/submissions/abc', {
+      method: 'PATCH',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'text/plain' },
+      body: JSON.stringify({ status: 'read' }),
+    });
+    expect(text.status).toBe(415);
+    expect((await getSubmission(worker.env.DB, 'abc'))?.status).toBe('unread');
   });
 
   test('sets and clears the suspected spam flag', async () => {
@@ -575,6 +701,28 @@ describe('admin API with an admin session', () => {
     expect(text).toContain(`"' =cmd|""/c calc""!A1"`);
   });
 
+  test('a failed CSV stream ends with a generic error, not the query', async () => {
+    await seed(worker, 'abc');
+    const pause = worker.pauseAt(/^select .* from "submissions"/s);
+    const logs = captureConsole();
+    try {
+      const response = await get('/api/admin/submissions.csv?q=secret-search');
+      expect(response.status).toBe(200);
+      const reading = response.text().then(
+        () => null,
+        (error: unknown) => error,
+      );
+      await pause.reached;
+      pause.release(new Error('D1 failed: params secret-search'));
+      const failure = await reading;
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toBe('csv export failed');
+      expect(logs.text()).toContain('csv export failed');
+    } finally {
+      logs.restore();
+    }
+  });
+
   test('GET /status reports configuration without secret values', async () => {
     await seed(worker, 'abc');
     const status = await (await get('/api/admin/status')).json();
@@ -648,6 +796,17 @@ describe('admin API with an admin session', () => {
       contactTooShort: ['IP_HASH_SECRET'],
     });
     expect(JSON.stringify(status)).not.toContain('short-secret');
+  });
+
+  test('GET /status reports a weak IP_HASH_SECRET', async () => {
+    worker.env.IP_HASH_SECRET = '0123456789'.repeat(4);
+    const status = await (await get('/api/admin/status')).json();
+    expect(status).toMatchObject({
+      contactAvailable: false,
+      contactMissing: ['IP_HASH_SECRET'],
+      contactTooShort: ['IP_HASH_SECRET'],
+    });
+    expect(JSON.stringify(status)).not.toContain('0123456789');
   });
 
   test('GET /status reports a missing Turnstile setup', async () => {

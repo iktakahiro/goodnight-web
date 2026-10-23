@@ -10,12 +10,14 @@
 # A feature whose secret is missing is turned off: for example, the contact
 # form does not accept messages until TURNSTILE_SECRET and the public
 # TURNSTILE_SITE_KEY (in wrangler.jsonc) are set. SETUP_TOKEN,
-# BETTER_AUTH_SECRET, and IP_HASH_SECRET must be at least 32 characters; a
-# shorter value turns its features off in the same way, and the admin screen
-# says which one is too short.
+# BETTER_AUTH_SECRET, and IP_HASH_SECRET must be random values of at least 32
+# characters. Nothing generates them for you, not even the Deploy button form:
+# use `openssl rand -base64 32`. A shorter value, or one that is clearly not
+# random (such as one character repeated), turns its features off in the same
+# way, and the admin screen says which one to replace.
 #
-# The admin screen, setup, and sign-in work only over https://, except on
-# localhost and 127.0.0.1 for `wrangler dev`.
+# The admin screen, setup, sign-in, and the contact API work only over
+# https://, except on localhost and 127.0.0.1 for `wrangler dev`.
 
 # A random string of 32 characters or more. You enter it once at /admin to
 # create the first admin. Delete it after setup is done.

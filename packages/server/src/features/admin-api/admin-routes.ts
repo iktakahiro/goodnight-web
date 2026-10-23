@@ -3,6 +3,7 @@ import * as z from 'zod';
 import packageJson from '../../../package.json' with { type: 'json' };
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
+import { isJsonContentType, readBodyWithLimit } from '../../shared/request.ts';
 import { secretProblem } from '../../shared/app-secret.ts';
 import { getContactAvailability } from '../contact/contact-availability.ts';
 import {
@@ -118,6 +119,12 @@ export const submissionUpdateSchema = z
       update.status !== undefined || update.suspectedSpam !== undefined,
   );
 
+/**
+ * Largest accepted body of `PATCH /api/admin/submissions/:id`, in bytes. The
+ * update holds two small values.
+ */
+export const SUBMISSION_UPDATE_MAX_BODY_BYTES = 4 * 1024;
+
 /** Body of `GET /api/admin/status`. Never contains secret values. */
 export interface AdminStatus {
   version: string;
@@ -127,15 +134,16 @@ export interface AdminStatus {
   contactAvailable: boolean;
   /**
    * Names of missing settings that keep the contact API closed. A secret that
-   * is set but too short is listed here and in `contactTooShort`. When
-   * `IP_HASH_SECRET` is neither set nor derived, `APP_SECRET` is listed
+   * is set but too short or weak is listed here and in `contactTooShort`.
+   * When `IP_HASH_SECRET` is neither set nor derived, `APP_SECRET` is listed
    * instead, because setting it fills the key in.
    */
   contactMissing: string[];
   /**
    * Names of secrets that are set but shorter than `MIN_SECRET_LENGTH`
-   * characters (`IP_HASH_SECRET`, or `APP_SECRET` when it stands in for
-   * it). The contact API stays closed until they are replaced.
+   * characters or weak (`IP_HASH_SECRET`, or `APP_SECRET` when it stands in
+   * for it; see `secretState`). The contact API stays closed until they are
+   * replaced.
    */
   contactTooShort: string[];
   /** `SLACK_WEBHOOK_URL` is set to a Slack incoming webhook URL. */
@@ -215,9 +223,15 @@ const choiceFilter = (
  *   invalid or unknown parameter is 400). Sorted by received time only;
  *   `q` searches the email address only. Also runs retention pruning
  *   (throttled) in the background.
- * - `GET /submissions/:id`: one submission; marks an unread one as read.
+ * - `GET /submissions/:id`: one submission. It changes nothing.
+ * - `POST /submissions/:id/read` (no body): marks an unread submission as
+ *   read, keeping an earlier `read_at`, and returns it. The admin UI calls
+ *   it when it opens an unread inquiry, so a GET (which skips the Origin
+ *   check) never changes state.
  * - `PATCH /submissions/:id` with {@link submissionUpdateSchema}: sets the
- *   status (`unread` or `read`) or the suspected spam flag.
+ *   status (`unread` or `read`) or the suspected spam flag. The body must be
+ *   `application/json` (415) and at most
+ *   {@link SUBMISSION_UPDATE_MAX_BODY_BYTES} (413).
  * - `DELETE /submissions/:id`: deletes it.
  * - `GET /submissions.csv?view=&q=&version=&field=&value=&lang=`: CSV
  *   export of the same filters, streamed in batches of rows.
@@ -236,7 +250,10 @@ export const adminRoutes = new Hono<HonoEnv>()
       ipHash?.name ?? null,
       contact.rateLimiter ? null : 'CONTACT_RATE_LIMITER',
     ].filter((name): name is string => name !== null);
-    const contactTooShort = ipHash?.issue === 'too_short' ? [ipHash.name] : [];
+    const contactTooShort =
+      ipHash?.issue === 'too_short' || ipHash?.issue === 'weak'
+        ? [ipHash.name]
+        : [];
     const [retentionDays, unreadCount] = await Promise.all([
       getRetentionDays(c.env.DB),
       countUnread(c.env.DB),
@@ -366,7 +383,9 @@ export const adminRoutes = new Hono<HonoEnv>()
           );
         } catch (error) {
           console.error('csv export failed:', safeErrorMessage(error));
-          controller.error(error);
+          // A generic error: the runtime may log the reason of an errored
+          // stream, and a failed query carries its bound values.
+          controller.error(new Error('csv export failed'));
         }
       },
       cancel: async () => {
@@ -380,19 +399,27 @@ export const adminRoutes = new Hono<HonoEnv>()
     });
   })
   .get('/submissions/:id', async (c) => {
-    const id = c.req.param('id');
-    const found = await getSubmission(c.env.DB, id);
-    const submission =
-      found?.status === 'unread'
-        ? await markRead(c.env.DB, id, Date.now())
-        : found;
+    const submission = await getSubmission(c.env.DB, c.req.param('id'));
+    if (!submission) return apiError(c, 404, 'not_found');
+    return c.json(await toAdminSubmission(c, submission));
+  })
+  .post('/submissions/:id/read', async (c) => {
+    const submission = await markRead(c.env.DB, c.req.param('id'), Date.now());
     if (!submission) return apiError(c, 404, 'not_found');
     return c.json(await toAdminSubmission(c, submission));
   })
   .patch('/submissions/:id', async (c) => {
+    if (!isJsonContentType(c.req.header('content-type'))) {
+      return apiError(c, 415, 'unsupported_media_type');
+    }
+    const text = await readBodyWithLimit(
+      c.req.raw,
+      SUBMISSION_UPDATE_MAX_BODY_BYTES,
+    );
+    if (text === null) return apiError(c, 413, 'payload_too_large');
     let body: unknown;
     try {
-      body = await c.req.json();
+      body = JSON.parse(text);
     } catch {
       return apiError(c, 400, 'invalid_json');
     }

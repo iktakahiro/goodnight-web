@@ -13,7 +13,10 @@ Cloudflare Worker with one D1 database.
 - `site.config.ts`: company name, address, phone, email, the company profile
   table, navigation, and theme colors.
 - `wrangler.jsonc`: only the value of `vars.TURNSTILE_SITE_KEY` (the public
-  Turnstile site key) and the Worker `name`.
+  Turnstile site key), the Worker `name`, and `workers_dev` (set it to
+  `false` once the site has its own domain). Keep `preview_urls` false
+  unless the person asks for preview URLs and understands that every preview
+  runs with the production database and secrets.
 - `src/pages/`: the pages. Pages in `src/pages/[...lang]/` are built once per
   language. Each page keeps its Japanese and English text side by side in a
   `text` object at the top of the file.
@@ -59,6 +62,23 @@ Do not add web fonts (font packages, font files in `public/`, or links to a
 font service) unless the site owner asks for them. A font service receives a
 request from every visitor, and the privacy policy would need to mention it.
 
+## Scripts and embeds
+
+The public pages share their origin with the admin screen. A script on any
+page runs with the authority of a signed-in admin: it can read, export, and
+delete inquiries through the admin API.
+
+- Do not add third-party scripts, analytics or chat tags, tag managers,
+  embeds (`<iframe>`), or raw HTML with `<script>` or `on*` attributes in
+  Markdown, unless the site owner asks for it and understands this.
+- `public/_headers` sets a Content Security Policy for the pages. It allows
+  scripts only from this site and from Cloudflare Turnstile, and no inline
+  scripts. If the owner wants a third-party script, add its origin to the
+  policy there, on purpose. Do not add `'unsafe-inline'` or `'unsafe-eval'`
+  to `script-src`.
+- Keep `build.inlineStylesheets` and `vite.build.assetsInlineLimit` in
+  `astro.config.ts`: they keep scripts in files, which the policy needs.
+
 ## What you must not change
 
 - `src/worker.ts`: keep the `createGoodnightWorker(...)` call as it is.
@@ -71,6 +91,10 @@ request from every visitor, and the privacy policy would need to mention it.
 - `@goodnight-web/*` packages: do not edit files in `node_modules`, do not
   copy their code into this repository, and do not change their version by
   hand. Updates arrive as pull requests from Dependabot.
+- `package-lock.json`: Cloudflare installs with `npm ci` from it. Do not edit
+  it by hand. When you add, remove, or change a package, use `npm install`
+  so `package.json` and `package-lock.json` change together, and commit
+  both.
 - `.github/workflows/` and `.github/scripts/`: these check update pull
   requests and the repository visibility.
 - The `data-*` attributes in `src/features/contact/contact-form.astro`
@@ -133,11 +157,13 @@ network access to Cloudflare Turnstile).
 ## Updates and pull requests
 
 - Merge only pull requests that have the "official goodnight-web update"
-  comment from the Update check workflow. The workflow gives that comment
-  only to a Dependabot pull request from this repository that changes only
-  `package.json` and the lockfile, and only `@goodnight-web/*` versions in
-  `package.json`. The lockfile may also change packages that
-  `@goodnight-web/*` uses. If a pull request has the warning
+  comment from the Update check workflow and a successful
+  `goodnight-web/update-check` status. The workflow gives them only to a
+  Dependabot pull request from this repository whose commits were all made
+  by Dependabot, that changes only `package.json` and the lockfile, and only
+  `@goodnight-web/*` versions in `package.json`. The lockfile may also change
+  packages that `@goodnight-web/*` uses, from the npm registry only. If a
+  pull request has the warning
   comment, do not merge it unless a person who understands the change has
   reviewed it.
 - Do not merge pull requests on your own. Tell the person what the pull

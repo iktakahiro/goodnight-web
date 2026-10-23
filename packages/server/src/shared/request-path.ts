@@ -91,8 +91,8 @@ export const requestArea = (url: string, routedPath: string): PathArea => {
 
 /**
  * Returns whether the area holds admin credentials or admin data: the admin
- * UI, the admin API, setup, and Better Auth. These require HTTPS and, when
- * configured, Cloudflare Access.
+ * UI, the admin API, setup, and Better Auth. These require Cloudflare
+ * Access when it is configured.
  */
 export const isAdminArea = (area: PathArea): boolean =>
   area === 'admin-ui' ||

@@ -38,9 +38,10 @@ import { safeErrorMessage } from './shared/log-error.ts';
  * - `/api/admin/*` (admin session with a passkey required)
  * - `GET /admin`, `GET /admin/*` (admin UI)
  *
- * The admin UI, the admin API, setup, and Better Auth require HTTPS (plain
- * HTTP is allowed on `localhost`), and a valid Cloudflare Access token when
- * `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` are set.
+ * The admin UI and every `/api/*` path require HTTPS (plain HTTP is allowed
+ * on `localhost`). The admin UI, the admin API, setup, and Better Auth also
+ * require a valid Cloudflare Access token when `ACCESS_AUD` and
+ * `ACCESS_TEAM_DOMAIN` are set.
  *
  * Before any route runs, `c.env` is replaced by the resolved env, in which
  * `APP_SECRET` stands in for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and
@@ -55,9 +56,9 @@ export const createGoodnightWorker = (options: GoodnightWorkerOptions = {}) => {
     await next();
   });
   app.use('*', securityHeaders);
-  // The admin UI, admin API, setup, and Better Auth: HTTPS only (except on
-  // localhost), then Cloudflare Access when ACCESS_AUD and
-  // ACCESS_TEAM_DOMAIN are set.
+  // The admin UI and /api/*: HTTPS only (except on localhost). Then the
+  // admin UI, admin API, setup, and Better Auth: Cloudflare Access when
+  // ACCESS_AUD and ACCESS_TEAM_DOMAIN are set.
   app.use('*', requireHttps);
   app.use('*', requireAccess);
   app.route('/api/contact', contactRoutes);

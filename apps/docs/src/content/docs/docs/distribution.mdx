@@ -34,6 +34,14 @@ The Deploy to Cloudflare button copies the `templates/starter` folder of the pub
 
 Your copy does not follow the goodnight-web repository. The server code reaches you through the npm package instead. See [Getting started](/docs/getting-started/).
 
+### The lockfile [#lockfile]
+
+The starter includes `package-lock.json`, which records the exact version and checksum of every package the site installs. Workers Builds installs with `npm ci` from it, so the first deploy installs exactly the committed packages, and so does every later build until a pull request changes the file.
+
+- Dependabot updates `package.json` and `package-lock.json` together.
+- Do not edit versions in `package.json` by hand without updating the lockfile. Run `npm install` (or `npm install <package>@<version>`) and commit both files. If they do not match, `npm ci` stops and the build fails.
+- Do not edit `package-lock.json` by hand.
+
 ## Your repository must be private [#private-repository]
 
 Keep your copy of the site in a **private** repository. On GitHub, open **Settings > General > Danger Zone > Change visibility** and choose private.
@@ -64,22 +72,24 @@ The workflow needs no token and no permissions. The workflow lives in the starte
        update-types: [minor, patch]
    ```
 
-3. Dependabot opens one pull request in your repository.
-4. Workers Builds builds the pull request and shows a preview.
-5. You check the preview and merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
+3. Dependabot opens one pull request in your repository. It changes `package.json` and `package-lock.json`.
+4. If Workers Builds builds non-production branches (a setting of the Worker's build configuration in the Cloudflare dashboard), it builds the pull request and shows whether the build passed. The build gets no public address: the starter turns preview URLs off (`"preview_urls": false` in `wrangler.jsonc`).
+5. You review the pull request: the Update check comment and status, the build result if there is one, and the changes. To try the update before merging, check out the pull request's branch and run `npm run preview` on your computer. Then merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
+
+Preview URLs stay off because each preview version would run with your production D1 database and secrets at a public address, before you merge it. If you want them, set `"preview_urls": true` knowing that.
 
 There is no one-click update in the admin screen. It would need a token that can write to your GitHub repository, stored in the Worker. goodnight-web does not give the Worker that access.
 
 ### The update check workflow [#the-update-check-workflow]
 
-**Merge only pull requests that have the official update comment.** A pull request that says "update" is not always an update from goodnight-web.
+**Merge only pull requests that have the official update comment and a passing `goodnight-web/update-check` check.** A pull request that says "update" is not always an update from goodnight-web.
 
-The starter's `.github/workflows/update-check.yml` comments on every pull request. The comment is in Japanese and English. The workflow updates the same comment instead of adding new ones.
+The starter's `.github/workflows/update-check.yml` comments on every pull request. The comment is in Japanese and English. The workflow updates the same comment instead of adding new ones. It also sets a commit status named `goodnight-web/update-check` on the pull request's latest commit: it passes only for an official update. Anyone can paste the text of the comment into a pull request, but setting the status takes write access to the repository (this workflow's token has it), and the status belongs to one commit. The status has not been tested on GitHub yet.
 
-| Result          | Comment                                                                                |
-| --------------- | -------------------------------------------------------------------------------------- |
-| Official update | "Official goodnight-web update" / "Safe to merge after checking the preview."          |
-| Anything else   | "This is not an official update" / "If you don't understand the changes, don't merge." |
+| Result          | Comment                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Official update | "Official goodnight-web update" / "Safe to merge. If a build result is shown, check it first." |
+| Anything else   | "This is not an official update" / "If you don't understand the changes, don't merge."         |
 
 #### What counts as official
 
@@ -87,14 +97,15 @@ A pull request counts as an **official update** only if all of these are true:
 
 - The author is `dependabot[bot]` and the account type is `Bot`.
 - The branch is in your own repository, not in a fork.
+- Every commit in the pull request was authored and committed by `dependabot[bot]`, and GitHub shows its signature as verified. A commit that someone else pushed to the Dependabot branch, or a commit made in the GitHub web interface, makes it not official.
 - The only changed files are `package.json` and lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`). Each of them is modified, not added or removed.
 - In `package.json`, every changed line is the version of a `@goodnight-web/*` dependency.
 
-The lockfile may change in other ways. A new `@goodnight-web/server` version can bring new versions of the packages it uses (for example `hono`), and those changes appear only in the lockfile.
+The lockfile may change in other ways. A new `@goodnight-web/server` version can bring new versions of the packages it uses (for example `hono`), and those changes appear only in the lockfile. But every package added to `package-lock.json` must come from `https://registry.npmjs.org/` with a sha512 checksum. A Git URL, a local path, a link, plain `http://`, or another host makes the pull request not official.
 
 The packages your site depends on directly are listed in `package.json`. That diff is checked line by line.
 
-If the check cannot see every change, the pull request is not counted as official. For example, GitHub may omit or truncate the `package.json` diff, or the list of changed files may be incomplete.
+If the check cannot see every change, the pull request is not counted as official. For example, GitHub may omit or truncate the `package.json` or `package-lock.json` diff, or the list of changed files or commits may be incomplete.
 
 #### Inside the script
 
@@ -105,7 +116,7 @@ The script `.github/scripts/update-check.cjs` collects a reason for every rule t
 const user = pullRequest.user;
 if (!user || user.login !== OFFICIAL_AUTHOR || user.type !== 'Bot') {
   reasons.push(
-    `author is not ${OFFICIAL_AUTHOR}: ${user ? user.login : 'unknown'}`,
+    `author is not ${OFFICIAL_AUTHOR}: ${user ? clean(user.login) : 'unknown'}`,
   );
 }
 
@@ -114,7 +125,7 @@ const headRepo = pullRequest.head.repo
   : null;
 if (headRepo !== pullRequest.base.repo.full_name) {
   reasons.push(
-    `branch is not in this repository: ${headRepo ?? 'deleted repository'}`,
+    `branch is not in this repository: ${headRepo === null ? 'deleted repository' : clean(headRepo)}`,
   );
 }
 ```
@@ -125,15 +136,15 @@ Then every changed line in `package.json` must be an `@goodnight-web/*` entry se
 for (const change of packageJsonChanges(hunks)) {
   if (change.name === null) {
     reasons.push(
-      `package.json: change outside a dependency entry: ${change.line}`,
+      `package.json: change outside a dependency entry: ${clean(change.line)}`,
     );
   } else if (!change.name.startsWith(OFFICIAL_SCOPE)) {
     reasons.push(
-      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${change.name}`,
+      `package.json: entry other than an ${OFFICIAL_SCOPE}* dependency changed: ${clean(change.name)}`,
     );
   } else if (change.invalidSpec) {
     reasons.push(
-      `package.json: ${change.name} is not set to a version number: ${change.line}`,
+      `package.json: ${clean(change.name)} is not set to a version number: ${clean(change.line)}`,
     );
   } else {
     officialChanges += 1;

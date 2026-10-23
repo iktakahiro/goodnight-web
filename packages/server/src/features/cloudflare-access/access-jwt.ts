@@ -49,13 +49,40 @@ export const ACCESS_KEYS_TTL_MS = 60 * 60 * 1000;
 // cannot make the Worker fetch the key set on every request.
 const REFETCH_MIN_INTERVAL_MS = 30 * 1000;
 
+/**
+ * After a failed fetch of the signing keys, requests fail closed without
+ * fetching again for this long, so a failing certs endpoint is not called
+ * on every admin request.
+ */
+export const ACCESS_KEYS_FAILURE_BACKOFF_MS = 10 * 1000;
+
 // Public signing keys per team origin, shared within the isolate. They are
 // public data, not secrets.
 const keyCache = new Map<string, KeySet>();
+// Time of the last failed fetch per team origin.
+const failedAt = new Map<string, number>();
 
 const RS256 = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } as const;
 
 const fetchKeys = async (teamOrigin: string, now: number): Promise<KeySet> => {
+  const failed = failedAt.get(teamOrigin);
+  if (failed !== undefined && now - failed < ACCESS_KEYS_FAILURE_BACKOFF_MS) {
+    throw new Error('certs fetch failed recently');
+  }
+  try {
+    const set = await fetchKeySet(teamOrigin, now);
+    failedAt.delete(teamOrigin);
+    return set;
+  } catch (error) {
+    failedAt.set(teamOrigin, now);
+    throw error;
+  }
+};
+
+const fetchKeySet = async (
+  teamOrigin: string,
+  now: number,
+): Promise<KeySet> => {
   const response = await fetch(`${teamOrigin}/cdn-cgi/access/certs`);
   if (!response.ok) throw new Error(`certs status ${response.status}`);
   const body: unknown = await response.json();
@@ -196,4 +223,5 @@ export const verifyAccessJwt = async (
 /** Forgets cached signing keys. For tests. */
 export const clearAccessKeyCache = (): void => {
   keyCache.clear();
+  failedAt.clear();
 };

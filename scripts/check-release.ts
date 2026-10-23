@@ -3,13 +3,21 @@
 // Cloudflare button copies `templates/starter` alone as the root of a new
 // repository, so the starter must install `@goodnight-web/server` from npm.
 // Inside this repository, bun links the workspace package because the
-// starter pins the exact version of the workspace. Part of `bun run validate`
+// starter pins the exact version of the workspace. The starter's
+// package-lock.json (used by `npm ci` in Workers Builds) must match its
+// package.json and lock that same version from the npm registry. Part of
+// `bun run validate`
 // and CI (after the build, because the tarball needs the generated files).
 //
 //   bun scripts/check-release.ts
+//   bun scripts/check-release.ts --tarball packages/server/goodnight-web-server-0.1.0.tgz
+//
+// Without `--tarball` (or `CHECK_RELEASE_TARBALL`), the tarball check uses the
+// file list of `npm pack --dry-run`. With it, the check reads the given .tgz,
+// the exact file that `npm publish` would upload, including its package.json.
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const SERVER = '@goodnight-web/server';
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -73,6 +81,102 @@ export const checkStarterManifest = (
         `but the starter has ${pinned ?? 'nothing'}. Bump both together; a different version ` +
         'makes bun install it from npm instead of linking the workspace.',
     );
+  }
+  return problems;
+};
+
+/** The registry that every locked package must come from. */
+export const NPM_REGISTRY = 'https://registry.npmjs.org/';
+
+const sameEntries = (
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined,
+): boolean => {
+  const left = Object.entries(a ?? {}).sort(([x], [y]) => x.localeCompare(y));
+  const right = Object.entries(b ?? {}).sort(([x], [y]) => x.localeCompare(y));
+  return JSON.stringify(left) === JSON.stringify(right);
+};
+
+/**
+ * Problems in `templates/starter/package-lock.json`, offline. Workers Builds
+ * runs `npm ci` from it, so it must match `package.json` exactly, lock the
+ * server version that the starter pins, and resolve every package from the
+ * npm registry with a sha512 integrity: no `link`, `file:`, `git+`, or
+ * workspace entries that would only work inside this monorepo. Entries that
+ * ship inside another package (`inBundle`) have no URL of their own.
+ *
+ * @param lock - The parsed lockfile, or `undefined` when the file is missing.
+ */
+export const checkStarterLockfile = (
+  lock: unknown,
+  starter: PackageJson,
+  serverVersion: string | undefined,
+): string[] => {
+  if (lock === undefined) {
+    return [
+      'package-lock.json is missing; Workers Builds needs it for `npm ci` (docs/starter.md)',
+    ];
+  }
+  if (!isRecord(lock) || !isRecord(lock.packages)) {
+    return ['package-lock.json has no "packages" object'];
+  }
+  const problems: string[] = [];
+  if (lock.lockfileVersion !== 3) {
+    problems.push(
+      `package-lock.json must be lockfileVersion 3 (npm 10), not ${String(lock.lockfileVersion)}`,
+    );
+  }
+  const root = lock.packages[''];
+  const rootEntry = isRecord(root) ? (root as PackageJson) : {};
+  if (!sameEntries(rootEntry.dependencies, starter.dependencies)) {
+    problems.push(
+      'package-lock.json dependencies differ from package.json; run `npm install` in a copy of the starter',
+    );
+  }
+  if (!sameEntries(rootEntry.devDependencies, starter.devDependencies)) {
+    problems.push(
+      'package-lock.json devDependencies differ from package.json; run `npm install` in a copy of the starter',
+    );
+  }
+  const server = lock.packages[`node_modules/${SERVER}`];
+  const locked = isRecord(server) ? server.version : undefined;
+  if (locked !== starter.dependencies?.[SERVER] || locked !== serverVersion) {
+    problems.push(
+      `package-lock.json locks ${SERVER} ${String(locked ?? 'nothing')}, but the starter pins ` +
+        `${starter.dependencies?.[SERVER] ?? 'nothing'} and packages/server is ${serverVersion ?? 'unknown'}`,
+    );
+  }
+  for (const [path, entry] of Object.entries(lock.packages)) {
+    if (path === '') continue;
+    if (!isRecord(entry)) {
+      problems.push(`package-lock.json entry ${path} is not an object`);
+      continue;
+    }
+    if (entry.link === true) {
+      problems.push(`package-lock.json entry ${path} is a link`);
+      continue;
+    }
+    if (
+      typeof entry.version === 'string' &&
+      LOCAL_PROTOCOL.test(entry.version)
+    ) {
+      problems.push(
+        `package-lock.json entry ${path} has version "${entry.version}"`,
+      );
+    }
+    if (entry.inBundle === true) continue;
+    const resolved = entry.resolved;
+    if (typeof resolved !== 'string' || !resolved.startsWith(NPM_REGISTRY)) {
+      problems.push(
+        `package-lock.json entry ${path} resolves to ${String(resolved ?? 'nothing')}, not ${NPM_REGISTRY}`,
+      );
+    }
+    if (
+      typeof entry.integrity !== 'string' ||
+      !entry.integrity.startsWith('sha512-')
+    ) {
+      problems.push(`package-lock.json entry ${path} has no sha512 integrity`);
+    }
   }
   return problems;
 };
@@ -160,6 +264,74 @@ export const parsePackJson = (output: string): string[] => {
   });
 };
 
+/**
+ * The file list from `tar -tzf` of a packed tarball: one path per line;
+ * directory entries (ending in `/`) are left out.
+ */
+export const parseTarList = (output: string): string[] =>
+  output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.endsWith('/'));
+
+/**
+ * Problems in the package.json inside a packed tarball: it must be the
+ * publishable server manifest ({@link checkServerManifest}) at
+ * `expectedVersion`, with no local protocol left in any dependency list.
+ */
+export const checkPackedManifest = (
+  pkg: PackageJson,
+  expectedVersion: string | undefined,
+): string[] => {
+  const problems = checkServerManifest(pkg);
+  if (pkg.version !== expectedVersion) {
+    problems.push(
+      `the packed version is ${pkg.version ?? 'missing'}, but packages/server/package.json has ${expectedVersion ?? 'nothing'}`,
+    );
+  }
+  for (const [name, range] of Object.entries(pkg.devDependencies ?? {})) {
+    if (LOCAL_PROTOCOL.test(range)) {
+      problems.push(`devDependency ${name} must not use "${range}"`);
+    }
+  }
+  return problems;
+};
+
+/**
+ * The tarball path from `--tarball <path>`, `--tarball=<path>`, or the
+ * `CHECK_RELEASE_TARBALL` environment variable, or `undefined`.
+ */
+export const tarballArgument = (
+  argv: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+): string | undefined => {
+  const index = argv.indexOf('--tarball');
+  if (index !== -1) {
+    const value = argv[index + 1];
+    if (!value || value.startsWith('--')) {
+      throw new Error('--tarball needs the path of a .tgz file');
+    }
+    return value;
+  }
+  const inline = argv.find((arg) => arg.startsWith('--tarball='));
+  if (inline) return inline.slice('--tarball='.length);
+  return env.CHECK_RELEASE_TARBALL || undefined;
+};
+
+/** The file list and package.json of a packed tarball, read with `tar`. */
+const readTarball = (
+  path: string,
+): { files: string[]; manifest: PackageJson } => ({
+  files: parseTarList(
+    execFileSync('tar', ['-tzf', path], { encoding: 'utf8' }),
+  ),
+  manifest: JSON.parse(
+    execFileSync('tar', ['-xzOf', path, 'package/package.json'], {
+      encoding: 'utf8',
+    }),
+  ) as PackageJson,
+});
+
 /** The tarball's file list from `npm pack --dry-run` (no scripts, no write). */
 const listTarball = (packageDir: string): string[] =>
   parsePackJson(
@@ -174,24 +346,41 @@ if (import.meta.main) {
   const serverDir = join(root, 'packages/server');
   const server = readJson(join(serverDir, 'package.json'));
   const starter = readJson(join(root, 'templates/starter/package.json'));
+  const lockPath = join(root, 'templates/starter/package-lock.json');
+  const lock: unknown = existsSync(lockPath)
+    ? JSON.parse(readFileSync(lockPath, 'utf8'))
+    : undefined;
   const migrations = readdirSync(join(serverDir, 'migrations')).filter((name) =>
     name.endsWith('.sql'),
   );
+
+  const tarball = tarballArgument(process.argv.slice(2), process.env);
+  const packed = tarball ? readTarball(resolve(tarball)) : undefined;
 
   const problems = [
     ...checkServerManifest(server).map((p) => `packages/server: ${p}`),
     ...checkStarterManifest(starter, server.version).map(
       (p) => `templates/starter: ${p}`,
     ),
-    ...checkTarballFiles(listTarball(serverDir), migrations).map(
-      (p) => `packages/server tarball: ${p}`,
+    ...checkStarterLockfile(lock, starter, server.version).map(
+      (p) => `templates/starter: ${p}`,
     ),
+    ...checkTarballFiles(
+      packed?.files ?? listTarball(serverDir),
+      migrations,
+    ).map((p) => `packages/server tarball: ${p}`),
+    ...(packed
+      ? checkPackedManifest(packed.manifest, server.version).map(
+          (p) => `${tarball}: ${p}`,
+        )
+      : []),
   ];
   if (problems.length > 0) {
     console.error(problems.map((p) => `- ${p}`).join('\n'));
     process.exit(1);
   }
   console.log(
-    `release check: ${SERVER}@${server.version} is publishable and the starter pins it`,
+    `release check: ${SERVER}@${server.version} is publishable, and the starter pins and locks it` +
+      (tarball ? ` (checked ${tarball})` : ''),
   );
 }

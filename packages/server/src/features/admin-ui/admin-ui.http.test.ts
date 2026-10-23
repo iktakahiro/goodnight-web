@@ -56,7 +56,57 @@ describe('serveAdminFile', () => {
   });
 
   test('returns 404 for a missing file', () => {
-    expect(serve('/admin/assets/missing.js').status).toBe(404);
+    const response = serve('/admin/assets/missing.js');
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  test('returns 404, not the SPA shell, for unknown paths under /admin/assets/', async () => {
+    for (const path of [
+      '/admin/assets/',
+      '/admin/assets/x',
+      '/admin/assets/a/b',
+    ]) {
+      const response = serve(path);
+      expect(response.status).toBe(404);
+      expect(await response.text()).not.toBe('<html>');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+  });
+});
+
+describe('admin UI error responses', () => {
+  test('the HTTPS redirect is not cached', async () => {
+    const worker = createTestWorker();
+    const response = await worker.fetch('http://example.com/admin');
+    expect(response.status).toBe(308);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  test('a Cloudflare Access denial is not cached', async () => {
+    const worker = createTestWorker({
+      env: {
+        ACCESS_AUD: 'aud',
+        ACCESS_TEAM_DOMAIN: 'team.cloudflareaccess.com',
+      },
+    });
+    const response = await worker.fetch('/admin');
+    expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  test('an unknown asset through the Worker is a 404 with no-store', async () => {
+    const worker = createTestWorker();
+    const response = await worker.fetch('/admin/assets/unknown');
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  test('admin pages keep their own cache headers', async () => {
+    const worker = createTestWorker();
+    const response = await worker.fetch('/admin');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-cache');
   });
 });
 

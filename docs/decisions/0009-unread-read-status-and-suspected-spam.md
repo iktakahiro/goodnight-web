@@ -25,7 +25,10 @@ search. Admins look for an inquiry by when it arrived or by who sent it.
 
 - **Status is `unread` or `read` only.** Opening the detail marks it read;
   an admin can set it back to unread from the list or the detail. `read_at`
-  is cleared when it goes back to unread.
+  is cleared when it goes back to unread. (Update, 2026-10-23: the admin UI
+  marks it read with `POST /api/admin/submissions/:id/read`; the `GET` of the
+  detail no longer changes state, so a cross-site navigation cannot flip
+  it.)
 - **Suspected spam is a separate flag**, `suspected_spam` (integer boolean,
   NOT NULL, default false). The contact API sets it when the honeypot is
   filled or the spam score is at least `SPAM_SUSPECT_THRESHOLD` (3, renamed

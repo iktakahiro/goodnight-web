@@ -62,7 +62,7 @@ The table below shows when to enter each value, and what happens if you lose it 
 | Project name         | In the form.                                                                                                                                              | If you change `name` in `wrangler.jsonc` later, the next deploy creates a different Worker, without the secrets and domain of the old one.                                                                                  |
 | D1 database          | In the form.                                                                                                                                              | If you delete the database, you lose every inquiry and admin account. A new empty database needs setup and a new passkey again.                                                                                             |
 
-A value shorter than 32 characters counts as missing, and the features that use it stay off.
+The setup form does not generate these values for you. A value shorter than 32 characters counts as missing, and the features that use it stay off. So does a value that is clearly not random, such as one character repeated or one short block repeated; the setup screen of your site then names the secret to replace.
 
 To make a random string that meets this rule (44 characters), run this in a terminal on your computer:
 
@@ -93,7 +93,7 @@ A passkey works only on the domain it was registered on (its WebAuthn relying pa
 Setup closes when the first passkey is registered, so you cannot register a new passkey on the new domain either. Reopening setup takes a manual change in the database ([When you cannot use or have lost your passkey](/docs/how-it-works/passkey-recovery/)), so add your domain before you create the first admin.
 
 1. In the Cloudflare dashboard, add a custom domain to the Worker.
-2. Turn off the `workers.dev` address and preview URLs. The admin screen is then reachable only on your domain.
+2. In `wrangler.jsonc`, change `"workers_dev": true` to `"workers_dev": false` and commit it. The deploy that follows turns the `workers.dev` address off, and the admin screen is then reachable only on your domain. Do not use the switch in the dashboard instead: every deploy applies `wrangler.jsonc` again and turns `workers.dev` back on. Preview URLs are already off in the starter (`"preview_urls": false`).
 
 </Step>
 

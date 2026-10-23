@@ -152,7 +152,7 @@ Do not run `wrangler d1 migrations create`. It would write a file into `node_mod
 
 From the moment the migration is applied until `wrangler deploy` finishes, the old version of the Worker runs against the new schema. Schema changes are additive (new tables and columns), and the queries list the columns they use, so the old version keeps working during that time.
 
-Preview builds of a pull request do not run the deploy script. A preview uses your database without the new migration, so a screen that needs the new schema can fail in the preview.
+A build of a pull request (when Workers Builds builds non-production branches) does not run the deploy script, so it never migrates your database. The starter turns preview URLs off, so such a build has no address. If you turn preview URLs on, a preview uses your production database without the new migration, so a screen that needs the new schema can fail there.
 
 ## Undoing a migration with Time Travel
 
@@ -166,6 +166,17 @@ wrangler d1 time-travel restore DB --timestamp=2026-10-22T09:00:00Z
 A restore also removes every inquiry and every sign-in after that time. It does not change the deployed code.
 
 If you restore to a time before a migration, also deploy the matching older version of your site. Otherwise the deploy script applies the migration again on the next deploy.
+
+A restore also brings back rows that were deleted after that time, including security changes:
+
+- Passkeys and sessions deleted by [passkey recovery](/docs/how-it-works/passkey-recovery/) or by [removing an admin](/docs/security/#removing-an-admin) come back, so an old passkey can sign in again.
+- A restore to a time before the first passkey was registered opens setup again: anyone with `SETUP_TOKEN` and an address in `ADMIN_EMAILS` can then create an admin.
+
+After a restore, check the `passkey` and `session` tables and the `setup_closed_at` row in `settings`, and run the recovery or removal statements again if the restore crossed one of them.
+
+### Rolling back the Worker
+
+There are no down migrations. If you roll back to an older version of the Worker in the Cloudflare dashboard after a schema change, the older code runs against the newer schema. goodnight-web keeps schema changes additive (new tables and columns), so older code keeps working, but roll back the database with Time Travel only together with the matching code.
 
 ## The migrations in the package
 

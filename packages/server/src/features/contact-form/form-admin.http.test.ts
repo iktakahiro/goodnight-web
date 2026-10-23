@@ -343,13 +343,14 @@ describe('authorization', () => {
 
   test('an address outside ADMIN_EMAILS gets 403', async () => {
     worker.env.ADMIN_EMAILS = 'someone-else@example.com';
-    expect((await get('/api/admin/form')).status).toBe(403);
     const response = await send('PUT', '/api/admin/form', {
       baseVersion: 1,
       fields: [],
     });
     expect(response.status).toBe(403);
     expect((await response.json()).error.code).toBe('forbidden');
+    // The 403 also deleted the user's sessions.
+    expect((await get('/api/admin/form')).status).toBe(401);
     expect(
       worker.sqlite.query('SELECT COUNT(*) AS n FROM form_definitions').get(),
     ).toEqual({ n: 1 });

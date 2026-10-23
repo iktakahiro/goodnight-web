@@ -1,6 +1,8 @@
 # Marks pull requests as an official goodnight-web update or not, with one
-# comment in Japanese and English. Merge only pull requests that have the
-# "official goodnight-web update" comment.
+# comment in Japanese and English and a commit status
+# (goodnight-web/update-check) on the head commit. Merge only pull requests
+# that have the "official goodnight-web update" comment and a successful
+# status. The status flow has not been tested on GitHub yet.
 #
 # Security: this workflow uses pull_request_target, so it runs with a token
 # that can write comments. It never checks out or runs code from the pull
@@ -12,9 +14,12 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
+# contents: read to check out the script, pull-requests: write for the
+# comment, statuses: write for the commit status. Nothing else.
 permissions:
   contents: read
   pull-requests: write
+  statuses: write
 
 concurrency:
   group: update-check-${{ github.event.pull_request.number }}

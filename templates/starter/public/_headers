@@ -1,0 +1,24 @@
+# Response headers for the static pages, applied by Workers Static Assets.
+# The Worker sets its own headers on /api/* and /admin*, so these rules do not
+# reach the contact API or the admin screen.
+#
+# The pages share their origin with the admin screen. A script on any page
+# runs with the authority of a signed-in admin, so the Content Security Policy
+# allows scripts only from this site and from Cloudflare Turnstile (the
+# contact form's bot check). Astro writes every script to /_astro/
+# (astro.config.ts), so 'unsafe-inline' is not needed for scripts.
+# style-src-attr allows only the style attribute on <html> that sets the
+# theme colors from site.config.ts; <style> elements and other inline styles
+# are not allowed. If you add a script, an embed, analytics, or a font
+# service, add its origin here on purpose, and read AGENTS.md first.
+#
+# Strict-Transport-Security is not set here. A browser that has seen it
+# refuses plain HTTP until max-age passes, so a wrong value cannot be taken
+# back quickly. Turn on "Always Use HTTPS" (and HSTS, if you want it) for
+# your zone in the Cloudflare dashboard instead.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()

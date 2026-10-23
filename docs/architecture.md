@@ -54,7 +54,10 @@ Design decisions are recorded in [decisions/](decisions/README.md).
   (`passkey/generate-authenticate-options` and
   `passkey/verify-authentication`) itself, with the key `auth:<ip_hash>` on
   the Rate Limiting binding. Over the limit returns 429; without the binding
-  or `IP_HASH_SECRET` they return 503.
+  or `IP_HASH_SECRET` they return 503. Every rate limit key (contact, setup,
+  sign-in) is an HMAC of the IPv4 address or of the IPv6 /64 prefix
+  (`ipRateLimitKey` in `src/shared/ip-rate-limit.ts`); the stored `ip_hash`
+  still hashes the full address.
 - **D1** stores submissions, settings, and the Better Auth tables. All of
   them are defined in one Drizzle schema
   (`packages/server/src/db/schema.ts`). Every query goes through the Drizzle
@@ -146,7 +149,8 @@ fields in the browser, so a form edit needs no build or deploy.
    and check that `hostname` is the request's hostname (or one of
    `options.contact.turnstileHostnames`) and that `action` is `contact`. On
    failure return 400 (`turnstile_failed`) and save nothing.
-4. Apply the Rate Limiting binding with `ip_hash` as the key. Over the limit
+4. Apply the Rate Limiting binding, keyed by the HMAC of the IPv4 address
+   or of the IPv6 /64 prefix. Over the limit
    returns 429.
 5. Validate the fixed parts with `contactRequestSchema` from
    `@goodnight-web/server/contact` (email, `consent` must be `true`,
@@ -162,7 +166,11 @@ fields in the browser, so a form edit needs no build or deploy.
    or a filled honeypot sets `suspected_spam`; the reason `honeypot` is
    added to `spam_reasons` before the score reasons. The status is always
    `unread`.
-6. Insert the row into D1 (`email`, `fields` keyed by field id,
+6. Count the rows stored in the last hour (`created_at` index). At
+   `CONTACT_HOURLY_INSERT_QUOTA` (500) or more, return 503 (`contact_busy`)
+   and store nothing. This caps how fast D1 can grow when someone pays for
+   Turnstile solves from many addresses; a small site never gets near it.
+   Then insert the row into D1 (`email`, `fields` keyed by field id,
    `form_version`, `locale`, and the operational columns), then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:
@@ -237,7 +245,8 @@ submission with the reason `honeypot` whatever the score (step 2 above).
 
 A submission's `status` is `unread` or `read` (check constraint
 `submissions_status_check`). Opening the detail marks it `read` and sets
-`read_at`; an admin can set it back to `unread`, which clears `read_at`.
+`read_at`: the admin UI sends `POST /api/admin/submissions/:id/read` after
+the read-only `GET`, so no `GET` changes state; an admin can set it back to `unread`, which clears `read_at`.
 `suspected_spam` (integer boolean) is a separate flag, set by the contact
 API and changed by admins with `PATCH`. It is not a status: a suspected spam
 row is unread or read too. Suspected spam never triggers Slack, and the
@@ -254,12 +263,14 @@ volume, and old rows are pruned.
 ### Retention without Cron
 
 `pruneIfDue()` deletes submissions older than `settings.retention_days`
-(180 by default), and Better Auth `verification` rows past `expires_at`
-(abandoned passkey challenges), at most once an hour. It claims the run with one conditional
-upsert of `settings.last_cleanup_at`, so two requests at the same time do not
-both delete. It runs in `ctx.waitUntil` after each submission and after each
-admin list request, so old rows are removed even when no new inquiries
-arrive.
+(180 by default), Better Auth `verification` rows past `expires_at`
+(abandoned passkey challenges), and `session` rows past `expires_at`, at most
+once an hour. It claims the run with one conditional upsert of
+`settings.last_cleanup_at`, so two requests at the same time do not both
+delete. It runs in `ctx.waitUntil` after each submission, after each admin
+list request, and after each allowed public sign-in request, so old rows are
+removed even when no new inquiries arrive. A site with no requests prunes
+nothing until the next one.
 
 ## Admin
 
@@ -326,7 +337,8 @@ the Worker's own `Origin` (CSRF). There is no development bypass.
 | `GET /api/admin/me`                                                            | the signed-in admin                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `GET /api/admin/status`                                                        | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `version`, `retentionDays`, `unreadCount` (unread, not suspected spam)                                                                                                                                                                                                                                                                                                                                                                  |
 | `GET /api/admin/submissions?view=&q=&version=&field=&value=&dir=&page=&limit=` | `view` is `unread`, `read`, `all` (default), or `spam`; `q` is a case-insensitive partial match on the email (at most 254 characters); `limit` per page (1–100, default 50); sorted by received time only, `desc` by default; `columns` (the current form's fields), `total`, `unreadCount`, and `suspectedSpamCount`; field values of the current form, long text cut to 120 characters; runs pruning. `field` + `value` filter on a select or radio option of the current form. Invalid or unknown parameters (including `sort`) are 400 |
-| `GET /api/admin/submissions/:id`                                               | one submission with `entries`: its values labeled by its own form version, each marked whether it is on the current form; an `unread` one becomes `read`                                                                                                                                                                                                                                                                                                                                                                                   |
+| `GET /api/admin/submissions/:id`                                               | one submission with `entries`: its values labeled by its own form version, each marked whether it is on the current form; read-only                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `POST /api/admin/submissions/:id/read`                                         | no body: an `unread` one becomes `read` (keeps an earlier `read_at`); the admin UI calls it when it opens an unread inquiry                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `PATCH /api/admin/submissions/:id`                                             | `{ status?, suspectedSpam? }` (at least one): `status` is `unread` or `read`; `suspectedSpam` is a boolean                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `DELETE /api/admin/submissions/:id`                                            | deletes the row                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `GET /api/admin/submissions.csv?view=&q=&version=&field=&value=&lang=`         | the list's filters; CSV with a UTF-8 BOM, streamed in batches of 200 rows (keyset on `created_at`, `id`); fixed columns, then one column per field id the form ever had (archived headers end with ` (vN)`); a cell whose first non-whitespace character is `= + - @`, or that starts with tab or CR, gets a leading `'`                                                                                                                                                                                                                   |
@@ -337,10 +349,14 @@ the Worker's own `Origin` (CSRF). There is no development bypass.
 
 `ip_hash` is never returned by the admin API.
 
-Removing an address from `ADMIN_EMAILS` locks its sessions out at the next
-request, but the user, sessions, and passkeys stay in D1 and work again if
-the address is added back. The docs site's security page gives the
-`wrangler d1 execute` command that deletes them.
+`requireAdmin` reads the session with `disableRefresh`, so admin API calls
+never extend a session. Removing an address from `ADMIN_EMAILS` locks its
+sessions out at the next admin API request, and that request deletes all of
+the user's sessions in `ctx.waitUntil` (best effort; the response is 403
+either way). The user and passkeys stay in D1, so the person can sign in
+again if the address is added back, but old sessions are gone. The docs
+site's security page gives the `wrangler d1 execute` command that deletes
+the user and passkeys.
 
 ### Admin UI
 
@@ -471,14 +487,14 @@ The UI does not use TanStack Start; the Worker serves the static build.
 
 ### HTTPS and Cloudflare Access
 
-Two app-wide middlewares run before the routes, for the admin areas
-(`/admin*`, `/api/admin/*`, `/api/setup`, `/api/auth/*`):
+Two app-wide middlewares run before the routes:
 
-- `requireHttps` (`src/features/https-only/`): over `http://`, `GET` and
-  `HEAD` get a 308 to `https://`, other methods 403 `https_required`.
-  `localhost`, `127.0.0.1`, and `[::1]` are exempt. The contact API and the
-  site are not affected.
-- `requireAccess` (`src/features/cloudflare-access/`): off unless
+- `requireHttps` (`src/features/https-only/`), for `/admin*` and every
+  `/api/*` path, the contact API included: over `http://`, `GET` and `HEAD`
+  get a 308 to `https://`, other methods 403 `https_required`. `localhost`,
+  `127.0.0.1`, and `[::1]` are exempt. The static site is not affected.
+- `requireAccess` (`src/features/cloudflare-access/`), for the admin areas
+  (`/admin*`, `/api/admin/*`, `/api/setup`, `/api/auth/*`): off unless
   `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` are set. Then `Cf-Access-Jwt-Assertion`
   must be an RS256 JWT signed by a key from
   `https://<team>/cdn-cgi/access/certs` (cached per isolate for an hour; an
@@ -499,8 +515,21 @@ as `/admin`. Responses from `/api/*` and `/admin/*` get `X-Content-Type-Options`
 `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
 `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, a
 `Permissions-Policy`, and HSTS on HTTPS. API responses get
-`default-src 'none'` and `Cache-Control: no-store`. Pages from Static Assets
-are not changed.
+`default-src 'none'` and `Cache-Control: no-store`. Admin UI responses other
+than 2xx and 304 also get `Cache-Control: no-store`. The Worker does not
+change pages from Static Assets; the starter's `public/_headers` gives them a
+site CSP instead ([starter.md](starter.md)).
+
+The public pages share their origin with `/admin` and `/api/admin`. Any
+script on any page (an analytics tag, a chat widget, a tag manager, or
+`<script>` or event-handler HTML in Markdown) runs with a signed-in admin's
+full read, export, delete, and form-edit authority; the `HttpOnly` cookie and
+the `Origin` check (`isAllowedOrigin`) do not prevent it. The starter limits
+scripts to its own files and Turnstile with the `_headers` CSP, and its
+`AGENTS.md` tells AI tools not to add third-party scripts. Full isolation
+needs a separate admin hostname that serves only the admin paths. A narrower
+cookie `Path` would not help, because same-origin script can still fetch
+`/api/admin` with credentials.
 
 ## Database
 
@@ -540,6 +569,17 @@ are not changed.
   logs redacted messages, and Better Auth rethrows endpoint errors to the
   app's `onError` instead of logging them itself, so no submitted values or
   tokens reach the logs ([0005](decisions/0005-drizzle-orm.md)).
+- **Restores and rollbacks.** There are no down migrations; a Worker rolled
+  back in the dashboard runs against the newer, additive schema. A D1 Time
+  Travel restore brings back passkeys and sessions that the passkey
+  recovery or admin removal SQL deleted, and a restore to before the first
+  passkey reopens setup. The docs site's database page tells operators to
+  re-check `passkey`, `session`, and `settings.setup_closed_at` after a
+  restore.
+- **Admin emails in form history.** `form_definitions.created_by` keeps the
+  address of the admin who saved each version. The table is append-only, so
+  removing an admin does not remove it; the security and privacy pages say
+  so.
 
 ## Package and starter
 
@@ -586,7 +626,12 @@ folder), the same pin installs the package from npm.
    repository. Security updates are not delayed by the cooldown. The
    starter's Update check workflow comments whether the pull request is an
    official update, and the starter's README tells users to merge only those.
-3. The user's CI or Workers Builds builds the pull request and shows a preview.
+3. If the user keeps Workers Builds' non-production branch builds on, the
+   pull request is built and shows a build result. The starter sets
+   `preview_urls: false`, so the build gets no public preview URL (a preview
+   version would share the production D1 and secrets). The user reviews the
+   Update check comment and status, the build result, and can run
+   `npm run preview` locally.
 4. The user merges the pull request. The deploy script runs
    `wrangler d1 migrations apply DB --remote && wrangler deploy`, so migrations
    are applied before the new code runs.

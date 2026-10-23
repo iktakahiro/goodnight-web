@@ -215,7 +215,7 @@ Then comes one column for every field ID the form ever had: the current fields i
 - An archived field's header ends with the last version that had it, for example `Budget (v3)`. A new field with the same label has its own column, `Budget`.
 - If two headers are still the same, the field ID is added in brackets.
 - Dropdown, radio button, and checkbox values are written as choice labels.
-- So that a spreadsheet app does not run a value as a formula, a leading `'` is added to any cell whose first non-whitespace character is `=`, `+`, `-`, or `@`, or that starts with a tab or carriage return.
+- So that a spreadsheet app does not run a value as a formula, a leading `'` is added to any cell whose first visible character is `=`, `+`, `-`, or `@` (full-width forms included), or that starts with a tab or carriage return.
 - The export follows the list's view, email search, and filters. The All view leaves suspected spam out; export the Suspected spam view to get it.
 - The file is read 200 rows at a time and streamed, so a large table is never held in memory.
 

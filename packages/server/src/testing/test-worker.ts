@@ -71,7 +71,8 @@ export interface TestWorker {
 
 /**
  * Creates a Worker with an in-memory D1 and every setting present. Pass
- * `env` overrides (`undefined` removes a setting). `secrets` picks the
+ * `env` overrides (`undefined` removes a setting). Names outside
+ * `GoodnightEnv` stand for other Worker vars. `secrets` picks the
  * four-variable setup ({@link SECRETS}, the default) or `APP_SECRET` alone
  * ({@link APP_SECRET_ONLY}).
  */
@@ -81,7 +82,7 @@ export const createTestWorker = ({
   rateLimit = 5,
   secrets = 'legacy',
 }: {
-  env?: Partial<Record<keyof GoodnightEnv, unknown>>;
+  env?: Partial<Record<keyof GoodnightEnv, unknown>> & Record<string, unknown>;
   options?: GoodnightWorkerOptions;
   rateLimit?: number;
   secrets?: TestSecrets;

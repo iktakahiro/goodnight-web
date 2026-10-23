@@ -11,6 +11,19 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-15",
   "compatibility_flags": ["nodejs_compat"],
+  // The workers.dev address. A new site has no custom domain yet, so this is
+  // the only way to reach /admin for the first setup; keep it true until
+  // then. After you attach your own domain (and before you register the
+  // first passkey), set it to false here and commit. Do not use the
+  // dashboard toggle instead: `wrangler deploy` applies this file on every
+  // deploy, and without routes it turns workers.dev back on.
+  "workers_dev": true,
+  // Preview URLs give every uploaded version its own public address, and
+  // each version uses the production D1 database and secrets. They are off,
+  // so an unmerged pull request never gets a public address. Cloudflare
+  // otherwise turns them on whenever workers_dev is on. Turn them on only if
+  // you accept that.
+  "preview_urls": false,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

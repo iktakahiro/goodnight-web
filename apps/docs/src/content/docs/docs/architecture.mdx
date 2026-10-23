@@ -60,7 +60,7 @@ The inquiry list in the admin screen shows 50 inquiries per page, sorted by rece
 6. **Save, then respond.** The row is inserted into D1. The visitor gets a 200 response only after the insert succeeds. Nothing after this step can change the response.
 7. **After the response (in `ctx.waitUntil`).**
    - If the submission is not suspected spam and a Slack webhook is set, the Worker posts a notice with the site name, the page path, the received time, and the admin URL, and records `notified_at`.
-   - If the last cleanup was more than an hour ago, the Worker deletes inquiries older than the retention period (180 days by default) and expired passkey challenges.
+   - If the last cleanup was more than an hour ago, the Worker deletes inquiries older than the retention period (180 days by default), expired passkey challenges, and expired sessions.
 
 The contact API fails closed. In any of these cases it returns 503, and the form says "The contact form is not available yet":
 
@@ -98,9 +98,9 @@ The factory builds one Hono app. Middleware for security headers, HTTPS, and Clo
 
 ```ts title="packages/server/src/app.ts"
 app.use('*', securityHeaders);
-// The admin UI, admin API, setup, and Better Auth: HTTPS only (except on
-// localhost), then Cloudflare Access when ACCESS_AUD and
-// ACCESS_TEAM_DOMAIN are set.
+// The admin UI and /api/*: HTTPS only (except on localhost). Then the
+// admin UI, admin API, setup, and Better Auth: Cloudflare Access when
+// ACCESS_AUD and ACCESS_TEAM_DOMAIN are set.
 app.use('*', requireHttps);
 app.use('*', requireAccess);
 app.route('/api/contact', contactRoutes);
@@ -134,7 +134,7 @@ The code for contact, setup, auth, the admin API, and the admin screen lives in 
 
 If `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, or `IP_HASH_SECRET` is shorter than 32 characters, it counts as missing, and the features that use it are turned off. Secrets are used only inside the Worker. They are never sent to the browser or written to D1.
 
-`/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` work only over `https://` (except on `localhost`). See [Security model](/docs/security/#https).
+`/admin`, `/admin/*`, and every path under `/api/`, including the contact API, work only over `https://` (except on `localhost`). See [Security model](/docs/security/#https).
 
 ## Styles and fonts [#styles-and-fonts]
 

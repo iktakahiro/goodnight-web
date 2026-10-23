@@ -245,6 +245,9 @@ locally, which is too close to the free plan's 10 ms limit.
   object, with one instance per request origin (the passkey `rpID` and
   `origin` come from it). If the runtime passes a different `env` object, a
   new instance is built, so changed bindings or secrets are picked up.
+  (Update, 2026-10-23: at most eight origins are kept per `env` object, and
+  the least recently used one is dropped, so a wildcard route cannot grow
+  the cache without bound.)
 - Nothing is built at module top level, and no secret is read outside a
   request.
 - `AGENTS.md` now states this rule instead of "create per request".

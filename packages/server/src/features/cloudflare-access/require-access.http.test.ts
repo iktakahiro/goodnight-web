@@ -10,6 +10,7 @@ import {
 import { captureConsole } from '../../testing/console-capture.ts';
 import { createTestWorker } from '../../testing/test-worker.ts';
 import {
+  ACCESS_KEYS_FAILURE_BACKOFF_MS,
   ACCESS_KEYS_TTL_MS,
   clearAccessKeyCache,
   readAccessConfig,
@@ -254,6 +255,35 @@ describe('verifyAccessJwt', () => {
     expect(
       await verifyAccessJwt(config, `${header}.${forged}.${signature}`),
     ).toMatchObject({ ok: false, detail: 'bad signature' });
+  });
+
+  test('backs off after a failed fetch of the keys', async () => {
+    certsStatus = 500;
+    const token = await sign({});
+    const now = Date.now();
+    for (let i = 0; i < 5; i++) {
+      expect(await verifyAccessJwt(config, token, now + i)).toMatchObject({
+        ok: false,
+        reason: 'unavailable',
+      });
+    }
+    expect(certsCalls).toBe(1);
+    certsStatus = 200;
+    expect(
+      await verifyAccessJwt(
+        config,
+        token,
+        now + ACCESS_KEYS_FAILURE_BACKOFF_MS - 1,
+      ),
+    ).toMatchObject({ ok: false, reason: 'unavailable' });
+    expect(
+      await verifyAccessJwt(
+        config,
+        token,
+        now + ACCESS_KEYS_FAILURE_BACKOFF_MS,
+      ),
+    ).toEqual({ ok: true });
+    expect(certsCalls).toBe(2);
   });
 
   test('refetches the keys after the cache expires', async () => {

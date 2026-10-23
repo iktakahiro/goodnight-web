@@ -53,9 +53,19 @@ export const fetchInquiries = (
   );
 };
 
-/** `GET /api/admin/submissions/:id`. The server marks an unread inquiry read. */
+/** `GET /api/admin/submissions/:id`. Changes nothing on the server. */
 export const fetchInquiry = (id: string): Promise<AdminSubmission> =>
   apiFetch<AdminSubmission>(`/api/admin/submissions/${encodeURIComponent(id)}`);
+
+/**
+ * `POST /api/admin/submissions/:id/read`. Marks an unread inquiry read and
+ * returns it.
+ */
+export const markInquiryRead = (id: string): Promise<AdminSubmission> =>
+  apiFetch<AdminSubmission>(
+    `/api/admin/submissions/${encodeURIComponent(id)}/read`,
+    { method: 'POST' },
+  );
 
 /** A change to an inquiry: its status, its suspected spam flag, or both. */
 export interface InquiryUpdate {

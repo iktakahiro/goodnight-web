@@ -9,7 +9,7 @@ goodnight-web never stores or logs a visitor's IP address. It keeps only a keyed
 
 - For each contact submission, the Worker computes `ip_hash = HMAC-SHA256(ip, IP_HASH_SECRET)`.
 - Only `ip_hash` is stored in D1. The raw IP address is never written to D1 and never logged.
-- The Rate Limiting binding uses `ip_hash` as its key.
+- For its key, the Rate Limiting binding uses an HMAC made the same way. For an IPv6 address it hashes the /64 prefix instead of the full address.
 
 ## In the code
 
@@ -45,11 +45,14 @@ export const hmacSha256Hex = async (
 };
 ```
 
-The same hash is the rate limit key. Setup and passkey sign-in use it too, with a prefix (`setup:` or `auth:`), so each has its own counter:
+The rate limit key is made the same way, with one difference: for an IPv6 address the HMAC covers only the first 64 bits (the /64 prefix). One IPv6 subscriber usually holds a whole /64, so counting single addresses would let one sender change addresses and never reach the limit. An IPv4 address (including one written in IPv6 form, `::ffff:192.0.2.1`) is hashed in full. Setup and passkey sign-in use the same key, with a prefix (`setup:` or `auth:`), so each has its own counter:
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
-// 4. Rate limit per ip_hash.
-const { success } = await limiter.limit({ key: ipHash });
+// 4. Rate limit per client: the IPv4 address, or the IPv6 /64 prefix,
+//    hashed like ip_hash.
+const { success } = await limiter.limit({
+  key: await ipRateLimitKey(ipHashSecret, ip),
+});
 if (!success) return apiError(c, 429, 'rate_limited');
 ```
 

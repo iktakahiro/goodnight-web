@@ -41,7 +41,11 @@ computer only. Create the GitHub repository yourself and choose **Private**.
 
 Set these as Worker secrets in the Cloudflare dashboard (or in the deploy
 form). Never write them in a file in this repository. `.dev.vars.example`
-lists them with notes.
+lists them with notes. The deploy form does not generate values for you:
+create `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` with
+`openssl rand -base64 32`. A
+value that is too short or clearly not random (such as one character
+repeated) keeps the features that use it off.
 
 | Name                 | Required | Purpose                                                                                               |
 | -------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -90,6 +94,14 @@ The documentation has a step-by-step page (Setup > Turnstile).
    fingerprint or face sign-in). There are no passwords.
 
 Setup closes once the first admin exists.
+
+A passkey works only on the domain it was registered on, so attach your own
+domain to the Worker before step 1 if you have one. Then set
+`"workers_dev": false` in `wrangler.jsonc` and commit it, so the
+`workers.dev` address is turned off. Do not use the switch in the Cloudflare
+dashboard: every deploy applies `wrangler.jsonc` again. Preview URLs are off
+(`"preview_urls": false`): each preview version would run with your
+production database and secrets at a public address.
 
 ## Edit the site
 
@@ -144,6 +156,14 @@ npm run build
 npm run dev
 ```
 
+`package-lock.json` records the exact version of every package. Cloudflare
+installs with `npm ci` from it, so the first deploy and every later build get
+exactly the committed packages. Do not edit versions in `package.json` by
+hand without updating the lockfile: run `npm install` (or
+`npm install <package>@<version>`) and commit `package.json` and
+`package-lock.json` together. If they do not match, `npm ci` and the build
+fail.
+
 `npm run dev` shows the pages only. To try the contact form and the admin
 screen on your computer, copy `.dev.vars.example` to `.dev.vars`, fill it
 in, and run `npm run preview`. It builds the site, creates the tables in a
@@ -160,20 +180,24 @@ computer, but the server rejects them: Turnstile then reports the hostname
 ## Updates
 
 Dependabot opens pull requests that update packages (`.github/dependabot.yml`).
-goodnight-web updates (`@goodnight-web/*`) come in one pull request, after a
-5-day cooldown. Security updates are not delayed.
+It updates `package.json` and `package-lock.json` together. goodnight-web
+updates (`@goodnight-web/*`) come in one pull request, after a 5-day
+cooldown. Security updates are not delayed.
 
-The **Update check** workflow comments on every pull request:
+The **Update check** workflow comments on every pull request and sets the
+check `goodnight-web/update-check` on its latest commit:
 
-- "Official goodnight-web update": the pull request was opened by Dependabot
-  in this repository, changes only `package.json` and the lockfile, and
-  changes only `@goodnight-web/*` versions in `package.json`. The lockfile
-  may also change packages that `@goodnight-web/*` uses. Check the preview,
-  then merge.
+- "Official goodnight-web update" and a passing check: the pull request was
+  opened by Dependabot in this repository, every commit in it was made by
+  Dependabot, it changes only `package.json` and the lockfile, and it changes
+  only `@goodnight-web/*` versions in `package.json`. The lockfile may also
+  change packages that `@goodnight-web/*` uses, but only to packages from
+  the npm registry. Safe to merge.
 - "This is not an official update": anything else. If you don't understand
   the changes, don't merge.
 
-**Merge only pull requests that have the official update comment.** Updates
+**Merge only pull requests that have the official update comment and a
+passing `goodnight-web/update-check` check.** Updates
 of other packages (such as Astro) also come from Dependabot and get the
 warning comment; ask someone who can review them.
 
