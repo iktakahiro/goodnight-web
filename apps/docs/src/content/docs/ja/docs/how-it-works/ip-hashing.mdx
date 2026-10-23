@@ -45,7 +45,7 @@ export const hmacSha256Hex = async (
 };
 ```
 
-同じハッシュを回数制限のキーにします。セットアップとパスキーでのログインも同じハッシュを使います。接頭辞（`setup:` か `auth:`）を付けるので、それぞれ別に数えます。
+同じハッシュを回数制限のキーにします。セットアップと Passkey でのログインも同じハッシュを使います。接頭辞（`setup:` か `auth:`）を付けるので、それぞれ別に数えます。
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
 // 4. Rate limit per ip_hash.

@@ -40,7 +40,7 @@ Three constraints shape the design:
 | `/api/setup`                     | The first admin  | Creates the first admin. Closes once a passkey is registered.                                                                                                                                                                                      |
 | `/api/auth/*`                    | Admins           | Better Auth: passkey registration and sign-in.                                                                                                                                                                                                     |
 | `/api/admin/*`                   | The admin screen | Listing, viewing, and deleting inquiries, marking them unread/read or suspected spam, CSV export, and the form editor with its versions. Also a status endpoint that reports missing contact form settings and whether Slack notifications are on. |
-| `/admin/*`                       | Admins           | The prebuilt admin screen (a React app). Every data request needs a session.                                                                                                                                                                       |
+| `/admin`, `/admin/*`             | Admins           | The prebuilt admin screen (a React app). Every data request needs a session.                                                                                                                                                                       |
 
 The inquiry list in the admin screen shows 50 inquiries per page, sorted by received time. The list API also returns the unread and suspected spam counts, and you can search it by email address.
 

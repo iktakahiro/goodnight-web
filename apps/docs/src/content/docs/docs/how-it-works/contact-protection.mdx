@@ -13,9 +13,9 @@ The API runs these checks from top to bottom. The cheap checks come first, so mo
 | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `Origin` is the site's own origin, `Content-Type` is as expected, and the body is at most 32 KB | Rejected before the body is parsed                                                                  |
 | Turnstile siteverify: `success`, `hostname`, and `action` match                                 | 400, nothing saved                                                                                  |
-| Rate Limiting binding, keyed by `ip_hash` (for example 5 requests per 60 seconds)               | 429                                                                                                 |
+| Rate Limiting binding, keyed by `ip_hash` (5 requests per 60 seconds)                           | 429                                                                                                 |
 | zod validation of the fields against the current form definition                                | Invalid input or an unknown field is 400; a submission from an old form version is 409              |
-| Honeypot (a field people cannot see) and spam score                                             | Never a failure: the submission is saved, flagged as suspected spam, and gets no Slack notification |
+| Honeypot and spam score                                                                         | Never a failure: the submission is saved, flagged as suspected spam, and gets no Slack notification |
 
 When all checks pass, the submission is saved to D1. Only then does the API return 200.
 

@@ -23,8 +23,8 @@ description: Worker 1 つと D1 1 つで動く部品の一覧と、問い合わ�
 | Hono アプリ               | Worker の中で動く Web フレームワーク。`@goodnight-web/server` の `createGoodnightWorker(options)` で作ります。`run_worker_first` により、`/api/*`、`/admin`、`/admin/*` だけが届きます。                                      |
 | D1                        | SQLite のデータベース 1 つ。問い合わせ、設定、Better Auth のテーブルを保存します。マイグレーションは npm パッケージに入っています。                                                                                           |
 | Turnstile                 | Cloudflare のボット対策。問い合わせフォームで使い、Worker がトークンをサーバー側で検証します。                                                                                                                                |
-| Rate Limiting binding     | Workers の binding。問い合わせの送信、セットアップ、パスキーでのログインの回数を `ip_hash`（IP アドレスのハッシュ）ごとに制限します。無料プランで使えます。                                                                   |
-| Better Auth とパスキー    | 管理者のログイン。パスキーだけを使います。メールとパスワードでのログインは無効です。                                                                                                                                          |
+| Rate Limiting binding     | Workers の binding。問い合わせの送信、セットアップ、Passkey でのログインの回数を `ip_hash`（IP アドレスのハッシュ）ごとに制限します。無料プランで使えます。                                                                   |
+| Better Auth と Passkey    | 管理者のログイン。Passkey だけを使います。メールとパスワードでのログインは無効です。                                                                                                                                          |
 | 管理画面                  | React、TanStack Router・Form・Table で作り、Vite でビルドしたアプリ。ビルド済みの状態で `@goodnight-web/server` に入っていて、Worker が配信します。                                                                           |
 | Slack Webhook（任意）     | 新しい問い合わせを短く知らせます。個人情報は含めません。                                                                                                                                                                      |
 | Cloudflare Access（任意） | `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すると、Worker も Access のトークンを確認します。 |
@@ -37,10 +37,10 @@ description: Worker 1 つと D1 1 つで動く部品の一覧と、問い合わ�
 | `/`、`/blog/*`、`/contact/` など | 訪問者             | 静的なページ。Worker のコードは動きません。                                                                                                                                                       |
 | `GET /api/contact/form`          | 問い合わせページ   | 現在のフォームの項目と、フォームが使えるかどうかを返します。公開で、読み取り専用です。                                                                                                            |
 | `POST /api/contact`              | 問い合わせフォーム | 送信内容を確認し、回数を制限して、保存します。                                                                                                                                                    |
-| `/api/setup`                     | 最初の管理者       | 最初の管理者を作ります。最初のパスキーを登録すると閉じます。                                                                                                                                      |
-| `/api/auth/*`                    | 管理者             | Better Auth。パスキーの登録とログインです。                                                                                                                                                       |
+| `/api/setup`                     | 最初の管理者       | 最初の管理者を作ります。最初の Passkey を登録すると閉じます。                                                                                                                                     |
+| `/api/auth/*`                    | 管理者             | Better Auth。Passkey の登録とログインです。                                                                                                                                                       |
 | `/api/admin/*`                   | 管理画面           | 問い合わせの一覧・詳細・削除、未読/既読とスパムの疑いの切り替え、CSV の書き出し、フォームの編集とバージョン。問い合わせフォームに足りない設定と Slack 通知の有無を返すステータス API もあります。 |
-| `/admin/*`                       | 管理者             | ビルド済みの管理画面（React アプリ）。データを取るたびにセッションが必要です。                                                                                                                    |
+| `/admin`、`/admin/*`             | 管理者             | ビルド済みの管理画面（React アプリ）。データを取るたびにセッションが必要です。                                                                                                                    |
 
 管理画面の問い合わせ一覧は 1 ページ 50 件で、受信日時の順に並びます。一覧の API は未読の件数とスパムの疑いの件数も返し、メールアドレスで検索できます。
 
@@ -60,7 +60,7 @@ description: Worker 1 つと D1 1 つで動く部品の一覧と、問い合わ�
 6. **保存してから応答。** D1 に行を INSERT し、成功してから訪問者に 200 を返します。これより後の処理で、応答が変わることはありません。
 7. **応答の後（`ctx.waitUntil` の中）。**
    - スパムの疑いがなく、Slack Webhook が設定されていれば、新しい問い合わせが 1 件あること、受信日時、管理画面の URL を送り、`notified_at` を記録します。
-   - 前回の削除から 1 時間以上たっていれば、保持期間（既定は 180 日）を過ぎた問い合わせと、期限切れのパスキーのチャレンジを削除します。
+   - 前回の削除から 1 時間以上たっていれば、保持期間（既定は 180 日）を過ぎた問い合わせと、期限切れの Passkey のチャレンジを削除します。
 
 問い合わせ API はフェイルクローズです。次のどれかに当てはまると、API は 503 を返し、フォームには「お問い合わせフォームは準備中です」と表示します。
 
@@ -121,7 +121,7 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 | ---------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | `DB`                   | D1 binding             | 保存するすべてのデータ                                                                                |
 | `ASSETS`               | Static Assets binding  | Astro でビルドしたページ                                                                              |
-| `CONTACT_RATE_LIMITER` | Rate Limiting binding  | `ip_hash` ごとの回数制限（問い合わせ、セットアップ、パスキーでのログイン）                            |
+| `CONTACT_RATE_LIMITER` | Rate Limiting binding  | `ip_hash` ごとの回数制限（問い合わせ、セットアップ、Passkey でのログイン）                            |
 | `TURNSTILE_SITE_KEY`   | 変数                   | 公開してよい Turnstile のサイトキー。`wrangler.jsonc` に書きます。ないと問い合わせ API は止まります。 |
 | `SETUP_TOKEN`          | シークレット           | 最初の管理者を作るときに必要。32 文字以上。セットアップ後に削除します。                               |
 | `ADMIN_EMAILS`         | シークレットまたは変数 | 管理者になれるメールアドレス                                                                          |

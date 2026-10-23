@@ -48,7 +48,7 @@ const copy = {
     routes: [
       ['/api/contact/*', 'フォームの項目と送信'],
       ['/api/setup', '最初の管理者だけ'],
-      ['/api/auth/*', 'Better Auth（パスキー）'],
+      ['/api/auth/*', 'Better Auth（Passkey）'],
       ['/api/admin/*', '問い合わせの API'],
       ['/admin/*', 'ビルド済みの管理画面'],
     ],

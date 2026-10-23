@@ -87,7 +87,7 @@ With both set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the pat
 
 ### Cloudflare WAF [#cloudflare-waf]
 
-Cloudflare WAF (Web Application Firewall) checks requests to your domain against rules before they reach the Worker. It is optional. goodnight-web does not depend on it: Turnstile, the rate limit, and the input checks run in the Worker either way.
+[Cloudflare WAF](/docs/glossary/#waf) checks requests to your domain against rules before they reach the Worker. It is optional. goodnight-web does not depend on it: Turnstile, the rate limit, and the input checks run in the Worker either way.
 
 WAF rules apply to a zone, a domain added to your Cloudflare account. Custom rules, which can match a request by properties such as the URL path or the IP address and then block or challenge it, are available on every plan, with a limit on the number of rules that depends on the plan. See Cloudflare's documentation:
 

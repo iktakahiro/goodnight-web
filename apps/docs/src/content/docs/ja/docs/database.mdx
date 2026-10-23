@@ -4,7 +4,7 @@ icon: Database
 description: D1 のテーブル、クエリの書き方、マイグレーションの配布と適用、スキーマの変更がサイトに届く流れです。
 ---
 
-このページでは、D1 データベースに何が入っているか、クエリをどう書くか、マイグレーション（テーブルを作ったり変えたりする SQL ファイル）がいつ適用されるか、適用を取り消す方法がわかります。
+このページでは、D1 データベースに何が入っているか、クエリをどう書くか、マイグレーションがいつ適用されるか、適用を取り消す方法がわかります。
 
 ## テーブル
 
@@ -15,7 +15,7 @@ description: D1 のテーブル、クエリの書き方、マイグレーショ�
 | `submissions`                                           | 問い合わせフォームの送信内容。メールアドレス、`fields`（フォームの値。項目 ID をキーにした JSON）、`form_version`、`locale`、状態（`unread` か `read`）、`suspected_spam`、スパムスコアと理由、`ip_hash`（IP アドレスの HMAC。IP アドレスそのものは入れません） |
 | `form_definitions`                                      | 問い合わせフォームの定義のバージョン。保存したバージョンごとに 1 行を追記するだけで、変更も削除もしません                                                                                                                                                       |
 | `settings`                                              | `retention_days`、`last_cleanup_at`（[データの自動削除](/ja/docs/how-it-works/data-pruning/)用）、`setup_closed_at`                                                                                                                                             |
-| `user`、`session`、`account`、`verification`、`passkey` | Better Auth の管理者、セッション、パスキー                                                                                                                                                                                                                      |
+| `user`、`session`、`account`、`verification`、`passkey` | Better Auth の管理者、セッション、Passkey                                                                                                                                                                                                                       |
 
 時刻は Unix ミリ秒で保存します。
 

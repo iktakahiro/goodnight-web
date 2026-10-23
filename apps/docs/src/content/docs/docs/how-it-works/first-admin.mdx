@@ -62,7 +62,7 @@ The admin API accepts only a signed-in user who is still in `ADMIN_EMAILS` and h
 Someone else who had the token earlier could have run setup with the same address and kept the session. These rules make sure such a session never becomes an admin session:
 
 - **Running setup again clears old sessions.** When setup runs again for an address that already has a user, that user's earlier sessions are deleted.
-- **Only one passkey registration can claim setup.** Before the passkey is saved, the registration claims setup: one SQL statement writes `setup_closed_at` only if it is not there yet. If two first passkeys are registered at the same time, only one claim succeeds. The other registration gets 403.
+- **Only one passkey registration can claim setup.** Before the passkey is saved, the registration claims setup: one SQL statement writes `setup_closed_at` only if it is not there yet. If two people try to register the first passkey at the same time, only one claim succeeds. The other registration gets 403.
 - **The claim deletes every session.** At this point, the only sessions are the ones setup created. The setup screen registers the passkey with `createSession`, so you get a new session, created after the passkey, and stay signed in.
 - **A failed save undoes the claim.** If the passkey cannot be saved after the claim, the claim is removed, so you can run setup again. The removal matches only that claim, and only while no passkey exists.
 - **Setup checks again at the end.** After setup creates its session, it checks that setup is still open. If a passkey registration claimed setup in the meantime, setup deletes that session and returns 403.

@@ -9,8 +9,8 @@ goodnight-web is a starter kit for company and shop websites. It runs on Cloudfl
 ## What you get
 
 - **Pages and a blog.** A website built with Astro, with a home page, company profile, services, news, blog, contact page, and privacy policy, in Japanese and English. Blog posts are Markdown files in the repository.
-- **A contact form.** You add, remove, and reorder its fields in the admin screen, with no code changes and no deploy. Submissions are checked with Turnstile (Cloudflare's bot check) and rate limited. Each one is saved to D1 (Cloudflare's database) before the visitor gets a response.
-- **An admin screen for inquiries.** You sign in with a passkey: a fingerprint, face, or device PIN instead of a password. You can read inquiries, mark them unread or read, search by email address, review suspected spam separately, delete inquiries, export them as CSV, and edit the form fields.
+- **A contact form.** You add, remove, and reorder its fields in the admin screen, with no code changes and no deploy. Submissions are checked with [Turnstile](/docs/glossary/#turnstile) and rate limited. Each one is saved to [D1](/docs/glossary/#d1) before the visitor gets a response.
+- **An admin screen for inquiries.** You sign in with a [passkey](/docs/glossary/#passkey) instead of a password. You can read inquiries, mark them unread or read, search by email address, review suspected spam separately, delete inquiries, export them as CSV, and edit the form fields.
 
 ## Who it is for
 
@@ -21,8 +21,8 @@ You do not need to write server code. The contact API and the admin screen come 
 
 ## Start here
 
-- [Getting started](/docs/getting-started/): create a copy of the website with the Deploy to Cloudflare button, enter the secrets (private values stored with the Worker), and create the first admin.
-- [Set up Turnstile](/docs/setup/turnstile/): create the widget for Turnstile, Cloudflare's bot check. The contact form does not accept submissions until you do.
+- [Getting started](/docs/getting-started/): create a copy of the website with the Deploy to Cloudflare button, enter the secrets, and create the first admin.
+- [Set up Turnstile](/docs/setup/turnstile/): create the Turnstile widget. The contact form does not accept submissions until you do.
 - [Customizing the contact form](/docs/contact-form/): edit the fields in the admin screen. Also covers versions and history, the inquiry list, and the CSV export.
 
 ## Concepts
