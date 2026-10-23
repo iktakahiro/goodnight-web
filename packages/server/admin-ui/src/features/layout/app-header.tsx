@@ -56,7 +56,7 @@ export const AppHeader = () => {
   });
   return (
     <header className='sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur-md'>
-      <div className='mx-auto flex h-16 max-w-5xl items-center gap-2 px-4 sm:gap-3 sm:px-6'>
+      <div className='mx-auto flex h-16 max-w-5xl items-center gap-1 px-4 sm:gap-3 sm:px-6'>
         <Link
           to='/'
           className='-ml-1 flex items-center gap-2.5 rounded-xl px-1 py-1 outline-none focus-visible:ring-3 focus-visible:ring-ring'
@@ -87,7 +87,7 @@ export const AppHeader = () => {
           />
         </nav>
 
-        <div className='ml-auto flex items-center gap-1 sm:gap-2'>
+        <div className='ml-auto flex items-center gap-0.5 sm:gap-2'>
           <Link
             to='/'
             search={{ view: 'unread' }}
@@ -111,14 +111,17 @@ export const AppHeader = () => {
                   })}
             </span>
           </Link>
-          <LanguageSwitch />
+          <LanguageSwitch
+            className='px-2.5 sm:px-3'
+            labelClassName='sr-only sm:not-sr-only'
+          />
           <ThemeSwitch />
           <Button
             variant='ghost'
             size='sm'
             onClick={() => void signOut()}
             title={t('header.signedInAs', { email: admin.email })}
-            className='px-3'
+            className='px-2.5 sm:px-3'
           >
             <ArrowRightFromSquare aria-hidden='true' />
             <span className='sr-only sm:not-sr-only'>{t('admin.signOut')}</span>

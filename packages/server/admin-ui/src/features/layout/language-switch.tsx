@@ -12,8 +12,18 @@ import {
   MenuTrigger,
 } from '../../shared/ui/menu.tsx';
 
-/** Header menu that switches between Japanese and English. */
-export const LanguageSwitch = ({ className }: { className?: string }) => {
+/**
+ * Header menu that switches between Japanese and English. `labelClassName`
+ * styles the visible language name, for example `sr-only sm:not-sr-only` to
+ * show only the globe on narrow screens; the accessible name is unchanged.
+ */
+export const LanguageSwitch = ({
+  className,
+  labelClassName,
+}: {
+  className?: string;
+  labelClassName?: string;
+}) => {
   const { locale, setLocale, t } = useI18n();
   return (
     <Menu>
@@ -27,7 +37,7 @@ export const LanguageSwitch = ({ className }: { className?: string }) => {
         )}
       >
         <Globe aria-hidden='true' />
-        <span>{t(`language.${locale}`)}</span>
+        <span className={labelClassName}>{t(`language.${locale}`)}</span>
       </MenuTrigger>
       <MenuContent>
         <MenuRadioGroup
