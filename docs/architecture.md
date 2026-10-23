@@ -655,7 +655,8 @@ It follows the same setup as the calendarpit documentation site:
 - `bun run test` in the workspace runs `scripts/check-static.ts` on the build:
   one `h1` per page, `lang`, canonical and `hreflang` URLs, internal links and
   anchors, local assets only, and identical code blocks in both languages.
-- `DOCS_SITE_URL` sets the origin for canonical URLs. Until a domain is chosen
-  it defaults to `https://goodnight-web.invalid`.
+- `DOCS_SITE_URL` sets the origin for canonical, language-alternate, Open
+  Graph, and X card URLs. It defaults to `https://goodnight-web.dev`
+  (`apps/docs/scripts/site-url.ts`).
 
 Mark anything not tested end to end with a "Draft / not verified yet" callout.

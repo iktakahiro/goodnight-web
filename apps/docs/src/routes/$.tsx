@@ -12,6 +12,7 @@ import { docs, source } from '../site/source';
 import { mdxComponents } from '../site/mdx-components';
 import { homeLayoutOptions, layoutOptions } from '../site/navigation';
 import { docsSection, groupSections } from '../site/navigation-tree';
+import { openGraphImages, openGraphSize } from '../site/open-graph';
 import { markdownFile, sitePath } from '../site/paths';
 import { i18n, localeFromPath } from '../site/i18n';
 import { MotionConfig } from 'motion/react';
@@ -48,6 +49,9 @@ export const Route = createFileRoute('/$')({
     if (!page) return {};
     const url = `${__DOCS_SITE_URL__}${sitePath(page.slug ? `${page.slug}/` : '')}`;
     const title = `${page.hero ? heroTitleText(page.hero.title) : page.title} | goodnight-web`;
+    // Every page shares its language's image; the origin is DOCS_SITE_URL.
+    const image = openGraphImages[page.locale === 'ja' ? 'ja' : 'en'];
+    const imageUrl = `${__DOCS_SITE_URL__}${sitePath(image.path)}`;
     return {
       meta: [
         { title },
@@ -62,7 +66,16 @@ export const Route = createFileRoute('/$')({
           content:
             page.locale === 'ja' ? openGraphLocales.ja : openGraphLocales.en,
         },
-        { name: 'twitter:card', content: 'summary' },
+        { property: 'og:image', content: imageUrl },
+        { property: 'og:image:type', content: 'image/png' },
+        { property: 'og:image:width', content: String(openGraphSize.width) },
+        { property: 'og:image:height', content: String(openGraphSize.height) },
+        { property: 'og:image:alt', content: image.alt },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: title },
+        { name: 'twitter:description', content: page.description },
+        { name: 'twitter:image', content: imageUrl },
+        { name: 'twitter:image:alt', content: image.alt },
       ],
       links: [
         { rel: 'canonical', href: url },
