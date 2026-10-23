@@ -1,39 +1,39 @@
 ---
-title: パスキーでのログイン
-description: 管理者が Better Auth のパスキーでログインするしくみと、パスワードを使わない理由を説明します。
+title: Passkey でのログイン
+description: 管理者が Better Auth の Passkey でログインするしくみと、パスワードを使わない理由を説明します。
 ---
 
-管理者は、`/admin/login` でパスキー（指紋や顔認証、PIN でログインするしくみ）を使ってログインします。認証には Better Auth というライブラリを使います。メールとパスワードでのログインはありません。このページでは、そのしくみと理由を説明します。
+管理者は、`/admin/login` で [Passkey](/ja/docs/glossary/#passkey) を使ってログインします。認証には Better Auth というライブラリを使います。メールとパスワードでのログインはありません。このページでは、そのしくみと理由を説明します。
 
 <AdminScreen
   name='sign-in'
   alt='「パスキーでログイン」ボタンがある、管理画面のログイン画面'
-  caption='パスワードの欄はありません。このサイトにパスキーを登録した人だけがログインできます。'
+  caption='パスワードの欄はありません。このサイトに Passkey を登録した人だけがログインできます。'
 />
 
 ## 使う前に知っておくこと
 
-- **パスキーは 1 つのドメインに結びつきます。** パスキーは独自ドメインを追加してから登録してください。`workers.dev` のアドレスで登録したパスキーは、独自ドメインでは使えません。
-- **同期されるパスキーを使ってください。** 管理画面には、2 つ目のパスキーを追加する画面がまだありません。セットアップでブラウザが保存先を聞いてきたら、端末の間で同期される保存先（iCloud キーチェーン、Google パスワードマネージャー、パスワード管理アプリなど）を選んでください。1 台の端末をなくしても、ほかの端末からログインできます。
-- **パスキーをすべてなくすと、ログインできなくなります。** 管理者を取り戻す手順は、まだありません。セットアップも開き直せません（[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照）。
-- **2 人目の管理者は追加できません。** セットアップが完了したあとは、パスキーを持たないユーザーは新しくパスキーを登録できないからです。
+- **Passkey は 1 つのドメインに結びつきます。** Passkey は独自ドメインを追加してから登録してください。`workers.dev` のアドレスで登録した Passkey は、独自ドメインでは使えません。
+- **同期される Passkey を使ってください。** 管理画面には、2 つ目の Passkey を追加する画面がまだありません。セットアップでブラウザが保存先を聞いてきたら、端末の間で同期される保存先（iCloud キーチェーン、Google パスワードマネージャー、パスワード管理アプリなど）を選んでください。1 台の端末をなくしても、ほかの端末からログインできます。
+- **Passkey をすべてなくすと、ログインできなくなります。** 管理者を取り戻す手順は、まだありません。セットアップも開き直せません（[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照）。
+- **2 人目の管理者は追加できません。** セットアップが完了したあとは、Passkey を持たないユーザーは新しく Passkey を登録できないからです。
 
 ## 何をするか
 
-- **Better Auth とパスキープラグインを使います。** 管理画面と管理 API は [Better Auth](https://better-auth.com/) とそのパスキープラグインを使います。ユーザー、セッション、パスキーは、同じ D1 データベースに保存します。
+- **Better Auth と Passkey プラグインを使います。** 管理画面と管理 API は [Better Auth](https://better-auth.com/) とその Passkey プラグインを使います。ユーザー、セッション、Passkey は、同じ D1 データベースに保存します。
 - **ほかの入り口はありません。** メールとパスワードでのログインは無効です。開発用の抜け道、既定のアカウント、共有のキーもありません。
-- **本人確認が必要です。** パスキーの登録とログインには、PIN や生体認証による本人確認が必要です。
+- **本人確認が必要です。** Passkey の登録とログインには、PIN や生体認証による本人確認が必要です。
 - **IP アドレスを記録しません。** Better Auth はセッションに IP アドレスを記録しません。
 - **ログインには回数制限があります。** 問い合わせフォームと同じ Rate Limiting binding で、ハッシュ化した IP アドレスごとに数えます。その binding か `IP_HASH_SECRET` がなければ、ログインは使えません。
 - **`https://` でだけ動きます。** ログイン、セットアップ、管理画面、管理 API が対象です。`wrangler dev` のために、`localhost` では平文の HTTP も使えます。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
-- **Cloudflare Access を前に置けます。** `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` が対象です。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すれば、Worker も Access のトークンを確認します。Access を使っても、パスキーでのログインは必要です。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。
-- **パスキーより前のセッションは使えません。** 管理 API は、最初のパスキーより前に作られたセッションを受け付けません。受け付けるのは、パスキーでのログインか、最初のパスキーの登録で作られたセッションです。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/#sessions)を参照してください。
+- **Cloudflare Access を前に置けます。** `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` が対象です。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すれば、Worker も Access のトークンを確認します。Access を使っても、Passkey でのログインは必要です。[セキュリティモデル](/ja/docs/security/#cloudflare-access)を参照してください。
+- **Passkey より前のセッションは使えません。** 管理 API は、最初の Passkey より前に作られたセッションを受け付けません。受け付けるのは、Passkey でのログインか、最初の Passkey の登録で作られたセッションです。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/#sessions)を参照してください。
 
 ## コードでは
 
 Better Auth は `emailAndPassword: { enabled: false }` で設定し、IP アドレスの記録も切っています（`advanced.ipAddress.disableIpTracking`）。
 
-パスキープラグインには、リクエストのホスト名を relying party ID（パスキーが結びつくドメイン）として渡し、本人確認を必須と指定します。ただしプラグインは、登録の検証で本人確認を強制しません。そのため、登録のフック（`registration.afterVerification`）で確かめます。
+Passkey プラグインには、リクエストのホスト名を relying party ID として渡し、本人確認を必須と指定します。ただしプラグインは、登録の検証で本人確認を強制しません。そのため、登録のフック（`registration.afterVerification`）で確かめます。
 
 ```ts title="packages/server/src/features/auth/auth.ts"
 passkey({
@@ -81,8 +81,8 @@ export const getAuth = (env: GoodnightEnv, origin: string): GoodnightAuth => {
 };
 ```
 
-## なぜパスキーか
+## なぜ Passkey か
 
-- **盗まれたり使い回されたりするパスワードがありません。** パスキーはドメインに結びつくので、別のドメインのフィッシングサイトでは使えません。
-- **無料プランの CPU の上限に収まります。** 無料プランの Worker が 1 回のリクエストで使える CPU 時間は 10 ms ほどです。パスワードのハッシュ（scrypt）はわざと遅く作られていて、Workers 上で Better Auth のパスワード処理がこの上限を超えるという報告があります（[better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)）。パスキーのログインは署名を確かめるだけなので速く済みます。
-- **ほかに動かすものがいりません。** パスキーには、メール送信のサービスも SMS のサービスも必要ありません。
+- **盗まれたり使い回されたりするパスワードがありません。** Passkey はドメインに結びつくので、別のドメインのフィッシングサイトでは使えません。
+- **無料プランの CPU の上限に収まります。** 無料プランの Worker が 1 回のリクエストで使える CPU 時間は 10 ms ほどです。パスワードのハッシュ（scrypt）はわざと遅く作られていて、Workers 上で Better Auth のパスワード処理がこの上限を超えるという報告があります（[better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)）。Passkey のログインは署名を確かめるだけなので速く済みます。
+- **ほかに動かすものがいりません。** Passkey には、メール送信のサービスも SMS のサービスも必要ありません。

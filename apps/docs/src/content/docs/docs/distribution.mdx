@@ -47,7 +47,7 @@ The workflow needs no token and no permissions. Only the public starter reposito
 ## How updates reach you
 
 1. goodnight-web publishes a new version of `@goodnight-web/server`. If it fixes a vulnerability, a GitHub security advisory comes with it.
-2. Dependabot, GitHub's tool that opens update pull requests, proposes the version once it has been public for 5 days. The settings are in the starter's `.github/dependabot.yml`:
+2. [Dependabot](/docs/glossary/#dependabot) proposes the version once it has been public for 5 days. The settings are in the starter's `.github/dependabot.yml`:
    - `@goodnight-web/*` updates are grouped into one pull request.
    - Security updates skip this 5-day wait (the cooldown).
    - Minor and patch updates of the site's other packages (such as Astro) come in a second group.

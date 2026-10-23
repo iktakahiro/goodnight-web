@@ -11,7 +11,7 @@ When you set the Worker secret `SLACK_WEBHOOK_URL` to a Slack incoming webhook U
 - **The message has three parts.** The count ("1 new inquiry"), the time the inquiry was received, and a link to the admin screen. It contains no email address, no form field values, and not even the option chosen in a dropdown field. This does not change when admins add fields to the form.
 - **The time is shown in each reader's time zone.** The time is sent as a Slack date token, so Slack shows it in each reader's own time zone.
 - **Success is recorded; there is no retry.** When the post succeeds, the Worker records `notified_at`. A failed post is not sent again.
-- **Suspected spam does not trigger a notification.** That is a submission with a filled honeypot (a field people cannot see) or a spam score of 3 or more. It is saved and listed under **Suspected spam** in the admin screen. See [Contact form protection](/docs/how-it-works/contact-protection/).
+- **Suspected spam does not trigger a notification.** That is a submission with a filled honeypot or a spam score of 3 or more. It is saved and listed under **Suspected spam** in the admin screen. See [Contact form protection](/docs/how-it-works/contact-protection/).
 
 ## In the code
 
