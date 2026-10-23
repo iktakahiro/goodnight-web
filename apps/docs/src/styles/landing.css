@@ -123,6 +123,14 @@ html:has(.landing):not(.dark) {
     display: none;
   }
 }
+/* The hero's stars: violet on the white page, pale lavender in the dark
+   theme. The mark is drawn with currentColor. */
+.night-sky-hero {
+  color: var(--star-day);
+}
+.dark .night-sky-hero {
+  color: var(--star-night);
+}
 /* Houses along the bottom edge, centered on four runs of artwork that are
    wider than any screen, so the edges are always cropped. */
 .night-town {
@@ -214,6 +222,7 @@ html:has(.landing):not(.dark) {
 /* Hero */
 .landing-hero {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   padding-block: 4.5rem 4rem;
   text-align: center;
