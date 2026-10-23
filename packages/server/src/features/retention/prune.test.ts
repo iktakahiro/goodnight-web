@@ -30,6 +30,7 @@ describe('pruneIfDue', () => {
       ran: true,
       deleted: 1,
       verificationsDeleted: 0,
+      sessionsDeleted: 0,
       retentionDays: 180,
     });
     expect(ids()).toEqual(['edge', 'new']);
@@ -99,6 +100,32 @@ describe('pruneIfDue', () => {
       verificationsDeleted: 2,
     });
     expect(sqlite.query('SELECT id FROM verification').all()).toEqual([
+      { id: 'live' },
+    ]);
+  });
+
+  test('deletes expired sessions only', async () => {
+    const { d1, sqlite } = await setup();
+    sqlite
+      .query(
+        `INSERT INTO user (id, name, email, email_verified, created_at,
+          updated_at) VALUES ('u1', 'Admin', 'admin@example.com', 1, ?1, ?1)`,
+      )
+      .run(NOW - DAY);
+    const addSession = (id: string, expiresAt: number) =>
+      sqlite
+        .query(
+          `INSERT INTO session (id, expires_at, token, created_at, updated_at,
+            user_id) VALUES (?1, ?2, ?1, ?3, ?3, 'u1')`,
+        )
+        .run(id, expiresAt, NOW - DAY);
+    addSession('expired', NOW - 1);
+    addSession('live', NOW + DAY);
+    expect(await pruneIfDue(d1, NOW)).toMatchObject({
+      ran: true,
+      sessionsDeleted: 1,
+    });
+    expect(sqlite.query('SELECT id FROM session').all()).toEqual([
       { id: 'live' },
     ]);
   });

@@ -8,9 +8,10 @@ Inquiries are deleted once they are older than the retention period, 180 days by
 ## What it does
 
 - **Cleanup runs after a new inquiry.** After an inquiry is saved, the Worker checks `settings.last_cleanup_at` inside `ctx.waitUntil`, which keeps work running after the response. If the last cleanup was more than an hour ago, it deletes inquiries older than the retention period and updates `last_cleanup_at`.
-- **Cleanup also runs from the admin screen.** Opening the inquiry list runs the same cleanup, so old inquiries are deleted even when no new ones arrive.
+- **Cleanup also runs from the admin screen and from sign-in.** Opening the inquiry list, or a passkey sign-in attempt, runs the same cleanup, so old inquiries are deleted even when no new ones arrive. On a site that gets no requests at all, nothing is deleted until the next request.
 - **The delete is fast.** There is an index on `created_at`.
 - **Expired challenges are deleted too.** Each passkey sign-in attempt writes a challenge to Better Auth's `verification` table. A used challenge is deleted at once, but an abandoned one would stay forever, so the same cleanup deletes expired rows. Challenges expire after a few minutes and sign-in is rate-limited, so the table stays small without an index.
+- **Expired sessions are deleted too.** An expired admin session would keep its token and browser name in the `session` table until the browser sent the token again, which may never happen. The same cleanup deletes sessions past their expiry time. Only admins have sessions, so this table is small too.
 
 Apart from this automatic deletion, admins can delete inquiries manually and export them as CSV. The export reads 200 rows per query and streams them, so it works the same for a large table.
 

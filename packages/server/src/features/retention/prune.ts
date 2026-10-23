@@ -1,7 +1,12 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { eq, lt, lte, sql } from 'drizzle-orm';
 import { getDatabase } from '../../db/database.ts';
-import { settings, submissions, verification } from '../../db/schema.ts';
+import {
+  session,
+  settings,
+  submissions,
+  verification,
+} from '../../db/schema.ts';
 
 /** Retention period when `settings.retention_days` is missing or invalid. */
 export const DEFAULT_RETENTION_DAYS = 180;
@@ -20,6 +25,8 @@ export type PruneResult =
       deleted: number;
       /** Expired Better Auth `verification` rows deleted. */
       verificationsDeleted: number;
+      /** Expired Better Auth `session` rows deleted. */
+      sessionsDeleted: number;
       retentionDays: number;
     };
 
@@ -38,15 +45,21 @@ export const getRetentionDays = async (db: D1Database): Promise<number> => {
 
 /**
  * Deletes submissions older than the retention period and expired Better
- * Auth `verification` rows, at most once per {@link PRUNE_INTERVAL_MS}. There
- * is no Cron Trigger: the contact API and the admin list call this inside
- * `ctx.waitUntil`.
+ * Auth `verification` and `session` rows, at most once per
+ * {@link PRUNE_INTERVAL_MS}. There is no Cron Trigger: the contact API, the
+ * admin list, and the public passkey sign-in endpoints call this inside
+ * `ctx.waitUntil`, so pruning happens only while the site gets requests.
  *
  * Each passkey sign-in attempt writes a challenge to `verification`. Better
  * Auth deletes a challenge when it is used, but an abandoned one stays, so
  * expired rows are deleted here. The table stays small (challenges expire
  * after a few minutes and the sign-in endpoints are rate-limited), so the
  * delete needs no index on `expires_at`.
+ *
+ * An expired session keeps its token and user agent until Better Auth sees
+ * the token again, which may never happen, so expired sessions are deleted
+ * here too. Only admins have sessions, so that table is small as well and
+ * needs no index on `expires_at` either.
  *
  * The run is claimed with one conditional upsert of
  * `settings.last_cleanup_at`, so concurrent requests do not both prune.
@@ -75,10 +88,14 @@ export const pruneIfDue = async (
   const verifications = await orm
     .delete(verification)
     .where(lt(verification.expiresAt, new Date(now)));
+  const sessions = await orm
+    .delete(session)
+    .where(lt(session.expiresAt, new Date(now)));
   return {
     ran: true,
     deleted: result.meta.changes,
     verificationsDeleted: verifications.meta.changes,
+    sessionsDeleted: sessions.meta.changes,
     retentionDays,
   };
 };

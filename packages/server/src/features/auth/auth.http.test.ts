@@ -106,6 +106,18 @@ describe('abandoned passkey challenges', () => {
     expect(list.status).toBe(200);
     expect(verificationCount(worker)).toBe(0);
   });
+
+  test('are also deleted by a later sign-in request', async () => {
+    const worker = createTestWorker({ rateLimit: 10 });
+    for (let i = 0; i < 3; i++) await worker.fetch(OPTIONS_PATH);
+    worker.sqlite.exec(
+      `UPDATE verification SET expires_at = ${Date.now() - 1000}`,
+    );
+    worker.sqlite.exec("DELETE FROM settings WHERE key = 'last_cleanup_at'");
+    expect((await worker.fetch(OPTIONS_PATH)).status).toBe(200);
+    // Only the challenge of the last request is left.
+    expect(verificationCount(worker)).toBe(1);
+  });
 });
 
 describe('/api/auth database errors', () => {

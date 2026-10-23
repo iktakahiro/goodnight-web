@@ -113,10 +113,20 @@ const buildAuth = (env: GoodnightEnv, origin: string) =>
 /** The Better Auth instance used by the Worker. */
 export type GoodnightAuth = ReturnType<typeof buildAuth>;
 
+/**
+ * Most Better Auth instances kept per env object, one per origin. A site
+ * normally has one or two origins (its domain and workers.dev). With a
+ * wildcard route, any client could add origins, so the least recently used
+ * instance is dropped beyond this number.
+ */
+export const MAX_AUTH_INSTANCES_PER_ENV = 8;
+
 // Building betterAuth() costs about 5 ms of CPU, close to the free plan's
 // 10 ms limit, so instances are reused within an isolate. They are keyed by
 // the env object (a new env means new bindings or secrets) and by origin
-// (passkeys are bound to the hostname). See docs/decisions/0001.
+// (passkeys are bound to the hostname). See docs/decisions/0001. A Map keeps
+// insertion order, so re-inserting on use makes the first key the least
+// recently used.
 const cache = new WeakMap<GoodnightEnv, Map<string, GoodnightAuth>>();
 
 /**
@@ -131,6 +141,9 @@ const cache = new WeakMap<GoodnightEnv, Map<string, GoodnightAuth>>();
  * Call {@link isAuthConfigured} first; this function does not check the
  * secret.
  *
+ * At most {@link MAX_AUTH_INSTANCES_PER_ENV} instances are kept per env;
+ * the least recently used one is dropped first.
+ *
  * @param origin - The request's origin. It sets the passkey relying party ID
  *   and the trusted origin.
  */
@@ -141,9 +154,15 @@ export const getAuth = (env: GoodnightEnv, origin: string): GoodnightAuth => {
     cache.set(env, byOrigin);
   }
   let auth = byOrigin.get(origin);
-  if (!auth) {
+  if (auth) {
+    byOrigin.delete(origin);
+  } else {
     auth = buildAuth(env, origin);
-    byOrigin.set(origin, auth);
+    for (const oldest of byOrigin.keys()) {
+      if (byOrigin.size < MAX_AUTH_INSTANCES_PER_ENV) break;
+      byOrigin.delete(oldest);
+    }
   }
+  byOrigin.set(origin, auth);
   return auth;
 };

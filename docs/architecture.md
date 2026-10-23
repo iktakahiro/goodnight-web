@@ -224,12 +224,14 @@ volume, and old rows are pruned.
 ### Retention without Cron
 
 `pruneIfDue()` deletes submissions older than `settings.retention_days`
-(180 by default), and Better Auth `verification` rows past `expires_at`
-(abandoned passkey challenges), at most once an hour. It claims the run with one conditional
-upsert of `settings.last_cleanup_at`, so two requests at the same time do not
-both delete. It runs in `ctx.waitUntil` after each submission and after each
-admin list request, so old rows are removed even when no new inquiries
-arrive.
+(180 by default), Better Auth `verification` rows past `expires_at`
+(abandoned passkey challenges), and `session` rows past `expires_at`, at most
+once an hour. It claims the run with one conditional upsert of
+`settings.last_cleanup_at`, so two requests at the same time do not both
+delete. It runs in `ctx.waitUntil` after each submission, after each admin
+list request, and after each allowed public sign-in request, so old rows are
+removed even when no new inquiries arrive. A site with no requests prunes
+nothing until the next one.
 
 ## Admin
 

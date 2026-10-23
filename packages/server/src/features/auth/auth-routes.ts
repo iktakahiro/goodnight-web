@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
 import { limitByIpHash } from '../../shared/ip-rate-limit.ts';
+import { safeErrorMessage } from '../../shared/log-error.ts';
 import { isJsonContentType, readBytesWithLimit } from '../../shared/request.ts';
+import { pruneIfDue } from '../retention/prune.ts';
 import { getAuth, isAuthConfigured } from './auth.ts';
 
 // Better Auth endpoints that anyone can call without a session. Each sign-in
@@ -71,7 +73,8 @@ const boundedAuthRequest = async (
  *
  * The public passkey sign-in endpoints count against `CONTACT_RATE_LIMITER`
  * with the key `auth:<ip_hash>` (429 over the limit). Without the binding or
- * `IP_HASH_SECRET` they answer 503.
+ * `IP_HASH_SECRET` they answer 503. An allowed call also runs `pruneIfDue`
+ * in `ctx.waitUntil`.
  */
 export const authRoutes = new Hono<HonoEnv>().on(
   ['GET', 'POST'],
@@ -95,6 +98,13 @@ export const authRoutes = new Hono<HonoEnv>().on(
         return apiError(c, 503, 'auth_unavailable');
       }
       if (limit === 'limited') return apiError(c, 429, 'rate_limited');
+      // Abandoned challenges pile up in `verification` on a site that gets
+      // sign-in attempts but no inquiries, so sign-in triggers pruning too.
+      c.executionCtx.waitUntil(
+        pruneIfDue(c.env.DB).catch((error: unknown) => {
+          console.error('prune failed:', safeErrorMessage(error));
+        }),
+      );
     }
     return getAuth(c.env, new URL(c.req.url).origin).handler(request);
   },
