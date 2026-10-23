@@ -24,6 +24,10 @@ A feature of Workers that serves ready-made files, such as the built pages, imag
 
 Cloudflare's database service, based on SQLite. goodnight-web stores inquiries, form settings, and sign-in data in one D1 database in your own account.
 
+### Binding [#binding]
+
+A Workers setting that gives a Worker access to a Cloudflare resource, such as a D1 database. It is declared in the Worker's settings, and the Worker uses it through `env`, for example `env.DB`. The Worker does not need a password or key for the resource. See [Why the database is not reachable from the network](/docs/security/#database-access).
+
 ### Turnstile [#turnstile]
 
 Cloudflare's bot check. It is used on the contact form to tell people from automated programs. See [Set up Turnstile](/docs/setup/turnstile/).
