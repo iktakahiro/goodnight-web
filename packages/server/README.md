@@ -13,8 +13,9 @@ export default createGoodnightWorker({ locale: 'ja' });
 ```
 
 Options: `locale` (`ja` or `en`: Slack messages, CSV headers when none is
-asked for, and API messages when `Accept-Language` matches neither) and
-`contact.turnstileHostnames` (hostnames accepted from Turnstile siteverify;
+asked for, and API messages when `Accept-Language` matches neither),
+`siteName` (the site name in Slack messages; defaults to the request's
+hostname), and `contact.turnstileHostnames` (hostnames accepted from Turnstile siteverify;
 defaults to the request's hostname).
 
 The contact form fields are not options. Admins edit them in the admin UI

@@ -83,8 +83,8 @@ test easier.
 - Save a contact submission to D1 before responding. Notifications and cleanup
   run in `ctx.waitUntil` and never change the response.
 - Slack notifications contain no personal data and no form values: only the
-  count, the received time, and the admin URL. Suspected spam is never
-  notified.
+  site name, the path of the page the form was on, the received time, and
+  the admin URL. Suspected spam is never notified.
 - Do not drop doubtful submissions. A filled honeypot or a spam score of
   `SPAM_SUSPECT_THRESHOLD` or more stores the submission with
   `suspected_spam = 1`; it is not a status. Store nothing before Turnstile

@@ -3,13 +3,49 @@ title: Slack notifications
 description: An optional Slack message about each new inquiry, sent after the response and free of personal data.
 ---
 
-When you set the Worker secret `SLACK_WEBHOOK_URL` to a Slack incoming webhook URL, goodnight-web sends a short Slack message whenever a new inquiry arrives. The message is sent after the visitor gets a response, and it contains no personal data and no inquiry contents.
+When you set the Worker secret `SLACK_WEBHOOK_URL` to a Slack incoming webhook URL, goodnight-web sends a Slack message whenever a new inquiry arrives. The message is sent after the visitor gets a response. It names your site and the page the form was on, and it contains no personal data and no inquiry contents.
 
-## What it does
+## What the message looks like
+
+For an inquiry sent from `/contact` on `example.com`, with the language set to English, the message has these parts from top to bottom:
+
+| Part     | What it shows                                                                                      |
+| -------- | -------------------------------------------------------------------------------------------------- |
+| Heading  | 🌙 New inquiry                                                                                     |
+| Text     | A new inquiry arrived on **example.com**.                                                          |
+| Received | The date and time, such as `2026-10-23 22:35`, in the reader's time zone                           |
+| Page     | `/contact`                                                                                         |
+| Note     | This notification does not include personal data or anything typed into the form.                  |
+| Button   | Open in admin. It opens the inquiry in the admin screen, which asks for a passkey sign-in as usual |
+
+In Japanese, the heading is "🌙 新しいお問い合わせ". Slack's notification banner and screen readers use the text line without bold instead: "A new inquiry arrived on example.com."
+
+## What it contains
+
+- **The site name.** By default this is the hostname of the request, such as `example.com`. Set the `siteName` option to show another name.
+- **The time the inquiry was received.** It is sent as a Slack date token, so Slack shows it in each reader's own time zone. The date is shown as `2026-10-23` in every language. The time follows each reader's Slack setting, so it appears as `22:35` or `10:35 PM`. A Slack app that cannot show the token shows the time in UTC, such as `2026-10-23 13:35 UTC`.
+- **The page the form was on.** Only the path, such as `/contact`. A query string or a `#` part is removed. When the page path is not known, this part is left out.
+- **A button to the inquiry** in the admin screen.
+
+The message contains no email address, no name, no form field values, not even the option chosen in a dropdown field, and no IP address or user agent. This does not change when admins add fields to the form.
+
+## Language and site name
+
+Both are options of `createGoodnightWorker()` in your site's `src/worker.ts`:
+
+```ts title="src/worker.ts"
+export default createGoodnightWorker({
+  locale: siteConfig.defaultLocale,
+  siteName: 'My Company',
+});
+```
+
+- `locale` sets the language of the message: `ja` or `en`. Without it, the message is in English. The starter passes the site's default language.
+- `siteName` replaces the hostname in the message. A blank value counts as not set. Slack shows the name as plain text: `*`, `_`, `~`, and backticks appear as their full-width forms, so they cannot turn on bold or other formatting, and `<` and `>` cannot make links or mentions. A name longer than 80 characters is cut and ends with `…`.
+
+## Other rules
 
 - **Only Slack is called.** After the Worker saves an inquiry that is not suspected spam, it posts to the webhook. Only an `https://hooks.slack.com/...` address is called; any other URL is ignored.
-- **The message has three parts.** The count ("1 new inquiry"), the time the inquiry was received, and a link to the admin screen. It contains no email address, no form field values, and not even the option chosen in a dropdown field. This does not change when admins add fields to the form.
-- **The time is shown in each reader's time zone.** The time is sent as a Slack date token, so Slack shows it in each reader's own time zone.
 - **Success is recorded; there is no retry.** When the post succeeds, the Worker records `notified_at`. A failed post is not sent again.
 - **Suspected spam does not trigger a notification.** That is a submission with a filled honeypot or a spam score of 3 or more. It is saved and listed under **Suspected spam** in the admin screen. See [Contact form protection](/docs/how-it-works/contact-protection/).
 
@@ -31,42 +67,37 @@ if (!suspectedSpam && isSlackWebhookUrl(webhookUrl)) {
         locale: options.locale,
         receivedAt: now,
         adminUrl: `${origin}/admin/inquiries/${id}`,
+        siteName: options.siteName ?? new URL(c.req.url).hostname,
+        pagePath: data.pagePath,
       }),
     }),
   );
 }
 ```
 
-The message is built from the received time and the admin URL only:
+The message is built from these values only. The function has no parameter for anything the visitor typed:
 
 ```ts title="packages/server/src/features/notify/slack.ts"
 export const buildSlackPayload = ({
   locale,
   receivedAt,
   adminUrl,
+  siteName,
+  pagePath,
 }: {
   locale: Locale;
   receivedAt: number;
   adminUrl: string;
+  siteName: string;
+  pagePath?: string | null;
 }): SlackPayload => {
-  const seconds = Math.floor(receivedAt / 1000);
-  const fallback = new Date(receivedAt).toISOString().replace(/\.\d+Z$/, 'Z');
-  return {
-    text: [
-      translate(locale, 'notify.newInquiry'),
-      translate(locale, 'notify.receivedAt', {
-        time: `<!date^${seconds}^{date_short_pretty} {time}|${fallback}>`,
-      }),
-      `<${adminUrl}|${translate(locale, 'notify.open')}>`,
-    ].join('\n'),
-  };
-};
 ```
 
 ## Why it is built this way
 
 - **The response does not wait for Slack.** The post runs in `ctx.waitUntil` after the inquiry is saved and the visitor has the response. A Slack outage cannot lose an inquiry or show the visitor an error.
-- **No personal data leaves Cloudflare.** Slack is a separate service. Sending only a count, a time, and a link means that inquiry contents stay in your D1 database.
-- **No answers are sent at all.** Admins decide what the form asks, so the server cannot know which answers are safe to send.
+- **No personal data leaves Cloudflare.** Slack is a separate service. The message carries only the site name, the page path, the time, and a link, so inquiry contents stay in the D1 database.
+- **No form answers are sent.** Admins decide what the form asks, so the server cannot know which answers are safe to send.
+- **The site name tells sites apart.** When several sites post to one channel, the name shows which site the inquiry came to.
 - **No Cloudflare Queues and no retry.** The admin screen always shows the unread count in its header, so a missed notification does not mean a missed inquiry.
 - **The webhook URL is a secret.** Anyone with the URL can post to your channel, so it is kept as a Worker secret and never shown in the admin screen.
