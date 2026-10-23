@@ -6,13 +6,20 @@ import {
   pageRange,
 } from './format.ts';
 
+// Newer ICU/CLDR versions use U+202F (narrow no-break space) before AM/PM and
+// may join the date and time with " at " instead of ",". Normalize the spaces
+// and accept both joiners so the tests do not depend on the ICU version.
+const normalize = (text: string) => text.replace(/[\u202F\u00A0]/g, ' ');
+
 // 2026-10-22 00:05 UTC = 09:05 in Tokyo.
 const at = Date.UTC(2026, 9, 22, 0, 5);
 
 describe('formatDateTime', () => {
   test('uses the given time zone and the locale', () => {
     expect(formatDateTime(at, 'ja', 'Asia/Tokyo')).toBe('2026/10/22 9:05');
-    expect(formatDateTime(at, 'en', 'UTC')).toBe('Oct 22, 2026, 12:05 AM');
+    expect(normalize(formatDateTime(at, 'en', 'UTC'))).toMatch(
+      /^Oct 22, 2026(,| at) 12:05 AM$/,
+    );
   });
 });
 
@@ -21,13 +28,17 @@ describe('formatListDate', () => {
 
   test('shows only the time on the same day', () => {
     expect(formatListDate(at, 'ja', now, 'Asia/Tokyo')).toBe('9:05');
-    expect(formatListDate(at, 'en', now, 'Asia/Tokyo')).toBe('9:05 AM');
+    expect(normalize(formatListDate(at, 'en', now, 'Asia/Tokyo'))).toBe(
+      '9:05 AM',
+    );
   });
 
   test('the day boundary follows the time zone', () => {
     // 23:30 UTC on Oct 21 is Oct 22 in Tokyo but Oct 21 in UTC.
     const late = Date.UTC(2026, 9, 21, 23, 30);
-    expect(formatListDate(late, 'en', now, 'Asia/Tokyo')).toBe('8:30 AM');
+    expect(normalize(formatListDate(late, 'en', now, 'Asia/Tokyo'))).toBe(
+      '8:30 AM',
+    );
     expect(formatListDate(late, 'en', now, 'UTC')).toBe('Oct 21');
   });
 
