@@ -62,6 +62,23 @@ Do not add web fonts (font packages, font files in `public/`, or links to a
 font service) unless the site owner asks for them. A font service receives a
 request from every visitor, and the privacy policy would need to mention it.
 
+## Scripts and embeds
+
+The public pages share their origin with the admin screen. A script on any
+page runs with the authority of a signed-in admin: it can read, export, and
+delete inquiries through the admin API.
+
+- Do not add third-party scripts, analytics or chat tags, tag managers,
+  embeds (`<iframe>`), or raw HTML with `<script>` or `on*` attributes in
+  Markdown, unless the site owner asks for it and understands this.
+- `public/_headers` sets a Content Security Policy for the pages. It allows
+  scripts only from this site and from Cloudflare Turnstile, and no inline
+  scripts. If the owner wants a third-party script, add its origin to the
+  policy there, on purpose. Do not add `'unsafe-inline'` or `'unsafe-eval'`
+  to `script-src`.
+- Keep `build.inlineStylesheets` and `vite.build.assetsInlineLimit` in
+  `astro.config.ts`: they keep scripts in files, which the policy needs.
+
 ## What you must not change
 
 - `src/worker.ts`: keep the `createGoodnightWorker(...)` call as it is.

@@ -81,6 +81,21 @@ added only when a page needs real interactivity.
   owner keeps non-production branch builds on) gets a build result but no
   public address. Owners review an update with the Update check comment and
   status, the build result, and `npm run preview` locally.
+- `public/_headers` gives the static pages a Content Security Policy
+  (`script-src 'self' https://challenges.cloudflare.com`, `frame-src` the
+  same Turnstile origin, `connect-src 'self'`, `style-src 'self'`,
+  `style-src-attr 'unsafe-inline'` for the theme colors set as a `style`
+  attribute on `<html>`, `object-src 'none'`, `base-uri 'self'`,
+  `form-action 'self'`, `frame-ancestors 'none'`), `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, and `Permissions-Policy`. No
+  HSTS: that is left to the zone. Workers Static Assets applies it to asset
+  responses only; the Worker's own headers cover `/api/*` and `/admin*`.
+  `astro.config.ts` sets `build.inlineStylesheets: 'never'` and
+  `vite.build.assetsInlineLimit: 0`, so Astro writes every script to
+  `/_astro/` and the policy needs no `'unsafe-inline'` for scripts (a static
+  file cannot carry per-page hashes). The starter e2e test checks the header
+  on `/` under `wrangler dev` and that the contact page with Turnstile logs
+  no CSP violation; `scripts/static-headers.test.ts` checks the file.
 - The D1 binding has no `database_id`. `wrangler dev`, `d1 migrations apply
   --local`, and `deploy --dry-run` work without it. Cloudflare creates the
   database and writes the ID when the Deploy button first deploys the site.

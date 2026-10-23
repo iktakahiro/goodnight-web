@@ -480,8 +480,21 @@ as `/admin`. Responses from `/api/*` and `/admin/*` get `X-Content-Type-Options`
 `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
 `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, a
 `Permissions-Policy`, and HSTS on HTTPS. API responses get
-`default-src 'none'` and `Cache-Control: no-store`. Pages from Static Assets
-are not changed.
+`default-src 'none'` and `Cache-Control: no-store`. Admin UI responses other
+than 2xx and 304 also get `Cache-Control: no-store`. The Worker does not
+change pages from Static Assets; the starter's `public/_headers` gives them a
+site CSP instead ([starter.md](starter.md)).
+
+The public pages share their origin with `/admin` and `/api/admin`. Any
+script on any page (an analytics tag, a chat widget, a tag manager, or
+`<script>` or event-handler HTML in Markdown) runs with a signed-in admin's
+full read, export, delete, and form-edit authority; the `HttpOnly` cookie and
+the `Origin` check (`isAllowedOrigin`) do not prevent it. The starter limits
+scripts to its own files and Turnstile with the `_headers` CSP, and its
+`AGENTS.md` tells AI tools not to add third-party scripts. Full isolation
+needs a separate admin hostname that serves only the admin paths. A narrower
+cookie `Path` would not help, because same-origin script can still fetch
+`/api/admin` with credentials.
 
 ## Database
 

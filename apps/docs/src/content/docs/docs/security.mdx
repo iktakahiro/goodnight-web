@@ -41,6 +41,18 @@ This page explains what goodnight-web protects and how, and what you need to do 
 
 The admin screen itself can load without a session, but every request for data needs one.
 
+### Public pages share the admin origin [#shared-origin]
+
+The site's pages, the admin screen, and the admin API are served from the same origin (for example `https://example.com`). The browser therefore treats a script on any public page like a script of the admin screen: while an admin is signed in, such a script can call the admin API with the admin's session and read, export, delete, or change inquiries and the form. The `HttpOnly` cookie and the `Origin` check do not stop a script that runs on the same origin.
+
+The starter keeps this risk small:
+
+- The pages are built from your repository. Only Cloudflare Turnstile is loaded from another origin.
+- `public/_headers` sends a Content Security Policy on every page. It allows scripts only from the site itself and from `https://challenges.cloudflare.com`, allows no inline scripts, and forbids framing (`frame-ancestors 'none'`). Astro writes every script to a file under `/_astro/` for this. The admin screen and the API get their own, stricter headers from the Worker.
+- The starter's `AGENTS.md` tells AI tools not to add third-party scripts, embeds, or HTML with scripts unless you ask for them.
+
+If you add an analytics tag, a chat widget, a tag manager, or an embed, it runs with this authority. Add it only if you trust it, and add its origin to `public/_headers` yourself. The only full isolation is a separate hostname for the admin screen, such as `admin.example.com`, that serves `/admin`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` and none of the public pages.
+
 ### Sessions and setup [#sessions-and-setup]
 
 Only a session from a passkey sign-in or from registering the first passkey can be an admin session. These rules make sure of that:
