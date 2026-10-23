@@ -10,7 +10,7 @@
 // and CI (after the build, because the tarball needs the generated files).
 //
 //   bun scripts/check-release.ts
-//   bun scripts/check-release.ts --tarball packages/server/goodnight-web-server-0.1.0.tgz
+//   bun scripts/check-release.ts --tarball packages/server/goodnight-web-server-0.9.1.tgz
 //
 // Without `--tarball` (or `CHECK_RELEASE_TARBALL`), the tarball check uses the
 // file list of `npm pack --dry-run`. With it, the check reads the given .tgz,

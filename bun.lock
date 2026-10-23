@@ -43,7 +43,7 @@
     },
     "packages/server": {
       "name": "@goodnight-web/server",
-      "version": "0.1.0",
+      "version": "0.9.1",
       "dependencies": {
         "@better-auth/core": "1.7.12",
         "@better-auth/passkey": "1.7.12",
