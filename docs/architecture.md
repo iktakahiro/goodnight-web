@@ -436,14 +436,14 @@ The UI does not use TanStack Start; the Worker serves the static build.
 
 ### HTTPS and Cloudflare Access
 
-Two app-wide middlewares run before the routes, for the admin areas
-(`/admin*`, `/api/admin/*`, `/api/setup`, `/api/auth/*`):
+Two app-wide middlewares run before the routes:
 
-- `requireHttps` (`src/features/https-only/`): over `http://`, `GET` and
-  `HEAD` get a 308 to `https://`, other methods 403 `https_required`.
-  `localhost`, `127.0.0.1`, and `[::1]` are exempt. The contact API and the
-  site are not affected.
-- `requireAccess` (`src/features/cloudflare-access/`): off unless
+- `requireHttps` (`src/features/https-only/`), for `/admin*` and every
+  `/api/*` path, the contact API included: over `http://`, `GET` and `HEAD`
+  get a 308 to `https://`, other methods 403 `https_required`. `localhost`,
+  `127.0.0.1`, and `[::1]` are exempt. The static site is not affected.
+- `requireAccess` (`src/features/cloudflare-access/`), for the admin areas
+  (`/admin*`, `/api/admin/*`, `/api/setup`, `/api/auth/*`): off unless
   `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` are set. Then `Cf-Access-Jwt-Assertion`
   must be an RS256 JWT signed by a key from
   `https://<team>/cdn-cgi/access/certs` (cached per isolate for an hour; an

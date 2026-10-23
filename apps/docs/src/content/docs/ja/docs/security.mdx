@@ -30,7 +30,7 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 | ログイン                       | Better Auth の Passkey だけです。メールとパスワードでのログインは無効です。パスワードのハッシュ処理は、Workers 無料プランの CPU 上限を超えることがあります（[better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)）。[Passkey でのログイン](/ja/docs/how-it-works/passkeys/)を参照してください。 |
 | セッション                     | 管理 API が受け付けるのは、そのユーザーの最初の Passkey 以降に作られたセッションだけです。セットアップで作られたセッションは管理者のセッションになりません。[セッションとセットアップ](#sessions-and-setup)を参照してください。                                                                                       |
 | `ADMIN_EMAILS`                 | リクエストのたびに読み直します。アドレスを外すと、次のリクエストからそのセッションは使えません。[管理者を外す](#removing-an-admin)を参照してください。                                                                                                                                                                |
-| HTTPS                          | 管理画面、管理 API、セットアップ、ログインは `https://` でだけ動きます。[HTTPS](#https) を参照してください。                                                                                                                                                                                                          |
+| HTTPS                          | 管理画面、管理 API、セットアップ、ログイン、問い合わせ API は `https://` でだけ動きます。[HTTPS](#https) を参照してください。                                                                                                                                                                                         |
 | Cloudflare Access              | 任意ですが、強く推奨します。50 ユーザーまで無料です。[Cloudflare Access](#cloudflare-access) を参照してください。                                                                                                                                                                                                     |
 | 最初の管理者                   | `SETUP_TOKEN` と、`ADMIN_EMAILS` にあるメールアドレスが必要です。最初の Passkey を登録するとセットアップは完了し、それ以降は使えません。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照してください。                                                                                                  |
 | Cloudflare WAF                 | 任意です。設定したルールで、ドメインへのリクエストを制限します。[Cloudflare WAF](#cloudflare-waf) を参照してください。                                                                                                                                                                                                |
@@ -52,13 +52,13 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 
 ### HTTPS [#https]
 
-平文の HTTP では、セットアップトークン、セッションの Cookie、Passkey のやり取りが暗号化されずに流れます。そこで、`/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` では `https://` を必須にします。
+平文の HTTP では、セットアップトークン、セッションの Cookie、Passkey のやり取り、訪問者が問い合わせフォームに入力した値が暗号化されずに流れます。そこで、`/admin`、`/admin/*` と、`/api/` の下のすべてのパスでは `https://` を必須にします。管理 API、セットアップ、ログイン、問い合わせ API が対象です。
 
 - `http://` での `GET` と `HEAD` は、同じ URL の `https://` にリダイレクトします（308）。
 - `http://` でのそれ以外のメソッドには、コード `https_required` の 403 を返します。本文はもう送られてしまっているので、リダイレクトしません。
 - `wrangler dev` で使えるように、`localhost`、`127.0.0.1`、`[::1]` は対象外です。
 
-サイトと問い合わせフォームは対象外です。これらも HTTPS に限るには、ゾーンの **Always Use HTTPS** を有効にしてください（Cloudflare ダッシュボード > SSL/TLS > Edge Certificates）。
+そのため、`http://` で開いたページの問い合わせフォームは、読み込みも送信もできません。静的なページはこの決まりの対象外です。すべてのページを HTTPS で配信するには、ゾーンの **Always Use HTTPS** を有効にしてください（Cloudflare ダッシュボード > SSL/TLS > Edge Certificates）。
 
 ### Cloudflare Access [#cloudflare-access]
 

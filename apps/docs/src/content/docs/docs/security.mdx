@@ -30,7 +30,7 @@ This page explains what goodnight-web protects and how, and what you need to do 
 | Sign-in                        | Passkeys through Better Auth, nothing else. Email and password sign-in is off, because password hashing can exceed the Workers free plan's CPU limit ([better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)). See [Passkey sign-in](/docs/how-it-works/passkeys/). |
 | Sessions                       | The admin API accepts only a session created at or after the user's first passkey. A session from setup is never an admin session. See [Sessions and setup](#sessions-and-setup).                                                                                                       |
 | `ADMIN_EMAILS`                 | Read again on every request. Removing an address locks its sessions out at the next request. See [Removing an admin](#removing-an-admin).                                                                                                                                               |
-| HTTPS                          | The admin screen, the admin API, setup, and sign-in work only over `https://`. See [HTTPS](#https).                                                                                                                                                                                     |
+| HTTPS                          | The admin screen, the admin API, setup, sign-in, and the contact API work only over `https://`. See [HTTPS](#https).                                                                                                                                                                    |
 | Cloudflare Access              | Optional, but strongly recommended. Free for up to 50 users. See [Cloudflare Access](#cloudflare-access).                                                                                                                                                                               |
 | First admin                    | Requires `SETUP_TOKEN` and an address in `ADMIN_EMAILS`. Setup closes permanently once the first passkey is registered. See [First admin setup](/docs/how-it-works/first-admin/).                                                                                                       |
 | Cloudflare WAF                 | Optional. Filters requests to your domain with rules you set. See [Cloudflare WAF](#cloudflare-waf).                                                                                                                                                                                    |
@@ -52,13 +52,13 @@ Only a session from a passkey sign-in or from registering the first passkey can 
 
 ### HTTPS [#https]
 
-Over plain HTTP, the setup token, session cookies, and passkey requests would cross the network in clear text. So `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` require `https://`:
+Over plain HTTP, the setup token, session cookies, passkey requests, and the values a visitor types into the contact form would cross the network in clear text. So `/admin`, `/admin/*`, and every path under `/api/` require `https://`: the admin API, setup, sign-in, and the contact API.
 
 - `GET` and `HEAD` over `http://` are redirected to the same URL on `https://` (308).
 - Other methods over `http://` get 403 with the code `https_required`. They are not redirected, because the body was already sent.
 - `localhost`, `127.0.0.1`, and `[::1]` are exempt, so that `wrangler dev` works.
 
-This rule does not cover the site or the contact form. To require HTTPS for them too, turn on **Always Use HTTPS** for your zone (Cloudflare dashboard > SSL/TLS > Edge Certificates).
+So the contact form on a page opened over `http://` cannot load or send. This rule does not cover the static pages. To serve every page over HTTPS, turn on **Always Use HTTPS** for your zone (Cloudflare dashboard > SSL/TLS > Edge Certificates).
 
 ### Cloudflare Access [#cloudflare-access]
 

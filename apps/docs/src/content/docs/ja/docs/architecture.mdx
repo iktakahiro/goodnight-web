@@ -98,9 +98,9 @@ export default createGoodnightWorker({ locale: siteConfig.defaultLocale });
 
 ```ts title="packages/server/src/app.ts"
 app.use('*', securityHeaders);
-// The admin UI, admin API, setup, and Better Auth: HTTPS only (except on
-// localhost), then Cloudflare Access when ACCESS_AUD and
-// ACCESS_TEAM_DOMAIN are set.
+// The admin UI and /api/*: HTTPS only (except on localhost). Then the
+// admin UI, admin API, setup, and Better Auth: Cloudflare Access when
+// ACCESS_AUD and ACCESS_TEAM_DOMAIN are set.
 app.use('*', requireHttps);
 app.use('*', requireAccess);
 app.route('/api/contact', contactRoutes);
@@ -134,7 +134,7 @@ app.on(['GET', 'HEAD'], ['/admin', '/admin/*'], (c) =>
 
 `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` が 32 文字より短いときは、ないものとして扱い、それを使う機能を止めます。シークレットは Worker の中だけで使います。ブラウザに返すことも、D1 に書くこともありません。
 
-`/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` は、`https://` でだけ動きます（`localhost` を除く）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
+`/admin`、`/admin/*` と、問い合わせ API を含む `/api/` の下のすべてのパスは、`https://` でだけ動きます（`localhost` を除く）。[セキュリティモデル](/ja/docs/security/#https)を参照してください。
 
 ## スタイルとフォント [#styles-and-fonts]
 

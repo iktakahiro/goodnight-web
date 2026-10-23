@@ -11,6 +11,7 @@ describe('HTTPS for the admin areas', () => {
     '/api/auth/get-session',
     '/api/admin/me',
     '/%61dmin',
+    '/api/contact/form',
   ])('GET http://example.com%s redirects to https', async (path) => {
     const worker = createTestWorker();
     const response = await worker.fetch(`http://example.com${path}`);
@@ -68,11 +69,34 @@ describe('HTTPS for the admin areas', () => {
     expect(response.status).toBe(200);
   });
 
-  test('the contact API and the site are not redirected', async () => {
-    const worker = createTestWorker({ env: { ASSETS: assets } });
+  test('POST /api/contact over http is refused and stores nothing', async () => {
+    const worker = createTestWorker();
+    const response = await worker.fetch('http://example.com/api/contact', {
+      method: 'POST',
+      headers: {
+        origin: 'http://example.com',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ email: 'visitor@example.com' }),
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe('https_required');
     expect(
-      (await worker.fetch('http://example.com/api/contact/form')).status,
-    ).toBe(200);
+      worker.sqlite.query('SELECT COUNT(*) AS n FROM submissions').get(),
+    ).toEqual({ n: 0 });
+    expect(worker.rateLimitKeys).toEqual([]);
+  });
+
+  test('the contact API still works on localhost over http', async () => {
+    const worker = createTestWorker();
+    const response = await worker.fetch(
+      'http://localhost:8787/api/contact/form',
+    );
+    expect(response.status).toBe(200);
+  });
+
+  test('the site is not redirected', async () => {
+    const worker = createTestWorker({ env: { ASSETS: assets } });
     expect((await worker.fetch('http://example.com/about')).status).toBe(200);
   });
 });
