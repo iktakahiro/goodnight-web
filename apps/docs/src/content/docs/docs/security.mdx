@@ -51,7 +51,7 @@ The starter keeps this risk small:
 - `public/_headers` sends a Content Security Policy on every page. It allows scripts only from the site itself and from `https://challenges.cloudflare.com`, allows no inline scripts, and forbids framing (`frame-ancestors 'none'`). Astro writes every script to a file under `/_astro/` for this. The admin screen and the API get their own, stricter headers from the Worker.
 - The starter's `AGENTS.md` tells AI tools not to add third-party scripts, embeds, or HTML with scripts unless you ask for them.
 
-If you add an analytics tag, a chat widget, a tag manager, or an embed, it runs with this authority. Add it only if you trust it, and add its origin to `public/_headers` yourself. The only full isolation is a separate hostname for the admin screen, such as `admin.example.com`, that serves `/admin`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` and none of the public pages.
+If you add an analytics tag, a chat widget, a tag manager, or an embed that loads a script, that script runs with this authority. Add it only if you trust it, and add its origin to `public/_headers` yourself. The only full isolation is a separate hostname for the admin screen, such as `admin.example.com`, that serves `/admin`, `/api/admin/*`, `/api/setup`, and `/api/auth/*` and none of the public pages.
 
 ### Sessions and setup [#sessions-and-setup]
 
@@ -113,13 +113,13 @@ Test a rule before you rely on it. A rule that blocks or challenges `/api/contac
 
 ### Removing an admin [#removing-an-admin]
 
-To remove an admin, delete their address from `ADMIN_EMAILS`. The Worker reads `ADMIN_EMAILS` on every request, so that admin's next request to the admin API gets 403. The same request deletes every session of that user. A new passkey sign-in does not help: the next admin API request refuses that session and deletes it too.
+To remove an admin, delete their address from `ADMIN_EMAILS`. The Worker reads `ADMIN_EMAILS` on every request, so that admin's next request to the admin API gets 403. The same request deletes every session of that user. Until that request, the sessions stay in D1: if you add the address back first, they work again. To end them now, run the command below. A new passkey sign-in does not help: the next admin API request refuses that session and deletes it too.
 
 The check covers the admin API (`/api/admin/*`). Better Auth's own endpoints under `/api/auth/*`, such as adding a passkey, do not read `ADMIN_EMAILS`, but nothing they do gives access to inquiries or the form.
 
 Admin API requests do not extend a session's expiry; only Better Auth's own session endpoint does. So a removed admin cannot keep a session alive through the admin API.
 
-The user record and its passkeys stay in D1, so adding the address again later lets that person sign in with the same passkeys. Old sessions do not come back, because they were deleted. To delete the user and the passkeys permanently, run this yourself (replace the address):
+The user record and its passkeys stay in D1, so adding the address again later lets that person sign in with the same passkeys. Sessions that were already deleted do not come back. To delete the user and the passkeys permanently, run this yourself (replace the address):
 
 ```sh
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
@@ -136,7 +136,7 @@ The contact API checks a submission like this before it saves it. [Contact form 
 - `Origin`, `Content-Type`, and the body size are checked before the body is parsed.
 - Turnstile is verified on the server, including `hostname` and `action`.
 - The Rate Limiting binding limits submissions per hashed IP address (per /64 prefix for IPv6).
-- At most 500 submissions are stored per hour across all senders. Above that, the API returns 503 (`contact_busy`) and stores nothing.
+- At most 500 submissions are stored per hour across all senders. Above that, the API returns 503 (`contact_busy`) and stores nothing. Requests that arrive at the same moment can go slightly over the limit.
 - A filled honeypot field does not change the response. The submission is stored as suspected spam only if it passes Turnstile, the rate limit, and validation. The honeypot value itself is not stored.
 - A high spam score also flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed separately in the admin screen.
 - There is no API key in the page. A key that the browser can read is not a secret, so it would only give a false sense of protection.

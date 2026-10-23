@@ -51,7 +51,7 @@ starter は、このリスクを次のように小さくしています。
 - `public/_headers` が、すべてのページに Content Security Policy を付けます。スクリプトはサイト自身と `https://challenges.cloudflare.com` からだけ許可し、インラインのスクリプトは許可せず、ほかのサイトへの埋め込みを禁止します（`frame-ancestors 'none'`）。そのために、Astro はすべてのスクリプトを `/_astro/` の下のファイルに書き出します。管理画面と API には、Worker がより厳しいヘッダーを付けます。
 - starter の `AGENTS.md` は、頼まれない限り、外部のスクリプト、埋め込み、スクリプトを含む HTML を追加しないよう AI ツールに伝えます。
 
-アクセス解析のタグ、チャットのウィジェット、タグマネージャー、埋め込みを追加すると、それらはこの権限で動きます。信頼できるものだけを追加し、そのオリジンをご自身で `public/_headers` に加えてください。完全に分けるには、管理画面に別のホスト名（たとえば `admin.example.com`）を使い、`/admin`、`/api/admin/*`、`/api/setup`、`/api/auth/*` だけを配信して、公開ページは配信しない構成にするしかありません。
+アクセス解析のタグ、チャットのウィジェット、タグマネージャー、スクリプトを読み込む埋め込みを追加すると、それらはこの権限で動きます。信頼できるものだけを追加し、そのオリジンをご自身で `public/_headers` に加えてください。完全に分けるには、管理画面に別のホスト名（たとえば `admin.example.com`）を使い、`/admin`、`/api/admin/*`、`/api/setup`、`/api/auth/*` だけを配信して、公開ページは配信しない構成にするしかありません。
 
 ### セッションとセットアップ [#sessions-and-setup]
 
@@ -113,13 +113,13 @@ WAF のルールは、Cloudflare アカウントに追加したドメイン（�
 
 ### 管理者を外す [#removing-an-admin]
 
-管理者を外すには、`ADMIN_EMAILS` からそのアドレスを消します。Worker はリクエストのたびに `ADMIN_EMAILS` を読むので、その管理者が次に管理 API へ送るリクエストは 403 になります。同じリクエストで、そのユーザーのセッションをすべて削除します。Passkey でログインし直しても使えません。次の管理 API へのリクエストがそのセッションを拒否し、同じように削除します。
+管理者を外すには、`ADMIN_EMAILS` からそのアドレスを消します。Worker はリクエストのたびに `ADMIN_EMAILS` を読むので、その管理者が次に管理 API へ送るリクエストは 403 になります。同じリクエストで、そのユーザーのセッションをすべて削除します。そのリクエストまでは、セッションは D1 に残ります。先にアドレスを戻すと、そのセッションはまた使えます。今すぐ終わらせるには、下のコマンドを実行してください。Passkey でログインし直しても使えません。次の管理 API へのリクエストがそのセッションを拒否し、同じように削除します。
 
 この確認の対象は管理 API（`/api/admin/*`）です。Passkey の追加など、`/api/auth/*` の下にある Better Auth 自身のエンドポイントは `ADMIN_EMAILS` を読みません。ただし、そこでできることでは、問い合わせやフォームには届きません。
 
 管理 API へのリクエストでは、セッションの有効期限を延ばしません。延ばすのは Better Auth 自身のセッションのエンドポイントだけです。そのため、外された管理者が管理 API を使ってセッションを保ち続けることはできません。
 
-ユーザーと Passkey は D1 に残ります。そのため、同じアドレスを戻すと、同じ Passkey でまたログインできます。古いセッションは削除済みなので戻りません。ユーザーと Passkey を完全に消すには、次のコマンドをご自身で実行してください（アドレスは置き換えます）。
+ユーザーと Passkey は D1 に残ります。そのため、同じアドレスを戻すと、同じ Passkey でまたログインできます。削除済みのセッションは戻りません。ユーザーと Passkey を完全に消すには、次のコマンドをご自身で実行してください（アドレスは置き換えます）。
 
 ```sh
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
@@ -136,7 +136,7 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id
 - 本文を読む前に、`Origin`、`Content-Type`、本文のサイズを確認します。
 - Turnstile をサーバー側で検証し、`hostname` と `action` も確認します。
 - Rate Limiting binding で、ハッシュにした IP アドレスごとに送信回数を制限します。IPv6 では /64 のプレフィックスごとに数えます。
-- 保存する送信は、すべての送信者の合計で 1 時間に 500 件までです。それを超えると、API は 503（`contact_busy`）を返し、何も保存しません。
+- 保存する送信は、すべての送信者の合計で 1 時間に 500 件までです。それを超えると、API は 503（`contact_busy`）を返し、何も保存しません。同時に届いたリクエストは、上限をわずかに超えることがあります。
 - honeypot 欄が埋まっていても、応答は変えません。その送信も Turnstile、回数制限、検証を通ったときだけ、スパムの疑いとして保存します。honeypot 欄の値そのものは保存しません。
 - スパムスコアが高い送信にも、スパムの疑いの印を付けます。スパムの疑いは Slack に通知せず、管理画面では分けて表示します。
 - ページに API キーを入れません。ブラウザが読めるキーは秘密ではなく、守っているという誤解を生むだけです。

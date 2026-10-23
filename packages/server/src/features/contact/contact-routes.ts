@@ -269,6 +269,9 @@ export const contactRoutes = new Hono<HonoEnv>()
     // 6. Global quota across all senders, after Turnstile and validation so
     //    only submissions that would be stored count. Over it, nothing is
     //    stored and the visitor is told to try again later.
+    //    The count and the insert are two statements, so requests that
+    //    arrive at the same moment can go slightly over: the quota bounds
+    //    growth, it is not an exact limit.
     const storedLastHour = await countSubmissionsSince(env.DB, now - HOUR_MS);
     if (storedLastHour >= CONTACT_HOURLY_INSERT_QUOTA) {
       console.warn('contact: hourly insert quota reached; nothing stored');

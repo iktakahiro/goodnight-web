@@ -20,7 +20,7 @@ The API runs these checks from top to bottom. The cheap checks come first, so mo
 
 When all checks pass, the submission is saved to D1. Only then does the API return 200.
 
-The hourly limit (`CONTACT_HOURLY_INSERT_QUOTA`) keeps D1 from being filled quickly by someone who pays for Turnstile solves from many addresses. A company site gets far fewer inquiries than 500 an hour, so real visitors do not reach it. While it is reached, the form shows its general error and asks the visitor to try again; nothing is saved, so nothing reaches the admin screen either.
+The hourly limit (`CONTACT_HOURLY_INSERT_QUOTA`) keeps D1 from being filled quickly by someone who pays for Turnstile solves from many addresses. A company site gets far fewer inquiries than 500 an hour, so normal traffic does not reach it on its own. While it is reached (an attack can use it up, and the limit is shared by every sender), the form shows its general error and asks the visitor to try again; nothing is saved, so nothing reaches the admin screen either.
 
 ## Spam protection
 
@@ -66,7 +66,7 @@ The field is moved off screen and hidden from screen readers (`aria-hidden`). Th
 - **The name is `gnw_hp_x`.** It means nothing to browsers and password managers. A name such as `website` or `url` invites autofill, and an autofilled honeypot would flag a real person's inquiry.
 - **Autofill is turned off.** `autocomplete="off"` and the `data-*` attributes ask the common password managers (1Password, LastPass, Bitwarden, and others) to leave the field alone.
 - **The response does not change.** A submission with a filled honeypot still needs a valid Turnstile token, counts against the rate limit, and must pass validation, like any other. If it passes, it is saved with the reason `honeypot`. If not, the client gets the same error as the same request with an empty honeypot, and nothing is saved. A bot cannot tell from the response that it hit the trap.
-- **The value is not stored.** What was typed into the honeypot field is never saved. Any value is accepted, however long, so a long value does not change the response either.
+- **The value is not stored.** What was typed into the honeypot field is never saved. Any value is accepted, however long (within the request size limit above), so a long value does not change the response either.
 
 The server only notes whether the field is filled and carries on:
 

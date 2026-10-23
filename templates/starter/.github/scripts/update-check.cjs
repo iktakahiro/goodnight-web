@@ -76,6 +76,8 @@ const VERSION_SPEC =
  * @property {string} [sha]
  * @property {{ login: string } | null} author
  * @property {{ login: string } | null} committer
+ * @property {{ verification?: { verified?: boolean } }} [commit] The Git data;
+ *   `verification.verified` is GitHub's check of the commit signature.
  */
 
 /**
@@ -158,8 +160,24 @@ function classifyUpdate(pullRequest, files, commits) {
       `the list of commits may be incomplete: listed ${commits.length}, expected ${pullRequest.commits ?? 'unknown'}`,
     );
   }
+  // The commits are listed oldest first, so the last one is the head of the
+  // pull request when this script read it. If the branch moved after the
+  // event was sent, the status below would vouch for a commit that was not
+  // checked, so the lists and the event must agree.
+  const lastCommit = commits[commits.length - 1];
+  if (lastCommit && lastCommit.sha !== pullRequest.head.sha) {
+    reasons.push(
+      `the branch changed while it was checked: the last commit is ${clean(String(lastCommit.sha ?? '')).slice(0, 7) || 'unknown'}, the event is for ${clean(String(pullRequest.head.sha)).slice(0, 7)}`,
+    );
+  }
   for (const commit of commits) {
     const short = clean(String(commit.sha ?? '')).slice(0, 7) || 'unknown';
+    // The author and committer are only names in the commit, so anyone who
+    // can push a branch could write the Dependabot address. GitHub signs
+    // Dependabot's commits; require its verification as well.
+    if (commit.commit?.verification?.verified !== true) {
+      reasons.push(`commit ${short}: the signature is not verified by GitHub`);
+    }
     for (const role of /** @type {const} */ (['author', 'committer'])) {
       const account = commit[role];
       if (!account || account.login !== OFFICIAL_AUTHOR) {
@@ -292,6 +310,14 @@ function lockfileProblems(file) {
       continue;
     }
     if (kind !== '+') continue;
+    // JSON escapes (`\u0072esolved`, `https:\/\/`) would hide a key or a URL
+    // from the checks below. npm writes none of them in these lines.
+    if (strict && line.includes('\\')) {
+      problems.push(
+        `${file.filename}: escape sequence in a changed line: ${clean(line)}`,
+      );
+      continue;
+    }
     const entry = /^"([^"]*)"\s*:\s*(.*?),?$/.exec(line);
     const key = entry ? entry[1] : null;
     // Funding links point to other hosts by design, and a bare string is an
@@ -515,7 +541,7 @@ function buildComment(result, headSha) {
  * status {@link STATUS_CONTEXT} on the head commit: `success` only for an
  * official update, `failure` otherwise, and `error` when the pull request
  * could not be read. A comment can be copied into a pull request body; the
- * status is bound to the commit and set only through the workflow token.
+ * status is bound to the commit, and setting it takes write access to the repository.
  *
  * When the changed files or the commits cannot be listed, the comment is set
  * to the warning so that an earlier "official" comment does not stay, the

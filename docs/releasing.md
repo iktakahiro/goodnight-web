@@ -114,7 +114,8 @@ cd "$repo" && bun run check:release
 ```
 
 (`date -d` is GNU date; on macOS use `date -u -v-48H +%Y-%m-%dT%H:%M:%SZ`.)
-Then, in another copy, run `npx -y npm@10.9.2 ci`, `npx astro build`, and
+Then, in a full copy of `templates/starter` outside the repository (with the new
+`package-lock.json`), run `npx -y npm@10.9.2 ci`, `npx astro build`, and
 `npx wrangler deploy --dry-run` to see that the locked tree builds.
 
 ## Provenance

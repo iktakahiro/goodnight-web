@@ -84,7 +84,7 @@ There is no one-click update in the admin screen. It would need a token that can
 
 **Merge only pull requests that have the official update comment and a passing `goodnight-web/update-check` check.** A pull request that says "update" is not always an update from goodnight-web.
 
-The starter's `.github/workflows/update-check.yml` comments on every pull request. The comment is in Japanese and English. The workflow updates the same comment instead of adding new ones. It also sets a commit status named `goodnight-web/update-check` on the pull request's latest commit: it passes only for an official update. Anyone can paste the text of the comment into a pull request, but only the workflow can set the status, and it belongs to one commit. The status has not been tested on GitHub yet.
+The starter's `.github/workflows/update-check.yml` comments on every pull request. The comment is in Japanese and English. The workflow updates the same comment instead of adding new ones. It also sets a commit status named `goodnight-web/update-check` on the pull request's latest commit: it passes only for an official update. Anyone can paste the text of the comment into a pull request, but setting the status takes write access to the repository (this workflow's token has it), and the status belongs to one commit. The status has not been tested on GitHub yet.
 
 | Result          | Comment                                                                                        |
 | --------------- | ---------------------------------------------------------------------------------------------- |
@@ -97,7 +97,7 @@ A pull request counts as an **official update** only if all of these are true:
 
 - The author is `dependabot[bot]` and the account type is `Bot`.
 - The branch is in your own repository, not in a fork.
-- Every commit in the pull request was authored and committed by `dependabot[bot]`. A commit that someone else pushed to the Dependabot branch, or a commit made in the GitHub web interface, makes it not official.
+- Every commit in the pull request was authored and committed by `dependabot[bot]`, and GitHub shows its signature as verified. A commit that someone else pushed to the Dependabot branch, or a commit made in the GitHub web interface, makes it not official.
 - The only changed files are `package.json` and lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`). Each of them is modified, not added or removed.
 - In `package.json`, every changed line is the version of a `@goodnight-web/*` dependency.
 

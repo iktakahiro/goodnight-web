@@ -154,7 +154,8 @@ hidden marker `<!-- goodnight-web:update-check -->` and the
 status `goodnight-web/update-check` on the head commit: `success` only for an
 official update, `failure` otherwise, and `error` when the pull request could
 not be read. A comment can be copied into a pull request body; the status is
-bound to the commit and can be set only with the workflow token.
+bound to the commit, and setting it takes write access to the repository
+(the workflow token has it).
 
 - It checks out only `.github/scripts` from the base commit
   (`pull_request.base.sha`, `persist-credentials: false`) and loads
@@ -168,7 +169,9 @@ bound to the commit and can be set only with the workflow token.
   repository; every commit listed by `pulls.listCommits` has the GitHub
   author and committer `dependabot[bot]` (a commit pushed by a collaborator,
   a commit with no linked account, and a commit made in the web interface,
-  whose committer is `web-flow`, all fail); the changed files are only root `package.json`,
+  whose committer is `web-flow`, all fail; so does a commit whose
+  signature GitHub does not show as verified, and a last listed commit that is
+  not the `head.sha` of the event); the changed files are only root `package.json`,
   `package-lock.json`, `bun.lock`, or `pnpm-lock.yaml`, all with status
   `modified`; `package.json` is one of them; every changed
   `package.json` line is an `@goodnight-web/*` entry set to a version
@@ -208,8 +211,8 @@ Known limits:
 - Not tested on GitHub yet: `pull_request_target` for Dependabot pull
   requests with `pull-requests: write`, the comment flow, the commit status
   flow with `statuses: write`, and the committer GitHub records for
-  Dependabot's own commits (expected to be `dependabot[bot]`; if it is
-  another account, every update gets the warning, which fails closed).
+  Dependabot's own commits (expected to be `dependabot[bot]`, and expected to be signed; if not,
+  every update gets the warning, which fails closed).
 - The workflow pins `actions/checkout` (v7.0.1) and `actions/github-script`
   by SHA.
   The starter's Dependabot config covers npm only, so these pins do not get

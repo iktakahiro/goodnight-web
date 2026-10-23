@@ -214,9 +214,13 @@ describe('admin API without a valid admin session', () => {
     expect(
       (await worker.fetch('/api/admin/me', { headers: { cookie } })).status,
     ).toBe(200);
-    expect(
-      worker.sqlite.query('SELECT expires_at AS e FROM session').get(),
-    ).toEqual({ e: soon });
+    // Every session keeps its expiry, including the one the cookie belongs to
+    // (`signInAsAdmin` leaves a setup session next to it).
+    const rows = worker.sqlite
+      .query('SELECT expires_at AS e FROM session')
+      .all();
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows).toEqual(rows.map(() => ({ e: soon })));
   });
 
   test('a removed address gets no admin access from a new passkey sign-in', async () => {

