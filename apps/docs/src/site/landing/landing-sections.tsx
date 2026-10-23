@@ -16,37 +16,53 @@ function useJapanese(): boolean {
 
 /**
  * The "built on" strip under the hero: the official Astro logo, linked to
- * astro.build, and Cloudflare product names as text. Brand names carry
- * `data-brand` so that they can become logos later.
+ * astro.build, and "Cloudflare Stack" as plain text. The brand name carries
+ * `data-brand` so that it can become a logo later.
  */
 export function BuiltOn() {
+  const japanese = useJapanese();
+  const astro = (
+    <a className='built-on-astro' href='https://astro.build'>
+      <img
+        className='themed-image themed-image-light'
+        src={sitePath('images/third-party/astro-logo-on-light.svg')}
+        alt='Astro'
+        width={138}
+        height={48}
+      />
+      <img
+        className='themed-image themed-image-dark'
+        src={sitePath('images/third-party/astro-logo-gradient-on-dark.svg')}
+        alt='Astro'
+        width={138}
+        height={48}
+        loading='lazy'
+      />
+    </a>
+  );
+  const stack = (
+    <span className='built-on-name' data-brand='cloudflare'>
+      Cloudflare Stack
+    </span>
+  );
   return (
     <div className='built-on'>
       <div className='landing-wrap'>
-        <p lang='en'>Built on</p>
-        <a className='built-on-astro' href='https://astro.build'>
-          <img
-            className='themed-image themed-image-light'
-            src={sitePath('images/third-party/astro-logo-on-light.svg')}
-            alt='Astro'
-            width={138}
-            height={48}
-          />
-          <img
-            className='themed-image themed-image-dark'
-            src={sitePath('images/third-party/astro-logo-gradient-on-dark.svg')}
-            alt='Astro'
-            width={138}
-            height={48}
-            loading='lazy'
-          />
-        </a>
-        <span className='built-on-name' data-brand='cloudflare-workers'>
-          Cloudflare Workers®
-        </span>
-        <span className='built-on-name' data-brand='cloudflare-d1'>
-          Cloudflare D1
-        </span>
+        {japanese ? (
+          <>
+            {astro}
+            <span className='built-on-text'>と</span>
+            {stack}
+            <span className='built-on-text'>で構築</span>
+          </>
+        ) : (
+          <>
+            <span className='built-on-text'>Built on</span>
+            {astro}
+            <span className='built-on-text'>and</span>
+            {stack}
+          </>
+        )}
       </div>
     </div>
   );
@@ -120,18 +136,6 @@ export function Feature({
 /** The small print under a feature's lead sentence. */
 export function FeatureNote({ children }: { children: ReactNode }) {
   return <div className='feature-note'>{children}</div>;
-}
-
-/**
- * The "What is Cloudflare?" block. The hero links to its `#cloudflare` id.
- * The children are a heading and the paragraphs.
- */
-export function CloudflareNote({ children }: { children: ReactNode }) {
-  return (
-    <div className='cloudflare-note' id='cloudflare'>
-      {children}
-    </div>
-  );
 }
 
 /**

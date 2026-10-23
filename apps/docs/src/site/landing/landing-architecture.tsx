@@ -1,127 +1,159 @@
-import { useRef } from 'react';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { motion, useInView } from 'motion/react';
 import {
   Database,
-  GitPullRequest,
+  GitBranch,
   Globe,
-  Inbox,
+  Hammer,
   KeyRound,
+  LayoutDashboard,
   Send,
+  ShieldCheck,
   User,
+  UserCog,
 } from 'lucide-react';
 
 const copy = {
   en: {
-    visitor: ['Visitor', 'Submits the form'],
-    you: ['You', 'Sign in with face or fingerprint'],
-    account: ['Your own ', ' account'],
-    steps: [
-      ['Website', 'Serves your pages', 'Pages built with Astro'],
-      [
-        'Intake and checks',
-        'Bot protection and a limit on repeated sends',
-        'Workers · Turnstile',
-      ],
-      ['Your own database', 'Stores the inquiry', 'D1'],
-      ['Admin panel', 'Where you read inquiries', 'Passkey sign-in'],
-    ],
-    github:
-      ' (where your code lives): updates arrive as proposed changes (PRs) and go live when you apply (merge) them.',
+    label: 'Architecture of a goodnight-web website',
+    visitor: ['Visitor', 'Reads pages, sends the form'],
+    owner: ['Admin', 'Reads inquiries'],
+    waf: ['Cloudflare WAF', 'Filters requests by rules you set'],
+    access: ['Cloudflare Access', 'A second sign-in for the admin panel'],
+    optional: 'Optional',
+    account: 'Your Cloudflare account',
+    workers: 'Workers',
+    website: ['Website', 'Static files built with Astro'],
+    form: ['Contact form API', 'Hono · Turnstile · rate limit'],
+    admin: ['Admin panel', 'Hono · sign in with a passkey'],
+    d1: ['D1', 'Stores inquiries'],
+    builds: ['Workers Builds', 'Builds and deploys'],
+    github: ['GitHub', 'Your files and history'],
   },
   ja: {
-    visitor: ['訪問者', 'フォームから送信'],
-    you: ['あなた', '顔や指紋でログイン'],
-    account: ['自分の ', ' アカウント'],
-    steps: [
-      ['Webサイト', 'ページを配信', 'Astro で作ったページ'],
-      ['受付とチェック', 'ボット対策と連続送信の制限', 'Workers・Turnstile'],
-      ['自分のデータベース', '問い合わせを保存', 'D1'],
-      ['管理画面', '届いた問い合わせを確認', 'パスキーでログイン'],
-    ],
-    github:
-      '（コードの置き場所）：更新は変更の提案（PR）として届き、反映（マージ）すると公開されます。',
+    label: 'goodnight-web のWebサイト構成図',
+    visitor: ['訪問者', 'ページを見る・フォームを送る'],
+    owner: ['管理者', '問い合わせを確認'],
+    waf: ['Cloudflare WAF', '設定したルールでリクエストを制限'],
+    access: ['Cloudflare Access', '管理画面に二段目のログインを追加'],
+    optional: '任意',
+    account: '自分の Cloudflare アカウント',
+    workers: 'Workers',
+    website: ['Webサイト', 'Astro で生成した静的ファイル'],
+    form: ['問い合わせフォーム API', 'Hono · Turnstile · レート制限'],
+    admin: ['管理画面', 'Hono · Passkey でログイン'],
+    d1: ['D1', '問い合わせを保存'],
+    builds: ['Workers Builds', 'ビルドとデプロイ'],
+    github: ['GitHub', 'ファイルと履歴を管理'],
   },
 } as const;
 
-const stepIcons = [Globe, Send, Database, Inbox] as const;
-
 /**
- * The top page architecture: a visitor, the four steps inside your own
- * Cloudflare account, you, and the GitHub repository. A glowing line runs
- * across the steps once when they scroll into view. Brand names are text in
- * elements with `data-brand`, so that they can become logos later.
+ * The top page architecture, drawn as an infrastructure diagram: the visitor
+ * and the admin on the left, the optional Cloudflare WAF and Cloudflare Access
+ * layers (dashed), the Worker with the website, the contact form API and the
+ * admin panel inside your Cloudflare account, the D1 database, and the path
+ * from GitHub through Workers Builds. Cloudflare products are plain text
+ * labels. The grid areas are set in landing.css; on narrow screens the boxes
+ * stack in reading order.
  */
 export function LandingArchitecture() {
   const text = useI18n().locale === 'ja' ? copy.ja : copy.en;
-  const flow = useRef<HTMLDivElement>(null);
-  const inView = useInView(flow, { once: true, amount: 0.35 });
   return (
-    <div className='arch'>
-      <div className='arch-actor arch-visitor'>
-        <User aria-hidden='true' />
-        <b>{text.visitor[0]}</b>
-        <span>{text.visitor[1]}</span>
-      </div>
-      <div className='arch-account'>
-        <p className='arch-account-label'>
-          {text.account[0]}
-          <span data-brand='cloudflare'>Cloudflare</span>
-          {text.account[1]}
-        </p>
-        <div className='arch-flow' ref={flow} data-in={inView || undefined}>
-          <motion.span
-            className='arch-flow-line motion-reveal'
-            aria-hidden='true'
-            initial={{ scaleX: 0 }}
-            animate={inView ? { scaleX: 1 } : undefined}
-            transition={{ duration: 1.4, ease: [0.65, 0, 0.35, 1] }}
-          />
-          <motion.span
-            className='arch-flow-head'
-            aria-hidden='true'
-            initial={{ x: '-100%', opacity: 0 }}
-            animate={inView ? { x: '0%', opacity: [0, 1, 1, 0] } : undefined}
-            transition={{
-              x: { duration: 1.4, ease: [0.65, 0, 0.35, 1] },
-              opacity: { duration: 1.9, times: [0, 0.1, 0.72, 1] },
-            }}
-          />
-          <ol className='arch-steps'>
-            {text.steps.map(([title, body, detail], index) => {
-              const Icon = stepIcons[index] ?? Globe;
-              return (
-                <li
-                  key={title}
-                  className={
-                    index === 2 ? 'arch-step arch-step-own' : 'arch-step'
-                  }
-                >
-                  <span className='arch-step-number' aria-hidden='true'>
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <Icon className='arch-step-icon' aria-hidden='true' />
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                  <small>{detail}</small>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      </div>
-      <div className='arch-actor arch-you'>
-        <KeyRound aria-hidden='true' />
-        <b>{text.you[0]}</b>
-        <span>{text.you[1]}</span>
-      </div>
-      <div className='arch-repo'>
-        <GitPullRequest aria-hidden='true' />
-        <p>
-          <b data-brand='github'>GitHub</b>
-          {text.github}
-        </p>
-      </div>
+    <div className='arch' role='group' aria-label={text.label}>
+      <div className='arch-frame arch-frame-account' aria-hidden='true' />
+      <div className='arch-frame arch-frame-workers' aria-hidden='true' />
+      <p className='arch-label arch-label-account'>{text.account}</p>
+      <p className='arch-label arch-label-workers'>{text.workers}</p>
+
+      <Node area='visitor' icon={User} title={text.visitor[0]}>
+        {text.visitor[1]}
+      </Node>
+      <Node
+        area='waf'
+        icon={ShieldCheck}
+        title={text.waf[0]}
+        optional={text.optional}
+      >
+        {text.waf[1]}
+      </Node>
+      <Node area='website' icon={Globe} title={text.website[0]}>
+        {text.website[1]}
+      </Node>
+      <Node area='form' icon={Send} title={text.form[0]}>
+        {text.form[1]}
+      </Node>
+      <Node area='admin' icon={LayoutDashboard} title={text.admin[0]}>
+        {text.admin[1]}
+      </Node>
+      <Node area='d1' icon={Database} title={text.d1[0]}>
+        {text.d1[1]}
+      </Node>
+      <Node area='owner' icon={UserCog} title={text.owner[0]}>
+        {text.owner[1]}
+      </Node>
+      <Node
+        area='access'
+        icon={KeyRound}
+        title={text.access[0]}
+        optional={text.optional}
+      >
+        {text.access[1]}
+      </Node>
+      <Node area='builds' icon={Hammer} title={text.builds[0]}>
+        {text.builds[1]}
+      </Node>
+      <Node area='github' icon={GitBranch} title={text.github[0]}>
+        {text.github[1]}
+      </Node>
+
+      {(
+        [
+          'visitor-waf',
+          'waf-website',
+          'waf-form',
+          'form-d1',
+          'owner-access',
+          'access-admin',
+          'admin-d1',
+          'github-builds',
+        ] as const
+      ).map((name) => (
+        <span
+          key={name}
+          className={`arch-arrow arch-arrow-${name}`}
+          aria-hidden='true'
+        />
+      ))}
+    </div>
+  );
+}
+
+/** One box of the diagram. `optional` draws it dashed with the label. */
+function Node({
+  area,
+  icon: Icon,
+  title,
+  optional,
+  children,
+}: {
+  area: string;
+  icon: typeof Globe;
+  title: string;
+  optional?: string;
+  children: string;
+}) {
+  return (
+    <div
+      className={
+        optional
+          ? `arch-node arch-${area} is-optional`
+          : `arch-node arch-${area}`
+      }
+    >
+      <Icon aria-hidden='true' />
+      <b>{title}</b>
+      {optional ? <em>{optional}</em> : null}
+      <span>{children}</span>
     </div>
   );
 }

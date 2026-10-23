@@ -32,6 +32,7 @@ This page explains what goodnight-web protects and how, and what you need to do 
 | HTTPS                          | The admin screen, the admin API, setup, and sign-in work only over `https://`. See [HTTPS](#https).                                                                                                                                                                                     |
 | Cloudflare Access              | Optional, but strongly recommended. Free for up to 50 users. See [Cloudflare Access](#cloudflare-access).                                                                                                                                                                               |
 | First admin                    | Requires `SETUP_TOKEN` and an address in `ADMIN_EMAILS`. Setup closes permanently once the first passkey is registered. See [First admin setup](/docs/how-it-works/first-admin/).                                                                                                       |
+| Cloudflare WAF                 | Optional. Filters requests to your domain with rules you set. See [Cloudflare WAF](#cloudflare-waf).                                                                                                                                                                                    |
 | `workers.dev` and preview URLs | These addresses are easy to leave out of an Access policy. Turn them off once your own domain works. Even without Access, the admin screen still requires a passkey sign-in.                                                                                                            |
 | CSRF                           | `Origin` checks and `SameSite` cookies.                                                                                                                                                                                                                                                 |
 | Headers                        | A Content Security Policy and other security headers on Worker responses. The Worker picks the headers after it normalizes the path, so `/%61dmin`, `//admin`, and `/admin/..%2f` get the same headers as `/admin`.                                                                     |
@@ -83,6 +84,18 @@ With both set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the pat
 - Those paths return 503 (`access_unavailable`) when only one of the two settings is set, when `ACCESS_TEAM_DOMAIN` is not a plain hostname, or when the keys cannot be fetched.
 - Without either setting, the Worker does not check Access tokens. Access in front of the site still works; the Worker just does not double-check it.
 - Passkey sign-in is still required with Access.
+
+### Cloudflare WAF [#cloudflare-waf]
+
+Cloudflare WAF (Web Application Firewall) checks requests to your domain against rules before they reach the Worker. It is optional. goodnight-web does not depend on it: Turnstile, the rate limit, and the input checks run in the Worker either way.
+
+WAF rules apply to a zone, a domain added to your Cloudflare account. Custom rules, which can match a request by properties such as the URL path or the IP address and then block or challenge it, are available on every plan, with a limit on the number of rules that depends on the plan. See Cloudflare's documentation:
+
+- [Cloudflare WAF](https://developers.cloudflare.com/waf/)
+- [Custom rules](https://developers.cloudflare.com/waf/custom-rules/)
+- [Managed rules](https://developers.cloudflare.com/waf/managed-rules/)
+
+Test a rule before you rely on it. A rule that blocks or challenges `/api/contact` can stop real visitors from sending the contact form. To restrict who can reach the admin screen, [Cloudflare Access](#cloudflare-access) is the better fit.
 
 ### Removing an admin [#removing-an-admin]
 

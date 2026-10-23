@@ -1,0 +1,87 @@
+---
+title: Glossary
+icon: BookOpen
+description: Plain explanations of the terms used on this site, such as GitHub, Cloudflare, Workers, D1, and passkeys, for readers who are new to them.
+---
+
+This page is for readers who do not often meet terms such as GitHub or Cloudflare. Each entry says what the term means and how goodnight-web uses it.
+
+## Where the site runs
+
+### Cloudflare [#cloudflare]
+
+A company that provides services for delivering websites quickly around the world and for protecting them. It also offers services for running programs and storing data. goodnight-web runs on your own Cloudflare account, so you manage the account and its settings yourself.
+
+### Workers [#workers]
+
+Cloudflare's service for running programs. goodnight-web runs one Worker per website. It runs the contact form API and the admin screen, and it serves the built pages.
+
+### Static Assets [#static-assets]
+
+A feature of Workers that serves ready-made files, such as the built pages, images, and styles. Cloudflare serves these files without running any program code.
+
+### D1 [#d1]
+
+Cloudflare's database service, based on SQLite. goodnight-web stores inquiries, form settings, and sign-in data in one D1 database in your own account.
+
+### Turnstile [#turnstile]
+
+Cloudflare's bot check. It is used on the contact form to tell people from automated programs. See [Set up Turnstile](/docs/setup/turnstile/).
+
+### Cloudflare WAF [#waf]
+
+WAF stands for Web Application Firewall. It checks requests to your domain against rules before they reach the Worker. It is an optional Cloudflare feature, not part of goodnight-web. See [Cloudflare WAF](/docs/security/#cloudflare-waf).
+
+### Cloudflare Access [#access]
+
+An optional Cloudflare feature that adds a second sign-in in front of the admin screen. See [Cloudflare Access](/docs/security/#cloudflare-access).
+
+## How the site is made
+
+### Astro [#astro]
+
+A tool that builds a website from files. The starter's pages are written with Astro, and their content is in Markdown files.
+
+### Markdown [#markdown]
+
+A simple text format for writing headings, lists, and links. News and blog posts in the starter are Markdown files.
+
+### SSG [#ssg]
+
+Short for static site generation. The pages are built once, ahead of time, into ready-made files. The server does not assemble a page for each visit. The starter's Astro site is built this way.
+
+### Hono [#hono]
+
+A small web framework that runs on Workers. The contact form API and the admin API are built with it. You do not edit this part.
+
+### CMS [#cms]
+
+Short for content management system, a service for editing a website's pages in a browser. goodnight-web does not use one. You edit files, or ask an AI tool to edit them for you.
+
+## How the site is managed
+
+### GitHub [#github]
+
+A service that stores your site's files and keeps the history of every change, using a tool called Git. The files of your website live in a repository (a project folder) in your own GitHub account. Keep it private. See [Distribution and updates](/docs/distribution/#private-repository).
+
+### Deploy [#deploy]
+
+To publish a new version of the site. The **Deploy to Cloudflare** button copies the starter into a new repository in your GitHub account and sets up the site in your Cloudflare account. See [Getting started](/docs/getting-started/).
+
+### Workers Builds [#workers-builds]
+
+Cloudflare's build service. It builds your site when you push to GitHub and deploys the result.
+
+### Pull request (PR) [#pull-request]
+
+A proposed change on GitHub. You review it, then merge it to apply the change. Updates to goodnight-web arrive as pull requests. See [Maintenance](/docs/maintenance/).
+
+### Dependabot [#dependabot]
+
+A GitHub tool that opens pull requests when a package your site uses has a new version.
+
+## Signing in
+
+### Passkey [#passkey]
+
+A way to sign in without a password, using a fingerprint, a face scan, or a device PIN. The admin screen accepts passkeys only. See [Passkey sign-in](/docs/how-it-works/passkeys/).

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BookOpen, Globe, Inbox } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { BlurFade } from '../../components/magicui/blur-fade';
 import { Highlighter } from '../../components/magicui/highlighter';
 import type { PageMetadata } from '../source';
@@ -12,23 +12,17 @@ import '../../styles/landing.css';
 const copy = {
   en: {
     gloss: 'Everything runs in your own Cloudflare® account.',
-    whatIsCloudflare: 'What is Cloudflare?',
     docs: 'Read the docs',
     stage: 'Example screens: the website and the admin panel',
     adminAlt: 'Inquiry list in the admin panel',
     siteAlt: 'Example website built with the starter kit',
-    admin: 'Admin panel',
-    site: 'Your website',
   },
   ja: {
     gloss: 'すべて自分の Cloudflare® アカウントで動きます。',
-    whatIsCloudflare: 'Cloudflare とは',
     docs: 'ドキュメントを読む',
     stage: 'Webサイトと管理画面の表示例',
     adminAlt: '管理画面の問い合わせ一覧',
     siteAlt: 'スターターキットで作るWebサイトの例',
-    admin: '管理画面',
-    site: 'あなたのWebサイト',
   },
 } as const;
 
@@ -114,9 +108,7 @@ export function LandingHero({ page }: { page: PageMetadata }) {
         <p className='hero-tagline'>
           <TaglinePhrases tagline={hero.tagline} />
         </p>
-        <p className='hero-gloss'>
-          {text.gloss} <a href='#cloudflare'>{text.whatIsCloudflare}</a>
-        </p>
+        <p className='hero-gloss'>{text.gloss}</p>
         <div className='landing-actions'>
           <a
             className='landing-button primary'
@@ -153,14 +145,6 @@ export function LandingHero({ page }: { page: PageMetadata }) {
               />
             </Window>
           </BlurFade>
-          <span className='hero-label hero-label-admin'>
-            <Inbox aria-hidden='true' />
-            {text.admin}
-          </span>
-          <span className='hero-label hero-label-site'>
-            <Globe aria-hidden='true' />
-            {text.site}
-          </span>
         </div>
       </div>
     </header>

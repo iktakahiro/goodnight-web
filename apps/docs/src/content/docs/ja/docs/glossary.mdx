@@ -1,0 +1,87 @@
+---
+title: 用語集
+icon: BookOpen
+description: GitHub、Cloudflare、Workers、D1、Passkey など、このサイトで使う言葉の解説です。聞きなれない方に向けてまとめています。
+---
+
+普段、GitHub や Cloudflare といった言葉に聞きなれのない方向けの解説です。それぞれの言葉の意味と、goodnight-web での使われ方を説明します。
+
+## サイトが動く場所
+
+### Cloudflare [#cloudflare]
+
+Webサイトを世界中に速く届けたり、守ったりするサービスを提供している会社です。プログラムを動かすサービスや、データを保存するサービスも提供しています。goodnight-web は自分の Cloudflare アカウントの中で動くので、アカウントと設定は自分で管理します。
+
+### Workers [#workers]
+
+Cloudflare のプログラムを動かすサービスです。goodnight-web は、Webサイトごとに 1 つの Worker を動かします。問い合わせフォームの API と管理画面を動かし、ビルドしたページも配信します。
+
+### Static Assets [#static-assets]
+
+Workers の機能のひとつで、ビルドしたページ、画像、スタイルなど、できあがったファイルを配信します。Cloudflare は、これらのファイルをプログラムを動かさずに配信します。
+
+### D1 [#d1]
+
+SQLite をもとにした、Cloudflare のデータベースのサービスです。goodnight-web は、問い合わせ、フォームの設定、ログインに必要なデータを、自分のアカウントの D1 データベースに保存します。
+
+### Turnstile [#turnstile]
+
+Cloudflare のボット対策です。問い合わせフォームで、人間と自動プログラムを見分けるために使います。[Turnstile の設定](/ja/docs/setup/turnstile/)を参照してください。
+
+### Cloudflare WAF [#waf]
+
+WAF は Web Application Firewall の略です。ドメインへのリクエストを、Worker に届く前にルールで確認します。Cloudflare の任意の機能で、goodnight-web には含まれません。[Cloudflare WAF](/ja/docs/security/#cloudflare-waf) を参照してください。
+
+### Cloudflare Access [#access]
+
+管理画面の前に、もう 1 段のログインを置く Cloudflare の任意の機能です。[Cloudflare Access](/ja/docs/security/#cloudflare-access) を参照してください。
+
+## サイトの作り方
+
+### Astro [#astro]
+
+ファイルからWebサイトを作るツールです。スターターキットのページは Astro で作られていて、内容は Markdown のファイルに書きます。
+
+### Markdown [#markdown]
+
+見出し、リスト、リンクなどを書ける、シンプルなテキストの書き方です。スターターキットのお知らせとブログは、Markdown のファイルです。
+
+### SSG [#ssg]
+
+静的サイト生成（static site generation）の略です。ページを事前に一度ビルドして、できあがったファイルにしておきます。訪問のたびにサーバーでページを組み立てることはありません。スターターキットの Astro のサイトは、この方法でビルドします。
+
+### Hono [#hono]
+
+Workers の上で動く、小さな Web フレームワークです。問い合わせフォームの API と管理 API は、これで作られています。この部分は編集しません。
+
+### CMS [#cms]
+
+コンテンツ管理システム（content management system）の略で、ブラウザーでWebサイトのページを編集するサービスです。goodnight-web では使いません。ファイルを編集するか、AI ツールに編集を頼みます。
+
+## サイトの管理
+
+### GitHub [#github]
+
+Git というツールで、サイトのファイルと変更の履歴を保管するサービスです。Webサイトのファイルは、自分の GitHub アカウントのリポジトリ（プロジェクトのフォルダー）にあります。リポジトリは private にしてください。[配布と更新のしくみ](/ja/docs/distribution/#private-repository)を参照してください。
+
+### デプロイ [#deploy]
+
+サイトの新しいバージョンを公開することです。**Deploy to Cloudflare** ボタンは、スターターキットを自分の GitHub アカウントの新しいリポジトリにコピーし、自分の Cloudflare アカウントにサイトを用意します。[はじめに](/ja/docs/getting-started/)を参照してください。
+
+### Workers Builds [#workers-builds]
+
+Cloudflare のビルドサービスです。GitHub に push すると、サイトをビルドしてデプロイします。
+
+### プルリクエスト（PR） [#pull-request]
+
+GitHub 上の、変更の提案です。内容を確認してからマージすると、変更が反映されます。goodnight-web の更新は、PR として届きます。[保守の作業](/ja/docs/maintenance/)を参照してください。
+
+### Dependabot [#dependabot]
+
+サイトが使っているパッケージに新しいバージョンが出ると、PR を作ってくれる GitHub のツールです。
+
+## ログイン
+
+### Passkey [#passkey]
+
+パスワードを使わず、指紋、顔、端末の PIN でログインする方法です。管理画面で使えるのは Passkey だけです。[Passkey でのログイン](/ja/docs/how-it-works/passkeys/)を参照してください。

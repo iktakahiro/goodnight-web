@@ -12,39 +12,35 @@ hero:
 
 <LandingSection>
 
-## 必要な機能だけを、自分のアカウントで動かす
+## CMSも外部のフォームサービスも使わない
 
-CMS（Webサイトの管理システム）や外部のフォームサービスを使わず、利用するサービスと保守の作業を明確にしています。
+ページは静的なファイルで管理し、問い合わせは自分のデータベースに保存します。必要なサービスは、Cloudflare と GitHub だけです。
 
 <FeatureGrid>
-  <Feature visual='files' wide title='ページの更新は、ファイルを編集するだけ'>
-    手作業でも、AI ツールに頼んでも更新できます。
+  <Feature visual='files' wide title='コンテンツは、静的なファイルで管理する'>
+    ページ、お知らせ、ブログは、Markdown などの静的なファイルです。GitHub で管理し、Astro を使ってビルドします。
 
     <FeatureNote>
-      ※ Astro（ファイルからWebサイトを作るツール）を使っています。AI ツール向けのガイド（`AGENTS.md`）も入っています。
+      ※ AI ツール向けのガイドとして、`AGENTS.md` も入っています。
     </FeatureNote>
 
   </Feature>
   <Feature visual='data' title='個人情報を、外部のフォームサービスに預けない'>
-    届いた問い合わせは自分のデータベースに保存されます。管理画面には、パスキー（顔や指紋を使うログイン）で入ります。
+    問い合わせフォームは実装済みです。届いた内容は自分のデータベースに保存され、管理画面で確認できます。ログインは Passkey だけで、パスワードは使いません。
 
-    <FeatureNote>※ 自分の Cloudflare アカウントの D1 データベースに保存します。</FeatureNote>
+    <FeatureNote>※ 問い合わせは、自分の Cloudflare アカウント内の D1 データベースに保存します。</FeatureNote>
 
   </Feature>
-  <Feature visual='pull-request' title='保守は、届いた更新の確認が中心'>
-    プログラムの更新は、変更の提案（PR）として GitHub に届きます。内容を確認して、反映（マージ）します。
+  <Feature visual='build' title='ビルド済みのファイルを、そのまま配信する'>
+    Webサイトは SSG でビルドし、できあがったファイルをそのまま Cloudflare から配信します。表示のたびにサーバーで組み立てないので、素早く表示されます。
 
     <FeatureNote>
-      ※ 使うのは Cloudflare Workers・D1 と、GitHub のリポジトリ（コードの置き場所）です。[保守の作業一覧を見る →](/ja/docs/maintenance/)
+      ※ 配信には、Cloudflare Workers の Static Assets を使います。
     </FeatureNote>
 
   </Feature>
   <Feature visual='starter' wide title='一から作らずに始められる'>
-    ページ、問い合わせフォーム、管理画面、データベース、更新の流れが最初からそろったスターターキットです。
-
-    <FeatureNote>
-      ※ Deploy to Cloudflare ボタンから、自分のアカウントに用意できます。
-    </FeatureNote>
+    ページ、問い合わせフォーム、管理画面、データベースが最初からそろったスターターキットです。
 
     <DeployButton variant="secondary" />
 
@@ -55,21 +51,11 @@ CMS（Webサイトの管理システム）や外部のフォームサービス�
 
 <LandingSection id='architecture' tone='night'>
 
-## すべて、自分の Cloudflare アカウントの中に
+## すべて自分のCloudflareアカウントで動く
 
-問い合わせが届いてから読むまでの流れです。コードは GitHub に置きます。
+Webサイト、問い合わせフォーム、管理画面、データベースは、どれも自分のアカウントの中にあります。点線の枠は、必要なときに追加できる Cloudflare の機能です。
 
 <LandingArchitecture />
-
-<CloudflareNote>
-
-### Cloudflare とは
-
-Cloudflare は、Webサイトを世界中に速く届け、攻撃から守るサービスを提供している会社です。Webサイトの配信だけでなく、プログラムを動かす仕組みやデータベースも提供しています。
-
-このスターターキットは、Webサイト・問い合わせの受付・データベース・管理画面のすべてを、自分の Cloudflare アカウントの中で動かします。関わるサービスが少ないので、何を自分で管理しているかがはっきりします。
-
-</CloudflareNote>
 
 </LandingSection>
 
@@ -89,7 +75,7 @@ Cloudflare は、Webサイトを世界中に速く届け、攻撃から守るサ
 
 <ClosingCta>
 
-## 自分の Cloudflare アカウントで始める
+## 自分のCloudflareアカウントで始める
 
 Deploy to Cloudflare ボタンから、すぐに用意できます。手順はドキュメントにまとめています。
 
