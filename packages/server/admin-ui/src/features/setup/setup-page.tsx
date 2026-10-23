@@ -372,7 +372,9 @@ export const SetupPage = () => {
                           name: problem.name,
                           min: MIN_SECRET_LENGTH,
                         })
-                      : t('setup.problemMissing', { name: problem.name })}
+                      : problem.issue === 'unsupported'
+                        ? t('setup.problemUnsupported', { name: problem.name })
+                        : t('setup.problemMissing', { name: problem.name })}
                   </li>
                 ))}
               </ul>

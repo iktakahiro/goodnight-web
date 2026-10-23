@@ -49,14 +49,15 @@ export interface TestWorker {
 
 /**
  * Creates a Worker with an in-memory D1 and every setting present. Pass
- * `env` overrides (`undefined` removes a setting).
+ * `env` overrides (`undefined` removes a setting). Names outside
+ * `GoodnightEnv` stand for other Worker vars.
  */
 export const createTestWorker = ({
   env: overrides = {},
   options,
   rateLimit = 5,
 }: {
-  env?: Partial<Record<keyof GoodnightEnv, unknown>>;
+  env?: Partial<Record<keyof GoodnightEnv, unknown>> & Record<string, unknown>;
   options?: GoodnightWorkerOptions;
   rateLimit?: number;
 } = {}): TestWorker => {

@@ -195,6 +195,7 @@ limit ? offset ?
 - シークレットをブラウザに返すことも、D1 に書くこともありません。Slack の Webhook URL は管理画面にも表示しません。
 - `SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` は 32 文字以上にしてください。短い値は設定されていないものとみなします。それを使うセットアップ、ログイン、問い合わせフォームは 503 を返します。
 - セットアップが完了するまでは、`GET /api/setup` が、足りない設定と短すぎる設定の名前を返します（値は返しません）。`IP_HASH_SECRET` が短すぎるときは、管理画面にも表示します。
+- Better Auth は、Worker の環境変数のいくつかを自分で読みます。goodnight-web は Origin と CSRF の確認を明示的に有効にしているため、`TEST` や `NODE_ENV` という名前の変数があっても、確認は止まりません。`BETTER_AUTH_TRUSTED_ORIGINS` と `BETTER_AUTH_SECRETS` は、信頼する Origin を増やしたり `BETTER_AUTH_SECRET` を置き換えたりする変数です。どちらかが設定されている間、ログインは 503 を返します。
 - 管理画面に更新ボタンはありません。あなたの GitHub リポジトリに書き込めるトークンが必要になるからです。
 
 ## CSV の書き出し

@@ -70,6 +70,8 @@ const en = {
   'setup.unavailableTitle': 'Setup is not configured',
   'setup.problemMissing': '{name} is not set.',
   'setup.problemTooShort': '{name} is shorter than {min} characters.',
+  'setup.problemUnsupported':
+    '{name} is set. goodnight-web does not support it. Delete the variable.',
   'setup.goToLogin': 'Go to sign-in',
 
   'list.title': 'Inquiries',
@@ -360,6 +362,8 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'setup.unavailableTitle': 'セットアップに必要な設定がありません',
   'setup.problemMissing': '{name} が設定されていません。',
   'setup.problemTooShort': '{name} が {min} 文字より短いです。',
+  'setup.problemUnsupported':
+    '{name} が設定されています。goodnight-web はこの変数に対応していないため、削除してください。',
   'setup.goToLogin': 'ログイン画面へ',
 
   'list.title': 'お問い合わせ',

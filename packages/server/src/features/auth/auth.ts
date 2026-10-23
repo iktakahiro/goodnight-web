@@ -10,14 +10,17 @@ import type { GoodnightEnv } from '../../env.ts';
 import { beforePasskeySaved } from '../setup/first-passkey.ts';
 import { createSetupPlugin } from '../setup/setup-plugin.ts';
 import { AUTH_BASE_PATH } from './auth-paths.ts';
+import { unsupportedAuthVariables } from './unsupported-variables.ts';
 
 /**
  * Returns whether sign-in can run. Without a `BETTER_AUTH_SECRET` of at
- * least `MIN_SECRET_LENGTH` characters, auth and the admin API answer 503
- * (fail closed).
+ * least `MIN_SECRET_LENGTH` characters, or while one of the
+ * `UNSUPPORTED_AUTH_VARIABLES` is set, auth and the admin API answer
+ * 503 (fail closed).
  */
 export const isAuthConfigured = (env: GoodnightEnv): boolean =>
-  isLongEnough(env.BETTER_AUTH_SECRET);
+  isLongEnough(env.BETTER_AUTH_SECRET) &&
+  unsupportedAuthVariables(env).length === 0;
 
 const buildAuth = (env: GoodnightEnv, origin: string) =>
   betterAuth({
@@ -52,6 +55,14 @@ const buildAuth = (env: GoodnightEnv, origin: string) =>
     // safeErrorMessage. API errors still become their HTTP responses.
     onAPIError: { throw: true },
     advanced: {
+      // Better Auth turns its Origin and CSRF checks off by default when
+      // `NODE_ENV` is `test` or a `TEST` variable is set, and Workers fill
+      // `process.env` from the Worker's vars and secrets. Set both
+      // explicitly, so no variable name can turn the checks off. (Its other
+      // test-mode paths only skip secret warnings, which isAuthConfigured
+      // replaces, and an IP fallback that disableIpTracking bypasses.)
+      disableOriginCheck: false,
+      disableCSRFCheck: false,
       // Never store raw IP addresses (the session table has an ip_address
       // column). Contact rate limits use the HMAC ip_hash instead.
       ipAddress: { disableIpTracking: true },

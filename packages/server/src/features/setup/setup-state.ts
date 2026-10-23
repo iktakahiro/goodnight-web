@@ -5,10 +5,12 @@ import { passkey, settings } from '../../db/schema.ts';
 import type { GoodnightEnv } from '../../env.ts';
 import { secretState } from '../../shared/secret-length.ts';
 import { parseAdminEmails } from '../auth/admin-emails.ts';
+import { unsupportedAuthVariables } from '../auth/unsupported-variables.ts';
 
 /**
- * A setting that keeps setup off: `missing`, or `too_short` for a secret
- * shorter than `MIN_SECRET_LENGTH` characters.
+ * A setting that keeps setup off: `missing`, `too_short` for a secret
+ * shorter than `MIN_SECRET_LENGTH` characters, or `unsupported` for a
+ * variable that must not be set (`UNSUPPORTED_AUTH_VARIABLES`).
  */
 export interface SetupProblem {
   name:
@@ -16,16 +18,18 @@ export interface SetupProblem {
     | 'ADMIN_EMAILS'
     | 'BETTER_AUTH_SECRET'
     | 'IP_HASH_SECRET'
-    | 'CONTACT_RATE_LIMITER';
-  issue: 'missing' | 'too_short';
+    | 'CONTACT_RATE_LIMITER'
+    | 'BETTER_AUTH_TRUSTED_ORIGINS'
+    | 'BETTER_AUTH_SECRETS';
+  issue: 'missing' | 'too_short' | 'unsupported';
 }
 
 /**
  * Lists the settings that keep setup off. Setup needs `SETUP_TOKEN`,
  * `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, and the attempt limit
  * (`IP_HASH_SECRET` and the `CONTACT_RATE_LIMITER` binding). The three
- * secrets must be at least `MIN_SECRET_LENGTH` characters. Names only; never
- * values.
+ * secrets must be at least `MIN_SECRET_LENGTH` characters, and no
+ * `UNSUPPORTED_AUTH_VARIABLES` may be set. Names only; never values.
  */
 export const setupProblems = (env: GoodnightEnv): SetupProblem[] => {
   const problems: SetupProblem[] = [];
@@ -42,6 +46,9 @@ export const setupProblems = (env: GoodnightEnv): SetupProblem[] => {
   }
   if (typeof env.CONTACT_RATE_LIMITER?.limit !== 'function') {
     problems.push({ name: 'CONTACT_RATE_LIMITER', issue: 'missing' });
+  }
+  for (const name of unsupportedAuthVariables(env)) {
+    problems.push({ name, issue: 'unsupported' });
   }
   return problems;
 };
