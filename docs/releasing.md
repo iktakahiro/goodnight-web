@@ -25,10 +25,20 @@ bun run validate          # includes check:release
 cd packages/server
 npm login                 # once per machine
 bun pm pack               # runs prepack: builds the admin module; output: goodnight-web-server-<version>.tgz
-tar tzf goodnight-web-server-*.tgz | grep -c admin-files.gen.ts   # expect 1
-npm publish ./goodnight-web-server-*.tgz --access public          # asks for the one-time code
-rm goodnight-web-server-*.tgz
+cd ../..
+bun scripts/check-release.ts --tarball packages/server/goodnight-web-server-<version>.tgz
+cd packages/server
+npm publish ./goodnight-web-server-<version>.tgz --access public  # asks for the one-time code
+rm goodnight-web-server-<version>.tgz
 ```
+
+`check-release --tarball` checks the exact file that `npm publish` uploads:
+its file list (the generated admin module, every migration, no tests) and
+its `package.json` (name, version equal to `packages/server/package.json`,
+no `workspace:` or other local ranges). `CHECK_RELEASE_TARBALL=<path>` does
+the same. Without the option, `bun run check:release` checks the list from
+`npm pack --dry-run` instead. `*.tgz` is git-ignored, so a leftover tarball
+is never committed.
 
 `bun pm pack` replaces `workspace:*` in the packed manifest with the real
 version. `npm publish` of a tarball does not run `prepack`, so always make

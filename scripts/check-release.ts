@@ -7,9 +7,14 @@
 // and CI (after the build, because the tarball needs the generated files).
 //
 //   bun scripts/check-release.ts
+//   bun scripts/check-release.ts --tarball packages/server/goodnight-web-server-0.1.0.tgz
+//
+// Without `--tarball` (or `CHECK_RELEASE_TARBALL`), the tarball check uses the
+// file list of `npm pack --dry-run`. With it, the check reads the given .tgz,
+// the exact file that `npm publish` would upload, including its package.json.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const SERVER = '@goodnight-web/server';
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -160,6 +165,74 @@ export const parsePackJson = (output: string): string[] => {
   });
 };
 
+/**
+ * The file list from `tar -tzf` of a packed tarball: one path per line;
+ * directory entries (ending in `/`) are left out.
+ */
+export const parseTarList = (output: string): string[] =>
+  output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.endsWith('/'));
+
+/**
+ * Problems in the package.json inside a packed tarball: it must be the
+ * publishable server manifest ({@link checkServerManifest}) at
+ * `expectedVersion`, with no local protocol left in any dependency list.
+ */
+export const checkPackedManifest = (
+  pkg: PackageJson,
+  expectedVersion: string | undefined,
+): string[] => {
+  const problems = checkServerManifest(pkg);
+  if (pkg.version !== expectedVersion) {
+    problems.push(
+      `the packed version is ${pkg.version ?? 'missing'}, but packages/server/package.json has ${expectedVersion ?? 'nothing'}`,
+    );
+  }
+  for (const [name, range] of Object.entries(pkg.devDependencies ?? {})) {
+    if (LOCAL_PROTOCOL.test(range)) {
+      problems.push(`devDependency ${name} must not use "${range}"`);
+    }
+  }
+  return problems;
+};
+
+/**
+ * The tarball path from `--tarball <path>`, `--tarball=<path>`, or the
+ * `CHECK_RELEASE_TARBALL` environment variable, or `undefined`.
+ */
+export const tarballArgument = (
+  argv: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+): string | undefined => {
+  const index = argv.indexOf('--tarball');
+  if (index !== -1) {
+    const value = argv[index + 1];
+    if (!value || value.startsWith('--')) {
+      throw new Error('--tarball needs the path of a .tgz file');
+    }
+    return value;
+  }
+  const inline = argv.find((arg) => arg.startsWith('--tarball='));
+  if (inline) return inline.slice('--tarball='.length);
+  return env.CHECK_RELEASE_TARBALL || undefined;
+};
+
+/** The file list and package.json of a packed tarball, read with `tar`. */
+const readTarball = (
+  path: string,
+): { files: string[]; manifest: PackageJson } => ({
+  files: parseTarList(
+    execFileSync('tar', ['-tzf', path], { encoding: 'utf8' }),
+  ),
+  manifest: JSON.parse(
+    execFileSync('tar', ['-xzOf', path, 'package/package.json'], {
+      encoding: 'utf8',
+    }),
+  ) as PackageJson,
+});
+
 /** The tarball's file list from `npm pack --dry-run` (no scripts, no write). */
 const listTarball = (packageDir: string): string[] =>
   parsePackJson(
@@ -178,20 +251,30 @@ if (import.meta.main) {
     name.endsWith('.sql'),
   );
 
+  const tarball = tarballArgument(process.argv.slice(2), process.env);
+  const packed = tarball ? readTarball(resolve(tarball)) : undefined;
+
   const problems = [
     ...checkServerManifest(server).map((p) => `packages/server: ${p}`),
     ...checkStarterManifest(starter, server.version).map(
       (p) => `templates/starter: ${p}`,
     ),
-    ...checkTarballFiles(listTarball(serverDir), migrations).map(
-      (p) => `packages/server tarball: ${p}`,
-    ),
+    ...checkTarballFiles(
+      packed?.files ?? listTarball(serverDir),
+      migrations,
+    ).map((p) => `packages/server tarball: ${p}`),
+    ...(packed
+      ? checkPackedManifest(packed.manifest, server.version).map(
+          (p) => `${tarball}: ${p}`,
+        )
+      : []),
   ];
   if (problems.length > 0) {
     console.error(problems.map((p) => `- ${p}`).join('\n'));
     process.exit(1);
   }
   console.log(
-    `release check: ${SERVER}@${server.version} is publishable and the starter pins it`,
+    `release check: ${SERVER}@${server.version} is publishable and the starter pins it` +
+      (tarball ? ` (checked ${tarball})` : ''),
   );
 }

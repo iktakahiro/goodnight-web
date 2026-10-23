@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  checkPackedManifest,
   checkServerManifest,
   checkStarterManifest,
   checkTarballFiles,
   parsePackJson,
+  parseTarList,
+  tarballArgument,
   type PackageJson,
 } from './check-release.ts';
 
@@ -119,5 +122,48 @@ describe('parsePackJson', () => {
   test('truncates long output in the error', () => {
     const long = 'x'.repeat(2000);
     expect(() => parsePackJson(long)).toThrow(/2000 characters/);
+  });
+});
+
+describe('parseTarList', () => {
+  test('lists files and leaves out directories', () => {
+    expect(
+      parseTarList(
+        'package/\npackage/package.json\r\npackage/src/\npackage/src/index.ts\n',
+      ),
+    ).toEqual(['package/package.json', 'package/src/index.ts']);
+  });
+});
+
+describe('checkPackedManifest', () => {
+  test('accepts the server manifest at the expected version', () => {
+    expect(checkPackedManifest(server, '0.1.0')).toEqual([]);
+  });
+
+  test('rejects another version and leftover workspace ranges', () => {
+    const problems = checkPackedManifest(
+      { ...server, devDependencies: { tsconfig: 'workspace:*' } },
+      '0.2.0',
+    );
+    expect(problems).toHaveLength(2);
+    expect(problems.join('\n')).toContain('0.2.0');
+    expect(problems.join('\n')).toContain('workspace:*');
+  });
+});
+
+describe('tarballArgument', () => {
+  test('reads --tarball <path>, --tarball=<path>, and the environment', () => {
+    expect(tarballArgument(['--tarball', 'a.tgz'], {})).toBe('a.tgz');
+    expect(tarballArgument(['--tarball=b.tgz'], {})).toBe('b.tgz');
+    expect(tarballArgument([], { CHECK_RELEASE_TARBALL: 'c.tgz' })).toBe(
+      'c.tgz',
+    );
+    expect(tarballArgument([], {})).toBeUndefined();
+    expect(tarballArgument([], { CHECK_RELEASE_TARBALL: '' })).toBeUndefined();
+  });
+
+  test('fails without a path', () => {
+    expect(() => tarballArgument(['--tarball'], {})).toThrow('.tgz');
+    expect(() => tarballArgument(['--tarball', '--x'], {})).toThrow('.tgz');
   });
 });
