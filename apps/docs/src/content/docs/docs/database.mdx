@@ -170,7 +170,7 @@ If you restore to a time before a migration, also deploy the matching older vers
 A restore also brings back rows that were deleted after that time, including security changes:
 
 - Passkeys and sessions deleted by [passkey recovery](/docs/how-it-works/passkey-recovery/) or by [removing an admin](/docs/security/#removing-an-admin) come back, so an old passkey can sign in again.
-- A restore to a time before the first passkey was registered opens setup again: anyone with `SETUP_TOKEN` and an address in `ADMIN_EMAILS` can then create an admin.
+- A restore to a time before the first passkey was registered opens setup again: anyone with the setup token (`APP_SECRET`, or `SETUP_TOKEN` if you set it) and an address in `ADMIN_EMAILS` can then create an admin.
 
 After a restore, check the `passkey` and `session` tables and the `setup_closed_at` row in `settings`, and run the recovery or removal statements again if the restore crossed one of them.
 

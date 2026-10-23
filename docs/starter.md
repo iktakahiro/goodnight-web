@@ -315,8 +315,8 @@ repository, `@goodnight-web/server` was installed from the tarball made by
 `wrangler deploy --dry-run`, `wrangler d1 migrations apply DB --local`, and
 `node e2e/run.ts` all passed. The real button flow (repository creation,
 resource provisioning, Workers Builds) can be tested only from a public
-repository. `@goodnight-web/server` 0.1.0 is published on npm (maintainer
-`iktakahiro`, 2026-10-23).
+repository. `@goodnight-web/server` is published on npm (maintainer
+`iktakahiro`; the first release, 0.1.0, was on 2026-10-23).
 
 ## End-to-end test
 

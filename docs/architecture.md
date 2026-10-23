@@ -106,13 +106,16 @@ new IP hashes differ.
 The Rate Limiting binding name is fixed
 ([0003](decisions/0003-rate-limit-binding.md)). `APP_SECRET`,
 `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` shorter than 32
-characters (`MIN_SECRET_LENGTH` in `src/shared/secret-length.ts`) count as
-missing; a short `APP_SECRET` fills nothing in. The admin API reports which
-contact settings are missing or too short (names only, never values) in
-`GET /api/admin/status` (`contactMissing`, `contactTooShort`), and
-`GET /api/setup` reports the settings that keep setup off (`problems`). A
-secret that is neither set nor filled in is reported as `APP_SECRET`; a
-variable that is set but too short is reported under its own name. `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` must be set
+characters (`MIN_SECRET_LENGTH` in `src/shared/secret-length.ts`), or weak
+(`secretState`: fewer than 10 distinct characters, or one block repeated),
+count as missing; a short or weak `APP_SECRET` fills nothing in. Setting
+`BETTER_AUTH_TRUSTED_ORIGINS` or `BETTER_AUTH_SECRETS` also turns sign-in and
+setup off (`unsupported`). The admin API reports which contact settings are
+missing or too short (names only, never values) in `GET /api/admin/status`
+(`contactMissing`, `contactTooShort`), and `GET /api/setup` reports the
+settings that keep setup off (`problems`). A secret that is neither set nor
+filled in is reported as `APP_SECRET`; a variable that is set but too short is
+reported under its own name. `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` must be set
 together; with only one, the admin areas answer 503.
 
 ## Contact flow
@@ -303,9 +306,11 @@ Setup closes when the first passkey is registered, so a person who left before
 registering one can run setup again. The first registration writes
 `settings.setup_closed_at` before it saves the passkey, and a trigger on the
 `passkey` table also records it in the same transaction as the insert, so setup stays closed even
-if every passkey is deleted later (migration `0002_setup_closed_trigger.sql`). `GET /api/setup` returns `{ configured, open, problems }`;
-`problems` lists the settings that keep setup off (`{ name, issue }`, issue
-`missing` or `too_short`) and is empty once setup is closed.
+if every passkey is deleted later (migration `0002_setup_closed_trigger.sql`). `GET /api/setup` returns `{ configured, open, tokenName, problems }`;
+`tokenName` is `SETUP_TOKEN` or `APP_SECRET` (the value the setup screen asks
+for), or `null` once setup is closed. `problems` lists the settings that keep
+setup off (`{ name, issue }`, issue `missing`, `too_short`, `weak`, or
+`unsupported`) and is empty once setup is closed.
 
 Session rules ([0006](decisions/0006-admin-sessions-and-setup-closure.md)):
 the passkey plugin's `registration.afterVerification` calls
@@ -335,7 +340,7 @@ the Worker's own `Origin` (CSRF). There is no development bypass.
 | Route                                                                          | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `GET /api/admin/me`                                                            | the signed-in admin                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `GET /api/admin/status`                                                        | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `version`, `retentionDays`, `unreadCount` (unread, not suspected spam)                                                                                                                                                                                                                                                                                                                                                                  |
+| `GET /api/admin/status`                                                        | `turnstileConfigured`, `contactAvailable`, `contactMissing`, `contactTooShort`, `slackConfigured`, `slackInvalid`, `version`, `retentionDays`, `unreadCount` (unread, not suspected spam)                                                                                                                                                                                                                                                                                                                                                  |
 | `GET /api/admin/submissions?view=&q=&version=&field=&value=&dir=&page=&limit=` | `view` is `unread`, `read`, `all` (default), or `spam`; `q` is a case-insensitive partial match on the email (at most 254 characters); `limit` per page (1–100, default 50); sorted by received time only, `desc` by default; `columns` (the current form's fields), `total`, `unreadCount`, and `suspectedSpamCount`; field values of the current form, long text cut to 120 characters; runs pruning. `field` + `value` filter on a select or radio option of the current form. Invalid or unknown parameters (including `sort`) are 400 |
 | `GET /api/admin/submissions/:id`                                               | one submission with `entries`: its values labeled by its own form version, each marked whether it is on the current form; read-only                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/admin/submissions/:id/read`                                         | no body: an `unread` one becomes `read` (keeps an earlier `read_at`); the admin UI calls it when it opens an unread inquiry                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -592,13 +597,14 @@ package ([0004](decisions/0004-admin-ui-delivery.md)).
 
 Entry points (`exports` in `packages/server/package.json`):
 
-| Import                           | Contents                                                                                                                               |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `@goodnight-web/server`          | `createGoodnightWorker`, env and option types, admin API types                                                                         |
-| `@goodnight-web/server/contact`  | the request schema, form definition types, limits and schemas, `buildFieldValuesSchema()`, Turnstile action, honeypot name, spam rules |
-| `@goodnight-web/server/client`   | `getContactForm()` and `submitContact()` for the browser (no zod)                                                                      |
-| `@goodnight-web/server/messages` | ja/en message catalogs, `translate()`, `pickLocale()`                                                                                  |
-| `migrations/`                    | D1 migrations, read through `migrations_dir`                                                                                           |
+| Import                                      | Contents                                                                                                                               |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `@goodnight-web/server`                     | `createGoodnightWorker`, env and option types, admin API types                                                                         |
+| `@goodnight-web/server/contact`             | the request schema, form definition types, limits and schemas, `buildFieldValuesSchema()`, Turnstile action, honeypot name, spam rules |
+| `@goodnight-web/server/client`              | `getContactForm()` and `submitContact()` for the browser (no zod)                                                                      |
+| `@goodnight-web/server/messages`            | ja/en message catalogs, `translate()`, `pickLocale()`                                                                                  |
+| `@goodnight-web/server/admin-messages.json` | ja/en message catalog of the admin UI (generated by the build; the starter e2e test reads it)                                          |
+| `migrations/`                               | D1 migrations, read through `migrations_dir`                                                                                           |
 
 **`templates/starter`** is the part users own: Astro pages, Markdown content in
 Content Collections (ja and en), `site.config.ts`, styles, a `src/worker.ts`
@@ -652,9 +658,10 @@ the Worker a token that can write to GitHub.
   for the starter and the docs site.
 - Oxlint and Oxfmt run once from the root.
 - CI runs install with a frozen lockfile, lint, format check, type check,
-  the SQL guard (`check:sql`), the migration check (`db:check`), tests,
-  build, and `deploy:check`. `bun run validate` runs the same checks except
-  build and `deploy:check`. A separate `e2e` job builds and runs the
+  the SQL guard (`check:sql`), the migration check (`db:check`), the release
+  check (`check:release`), tests, build, a dry-run `npm ci` of the starter's
+  lockfile, and `deploy:check`. `bun run validate` runs lint, format check,
+  type check, `check:sql`, `db:check`, `check:release`, and tests. A separate `e2e` job builds and runs the
   end-to-end tests of `packages/server` and `templates/starter` with
   Playwright Chromium, and uploads screenshots and traces when they fail.
 - Dependencies use exact versions and a 48-hour release-age gate
