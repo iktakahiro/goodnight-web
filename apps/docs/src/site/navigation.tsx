@@ -3,6 +3,9 @@ import logoDark from '../assets/logo-lockup-dark.svg';
 import logoLight from '../assets/logo-lockup-light.svg';
 import { i18n, localeFromPath } from './i18n';
 
+/** The public repository, linked from the header of every page. */
+const repositoryUrl = 'https://github.com/iktakahiro/goodnight-web';
+
 /** Returns the landing page path for the locale of a page slug. */
 export function homePath(slug: string): string {
   const locale = localeFromPath(slug);
@@ -11,7 +14,8 @@ export function homePath(slug: string): string {
 
 /**
  * Product navigation; Fumadocs supplies the locale selector and page tree.
- * There is no GitHub link yet because the repository is still private.
+ * `githubUrl` adds Fumadocs' default GitHub icon link (labelled "GitHub") to
+ * the header of every page.
  */
 export function layoutOptions(slug: string): BaseLayoutProps {
   return {
@@ -37,6 +41,7 @@ export function layoutOptions(slug: string): BaseLayoutProps {
       ),
       url: homePath(slug),
     },
+    githubUrl: repositoryUrl,
     searchToggle: { enabled: false },
   };
 }
