@@ -15,6 +15,18 @@ describe('contactRequestSchema', () => {
       contactRequestSchema.parse({ ...base, email: ' taro@example.org\u0000 ' })
         .email,
     ).toBe('taro@example.org');
+    expect(
+      contactRequestSchema.parse({
+        ...base,
+        email: '\ufefftaro@example.org\u200b\u202c',
+      }).email,
+    ).toBe('taro@example.org');
+    expect(
+      contactRequestSchema.safeParse({
+        ...base,
+        email: 'taro\u202e@example.org',
+      }).success,
+    ).toBe(false);
   });
 
   test('requires a Turnstile token and validates pagePath', () => {

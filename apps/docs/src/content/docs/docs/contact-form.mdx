@@ -49,17 +49,17 @@ In the editor, the email and consent rows are marked **Fixed**, with a short exp
 
 ## Field types and limits
 
-| Type       | Shown in the admin screen as | Stored value                          | Notes                                                         |
-| ---------- | ---------------------------- | ------------------------------------- | ------------------------------------------------------------- |
-| `text`     | Single-line text             | Text on one line                      | Control characters are removed and spaces trimmed             |
-| `textarea` | Multi-line text              | Text with line breaks                 |                                                               |
-| `tel`      | Phone number                 | Text                                  | Digits, `+`, `-`, `(`, `)`, spaces; full-width digits allowed |
-| `url`      | URL                          | Text                                  | `http://` or `https://` only                                  |
-| `number`   | Number                       | A number                              |                                                               |
-| `date`     | Date                         | `YYYY-MM-DD`                          | Must be a real date                                           |
-| `select`   | Dropdown                     | One choice value                      | Must be one of the field's choices                            |
-| `radio`    | Radio buttons                | One choice value                      | Must be one of the field's choices                            |
-| `checkbox` | Checkboxes                   | A list of choice values (one or more) | Each must be one of the field's choices                       |
+| Type       | Shown in the admin screen as | Stored value                          | Notes                                                                      |
+| ---------- | ---------------------------- | ------------------------------------- | -------------------------------------------------------------------------- |
+| `text`     | Single-line text             | Text on one line                      | Control and invisible formatting characters are removed and spaces trimmed |
+| `textarea` | Multi-line text              | Text with line breaks                 |                                                                            |
+| `tel`      | Phone number                 | Text                                  | Digits, `+`, `-`, `(`, `)`, spaces; full-width digits allowed              |
+| `url`      | URL                          | Text                                  | `http://` or `https://` only                                               |
+| `number`   | Number                       | A number                              |                                                                            |
+| `date`     | Date                         | `YYYY-MM-DD`                          | Must be a real date                                                        |
+| `select`   | Dropdown                     | One choice value                      | Must be one of the field's choices                                         |
+| `radio`    | Radio buttons                | One choice value                      | Must be one of the field's choices                                         |
+| `checkbox` | Checkboxes                   | A list of choice values (one or more) | Each must be one of the field's choices                                    |
 
 | Limit                                                       | Value                  |
 | ----------------------------------------------------------- | ---------------------- |
@@ -333,7 +333,7 @@ The server builds a zod schema from the current version in D1 and checks `fields
 The built schema is cached per Worker isolate and version. Each request reads only the current version number.
 
 - Only the IDs of the current fields are accepted. Any other key, including `__proto__`, is rejected with 400.
-- Required fields, lengths, formats, and choice values are checked. Text loses control characters and surrounding whitespace (multi-line text keeps line breaks and tabs).
+- Required fields, lengths, formats, and choice values are checked. Text loses control characters, bidi control characters, zero width spaces, word joiners, byte order marks, and surrounding whitespace (multi-line text keeps line breaks and tabs). Zero width joiners, zero width non-joiners, and variation selectors stay, because emoji, Persian, and Indic scripts need them. An unpaired surrogate is replaced with U+FFFD.
 - Empty optional fields are left out of the stored JSON.
 
 The route reads the current version, rejects an outdated page, and checks the values with the schema of that version:

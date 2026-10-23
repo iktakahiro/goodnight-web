@@ -90,6 +90,27 @@ describe('POST /api/contact', () => {
     expect(verify?.form?.get('response')).toBe('token-123');
   });
 
+  test('stores text without bidi controls, zero width characters, or lone surrogates', async () => {
+    const worker = createTestWorker();
+    const response = await post(
+      worker,
+      validBody(
+        {},
+        {
+          f_name: '\u202eabc\u200bdef.exe\u202c\ud800',
+          f_message:
+            'Hi \u{1f468}\u200d\u{1f469}\u200d\u{1f467}\u2066\r\nbye\ufeff',
+        },
+      ),
+    );
+    expect(response.status).toBe(200);
+    const fields = JSON.parse(String(rows(worker)[0]?.fields));
+    expect(fields.f_name).toBe('abc def.exe \ufffd');
+    expect(fields.f_message).toBe(
+      'Hi \u{1f468}\u200d\u{1f469}\u200d\u{1f467}\nbye',
+    );
+  });
+
   test('stores only the HMAC of the IP, never the raw IP', async () => {
     const worker = createTestWorker();
     expect((await post(worker, validBody())).status).toBe(200);

@@ -12,19 +12,48 @@ const SINGLE_LINE_CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
 // oxlint-disable-next-line no-control-regex
 const MULTI_LINE_CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
 
-/** Replaces control characters with spaces and trims. */
-export const singleLine = (value: string): string =>
-  value.replace(SINGLE_LINE_CONTROLS, ' ').trim();
+/**
+ * Invisible characters that change how the text around them is displayed.
+ * They can make a stored value look different from what it holds, for
+ * example `abc\u202Edef.exe` shows as `abcexe.fed`, so they are cleaned like
+ * control characters.
+ *
+ * - U+200B: zero width space.
+ * - U+200E, U+200F: left-to-right and right-to-left marks.
+ * - U+202A-U+202E: bidi embeddings, overrides, and their terminator.
+ * - U+2060: word joiner.
+ * - U+2066-U+2069: bidi isolates and their terminator.
+ * - U+FEFF: zero width no-break space, also used as a byte order mark.
+ *
+ * U+200C and U+200D (zero width non-joiner and joiner) and the variation
+ * selectors are kept: Persian and Indic scripts and emoji need them.
+ */
+const INVISIBLE_FORMATS =
+  /[\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/g;
 
 /**
- * Normalizes line breaks to `\n`, removes control characters other than tab
- * and line feed, and trims.
+ * Replaces unpaired surrogates with U+FFFD, removes control and invisible
+ * formatting characters by replacing them with spaces, and trims.
+ */
+export const singleLine = (value: string): string =>
+  value
+    .toWellFormed()
+    .replace(SINGLE_LINE_CONTROLS, ' ')
+    .replace(INVISIBLE_FORMATS, ' ')
+    .trim();
+
+/**
+ * Replaces unpaired surrogates with U+FFFD, normalizes line breaks to `\n`,
+ * removes control characters other than tab and line feed and invisible
+ * formatting characters, and trims.
  */
 export const multiLine = (value: string): string =>
   value
+    .toWellFormed()
     .replace(/\r\n?/g, '\n')
     .replace(/[\u2028\u2029]/g, '\n')
     .replace(MULTI_LINE_CONTROLS, '')
+    .replace(INVISIBLE_FORMATS, '')
     .trim();
 
 /** A stored field value: text, a number, or a list of option values. */

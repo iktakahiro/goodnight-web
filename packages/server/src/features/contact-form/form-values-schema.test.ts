@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import type { FormField } from './form-definition.ts';
-import { buildFieldValuesSchema } from './form-values-schema.ts';
+import {
+  buildFieldValuesSchema,
+  multiLine,
+  singleLine,
+} from './form-values-schema.ts';
 
 const field = (
   id: string,
@@ -32,7 +36,7 @@ const value = (f: FormField, input: unknown) => {
 describe('buildFieldValuesSchema', () => {
   test('text: removes control characters, trims, and checks length', () => {
     const f = field('f_t', 'text', { maxLength: 8 });
-    expect(value(f, ' Ta\u0000ro‮ ')).toBe('Ta ro‮');
+    expect(value(f, ' Ta\u0000ro\u202e ')).toBe('Ta ro');
     expect(value(f, 'a\r\nb')).toBe('a  b');
     expect(parse(f, 'abcdefghi').success).toBe(false);
     expect(parse(f, 123).success).toBe(false);
@@ -181,5 +185,117 @@ describe('buildFieldValuesSchema', () => {
     const schema = buildFieldValuesSchema([]);
     expect(schema.parse({})).toEqual({});
     expect(schema.safeParse({ f_a: 'x' }).success).toBe(false);
+  });
+});
+
+// Bidi controls and invisible characters that the cleaners remove.
+const INVISIBLE = [
+  ['U+200B zero width space', '\u200b'],
+  ['U+200E left-to-right mark', '\u200e'],
+  ['U+200F right-to-left mark', '\u200f'],
+  ['U+202A left-to-right embedding', '\u202a'],
+  ['U+202B right-to-left embedding', '\u202b'],
+  ['U+202C pop directional formatting', '\u202c'],
+  ['U+202D left-to-right override', '\u202d'],
+  ['U+202E right-to-left override', '\u202e'],
+  ['U+2060 word joiner', '\u2060'],
+  ['U+2066 left-to-right isolate', '\u2066'],
+  ['U+2067 right-to-left isolate', '\u2067'],
+  ['U+2068 first strong isolate', '\u2068'],
+  ['U+2069 pop directional isolate', '\u2069'],
+  ['U+FEFF zero width no-break space', '\ufeff'],
+] as const;
+
+// Text that must pass through both cleaners unchanged.
+const LEGITIMATE = [
+  [
+    'a ZWJ family emoji',
+    '\u{1f468}\u200d\u{1f469}\u200d\u{1f467}\u200d\u{1f466}',
+  ],
+  ['a flag', '\u{1f1ef}\u{1f1f5}'],
+  ['a skin tone emoji', '\u{1f44d}\u{1f3fd}'],
+  ['a keycap emoji', '1\ufe0f\u20e3'],
+  ['a heart with VS16', '\u2764\ufe0f'],
+  ['a smiley with VS15', '\u263a\ufe0e'],
+  ['an ideographic variation sequence', '\u845b\u{e0100}'],
+  ['Persian with ZWNJ', '\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645'],
+  [
+    'Devanagari with ZWNJ and ZWJ',
+    '\u0915\u094d\u200c\u0937 \u0915\u094d\u200d\u0937',
+  ],
+  ['Japanese', 'お問い合わせの件です。全角ＡＢＣ、半角ｶﾅ'],
+] as const;
+
+describe('singleLine', () => {
+  test.each(INVISIBLE)('replaces %s with a space and trims', (_name, char) => {
+    expect(singleLine(`abc${char}def`)).toBe('abc def');
+    expect(singleLine(`${char}abc${char}`)).toBe('abc');
+  });
+
+  test('a right-to-left override cannot reverse a file name', () => {
+    expect(singleLine('abc\u202edef.exe\u202c')).toBe('abc def.exe');
+  });
+
+  test.each(LEGITIMATE)('keeps %s', (_name, text) => {
+    expect(singleLine(text)).toBe(text);
+  });
+
+  test('replaces lone surrogates with U+FFFD and keeps pairs', () => {
+    expect(singleLine('a\ud800b')).toBe('a\ufffdb');
+    expect(singleLine('a\udc00b')).toBe('a\ufffdb');
+    expect(singleLine('\ude00\ud83d')).toBe('\ufffd\ufffd');
+    expect(singleLine('a\ud83d\ude00b')).toBe('a\u{1f600}b');
+  });
+});
+
+describe('multiLine', () => {
+  test.each(INVISIBLE)('removes %s and keeps line breaks', (_name, char) => {
+    expect(multiLine(`${char}ab${char}c\r\nd\te${char}`)).toBe('abc\nd\te');
+  });
+
+  test.each(LEGITIMATE)('keeps %s', (_name, text) => {
+    expect(multiLine(`${text}\n${text}`)).toBe(`${text}\n${text}`);
+  });
+
+  test('replaces lone surrogates with U+FFFD and keeps pairs', () => {
+    expect(multiLine('a\ud800\nb\udc00')).toBe('a\ufffd\nb\ufffd');
+    expect(multiLine('\ud83d\ude00\n\u{1f44d}\u{1f3fd}')).toBe(
+      '\u{1f600}\n\u{1f44d}\u{1f3fd}',
+    );
+  });
+});
+
+describe('field values with invisible characters', () => {
+  test('text and textarea clean them', () => {
+    const schema = buildFieldValuesSchema([
+      field('f_t', 'text'),
+      field('f_m', 'textarea'),
+    ]);
+    expect(
+      schema.parse({
+        f_t: '\u202ename\u200b\ud800',
+        f_m: 'line1\u2066\r\nline2\ufeff',
+      }),
+    ).toEqual({ f_t: 'name \ufffd', f_m: 'line1\nline2' });
+  });
+
+  test('a value of only invisible characters counts as empty', () => {
+    const f = field('f_t', 'text', { required: true });
+    expect(parse(f, '\u200b\u202e\ufeff').success).toBe(false);
+  });
+
+  test('tel, url, and number clean them after NFKC', () => {
+    expect(value(field('f_p', 'tel'), '\u202e０３－１２３４\u200b')).toBe(
+      '03-1234',
+    );
+    expect(value(field('f_u', 'url'), '\u200bhttps://example.com/\u2069')).toBe(
+      'https://example.com/',
+    );
+    expect(value(field('f_n', 'number'), '\ufeff１２\u200e')).toBe(12);
+  });
+
+  test('text keeps emoji and other legitimate sequences', () => {
+    const f = field('f_t', 'text');
+    for (const [, text] of LEGITIMATE) expect(value(f, text)).toBe(text);
   });
 });
