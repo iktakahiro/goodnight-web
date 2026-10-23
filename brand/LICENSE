@@ -1,0 +1,42 @@
+goodnight-web brand assets: license notice
+
+Copyright (c) 2026 Takahiro Ikeuchi. All rights reserved.
+
+The MIT License in the root LICENSE file covers the code of this repository.
+It does not cover the brand assets listed here. For these, all rights are
+reserved.
+
+Not covered by the MIT License:
+
+- The goodnight-web logo: the crescent moon with a sleeping cat, the symbol,
+  the lockups, and the wordmark.
+- The app icon, the favicon, and every file made from the logo, in any format:
+  `brand/*.svg`, `brand/masters/`, `brand/png/`, the copies in `apps/docs`
+  (`src/assets/`, `public/`), the copies in `packages/server/admin-ui`
+  (`public/` and `src/features/layout/logo-shapes.gen.ts`), and the same files
+  inside the published `@goodnight-web/server` package.
+- The Open Graph and share images (`apps/docs/public/images/og/`) and the
+  artwork composed in them.
+
+Covered by the MIT License, as the rest of the repository: the code that
+builds or renders these files (`brand/scripts/`, `apps/docs/scripts/og/`,
+`apps/docs/src/site/night-art.ts`, the admin UI components that draw the
+logo). The fonts under `apps/docs/scripts/og/fonts/` keep their own SIL Open
+Font License 1.1.
+
+You may, without asking:
+
+- Use the name goodnight-web to refer to the project: link to it, describe it,
+  write about it, review it, or say that your site is built with it.
+- Show the logo unmodified, next to such a reference.
+- Keep the logo and icons exactly as they ship in the admin screen of
+  `@goodnight-web/server` and in the starter's dependencies. Running the
+  software does not need any other permission.
+
+Any other use needs written permission. This includes using the logo, the
+wordmark, or the share images as the identity of another product, site, or
+company; changing them; using them in a way that suggests the project endorses
+you; and putting them on merchandise. If you fork the project and publish it
+under another name, use your own name and logo.
+
+To ask, open an issue in this repository.

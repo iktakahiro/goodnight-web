@@ -1,4 +1,4 @@
-# Fails when this repository is public. A company site repository should be
+# Fails when this repository is public. A website repository should be
 # private: it holds your settings and drafts, and a public copy invites pull
 # requests from strangers.
 name: Visibility check

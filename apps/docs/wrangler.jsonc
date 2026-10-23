@@ -11,7 +11,10 @@
     "html_handling": "force-trailing-slash",
     "not_found_handling": "404-page",
   },
-  // No custom domain yet. When one is chosen, add it here, for example
-  // "routes": [{ "pattern": "docs.example.com", "custom_domain": true }],
-  // and build with DOCS_SITE_URL set to the same origin.
+  // The docs live on the apex domain only. `custom_domain: true` makes
+  // Cloudflare create the DNS record and the certificate on deploy, so the
+  // zone must be on the same Cloudflare account. Build with
+  // DOCS_SITE_URL=https://goodnight-web.dev (the default) so the canonical and
+  // hreflang URLs match this route.
+  "routes": [{ "pattern": "goodnight-web.dev", "custom_domain": true }],
 }

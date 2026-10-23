@@ -6,19 +6,27 @@
 # goodnight-web
 
 goodnight-web is a starter kit for a website with a blog and a contact
-form. It runs on Cloudflare only: one Worker serves the static site, the
+form. It runs on Cloudflare® only: one Worker serves the static site, the
 contact API, and an admin screen for reading inquiries, and one D1 database
 stores the inquiries.
 
-[日本語](README.ja.md)
+[日本語](README.ja.md) · [Documentation](https://goodnight-web.dev)
 
-## Deploy
+## Quick start
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web/tree/main/templates/starter)
 
-The button copies the starter (`templates/starter`) into a new repository in
-your GitHub account and deploys it to your Cloudflare account. See the
-[starter README](templates/starter/README.md) for the settings and secrets.
+1. Press the button. It copies the starter (`templates/starter`) into a new
+   repository in your GitHub account. In the setup form, tick **Create private
+   Git repository** and enter the secrets it asks for.
+2. Cloudflare Workers® creates the D1 database, builds the site, and deploys it
+   to your Cloudflare account.
+3. Open `/admin` on the new site, enter the setup token, and register a passkey
+   for the first admin.
+
+The [documentation](https://goodnight-web.dev/docs/getting-started/) walks
+through each step, including your own domain and Turnstile. The
+[starter README](templates/starter/README.md) lists the settings and secrets.
 
 ## Goal
 
@@ -40,12 +48,11 @@ Everything user-facing is available in Japanese and English.
 | Path                         | Contents                                                                   |
 | ---------------------------- | -------------------------------------------------------------------------- |
 | `packages/server`            | `@goodnight-web/server`: Worker, contact API, admin API and UI, migrations |
-| `packages/astro`             | `@goodnight-web/astro`: optional Astro integration, added only if needed   |
 | `packages/typescript-config` | Shared TypeScript presets                                                  |
 | `templates/starter`          | The Astro site that users copy and edit (what the Deploy button copies)    |
 | `apps/docs`                  | Documentation site                                                         |
 | `docs`                       | Developer documentation                                                    |
-| `brand`                      | Logo, favicon, and app icon files and their build script                   |
+| `brand`                      | Logo, favicon, and app icon files and their build script (see License)     |
 
 See [docs/architecture.md](docs/architecture.md) for details.
 
@@ -64,4 +71,12 @@ see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[MIT](LICENSE)
+The code is under the [MIT License](LICENSE). The logo, wordmark, icons, and
+share images are not: all rights reserved, with a few permitted uses. See
+[brand/LICENSE](brand/LICENSE). You can use the name goodnight-web to refer to
+the project.
+
+Cloudflare, the Cloudflare logo, and Cloudflare Workers are trademarks and/or
+registered trademarks of Cloudflare, Inc. in the United States and other
+jurisdictions. goodnight-web is not affiliated with or endorsed by
+Cloudflare, Inc.
