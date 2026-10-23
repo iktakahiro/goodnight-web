@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 import { cn } from './cn.ts';
 import { scrollLeftToReveal, useScrollEdges } from './horizontal-scroll.ts';
 
+const EDGE_FADE_WIDTH = 32;
+
 /** Tabs (Base UI Tabs). */
 export const Tabs = BaseTabs.Root;
 
@@ -37,26 +39,38 @@ export const TabsList = ({
         element.getBoundingClientRect().left -
         element.clientLeft +
         element.scrollLeft;
-      const padding = Number.parseFloat(getComputedStyle(element).paddingLeft);
       // Only this list moves; focus and the page's vertical position stay put.
       element.scrollTo({
         left: scrollLeftToReveal(
           element,
           start,
           start + active.getBoundingClientRect().width,
-          padding,
+          EDGE_FADE_WIDTH,
         ),
         behavior: 'instant',
       });
     };
+    // Tabs change size when their count badges load; the indicator's own
+    // transition is not observed, so a manual scroll is not undone.
     const resizeObserver = new ResizeObserver(revealActiveTab);
     resizeObserver.observe(element);
-    for (const child of element.children) resizeObserver.observe(child);
-    const mutationObserver = new MutationObserver(revealActiveTab);
+    for (const tab of element.querySelectorAll('[role="tab"]')) {
+      resizeObserver.observe(tab);
+    }
+    const mutationObserver = new MutationObserver((mutations) => {
+      if (
+        mutations.some(
+          ({ target }) =>
+            target instanceof HTMLElement &&
+            target.matches('[role="tab"][data-active]'),
+        )
+      ) {
+        revealActiveTab();
+      }
+    });
     mutationObserver.observe(element, {
       attributes: true,
       attributeFilter: ['data-active'],
-      childList: true,
       subtree: true,
     });
     revealActiveTab();
@@ -84,14 +98,16 @@ export const TabsList = ({
         className='pointer-events-none absolute inset-px overflow-hidden rounded-full'
       >
         <div
+          style={{ width: EDGE_FADE_WIDTH }}
           className={cn(
-            'absolute inset-y-0 left-0 w-8 bg-linear-to-r from-card to-transparent transition-opacity motion-reduce:transition-none',
+            'absolute inset-y-0 left-0 bg-linear-to-r from-card to-transparent transition-opacity motion-reduce:transition-none',
             edges.before ? 'opacity-100' : 'opacity-0',
           )}
         />
         <div
+          style={{ width: EDGE_FADE_WIDTH }}
           className={cn(
-            'absolute inset-y-0 right-0 w-8 bg-linear-to-l from-card to-transparent transition-opacity motion-reduce:transition-none',
+            'absolute inset-y-0 right-0 bg-linear-to-l from-card to-transparent transition-opacity motion-reduce:transition-none',
             edges.after ? 'opacity-100' : 'opacity-0',
           )}
         />
