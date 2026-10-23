@@ -11,6 +11,7 @@ import {
   type FormFieldType,
   type LocalizedText,
 } from '../../../../src/features/contact-form/form-definition.ts';
+import { formatNumber } from '../../shared/i18n/format.ts';
 import { useI18n } from '../../shared/i18n/i18n-provider.tsx';
 import { Badge } from '../../shared/ui/badge.tsx';
 import { Button } from '../../shared/ui/button.tsx';
@@ -29,6 +30,7 @@ import {
   defaultMaxLength,
   maxLengthLimit,
   newEditorOption,
+  submissionSizeHint,
   type EditorError,
   type EditorField,
   type EditorOption,
@@ -319,6 +321,7 @@ export const FieldCard = ({
   const textType = isTextFieldType(field.type);
   const choiceType = isChoiceFieldType(field.type);
   const limit = maxLengthLimit(field.type);
+  const sizeHint = submissionSizeHint(field.type);
   const hasErrors = errors.length > 0;
   const fieldError =
     settingError(errors, 'field') ?? settingError(errors, 'type');
@@ -461,7 +464,11 @@ export const FieldCard = ({
                   value={field.maxLength}
                   placeholder={String(defaultMaxLength(field.type))}
                   aria-invalid={maxLengthError ? true : undefined}
-                  aria-describedby={`${id}-max-hint`}
+                  aria-describedby={
+                    sizeHint
+                      ? `${id}-max-hint ${id}-size-hint`
+                      : `${id}-max-hint`
+                  }
                   onChange={(event) =>
                     onUpdate((f) => ({ ...f, maxLength: event.target.value }))
                   }
@@ -482,6 +489,17 @@ export const FieldCard = ({
                         default: defaultMaxLength(field.type),
                       })}
                 </p>
+                {sizeHint ? (
+                  <p
+                    id={`${id}-size-hint`}
+                    className='text-[0.8125rem] leading-relaxed text-muted-foreground'
+                  >
+                    {t('form.submissionSizeHint', {
+                      size: sizeHint.kb,
+                      chars: formatNumber(sizeHint.jaChars, locale),
+                    })}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>

@@ -110,7 +110,8 @@ added only when a page needs real interactivity.
   visitor was typing) it loads the form again, keeps the values of fields
   that still exist, and asks the visitor to send again. Results: success (thank-you panel),
   `invalid_input` (per-field messages from `fields`), `turnstile_failed`,
-  `rate_limited`, `contact_unavailable` (switches to the notice), and any
+  `rate_limited`, `payload_too_large` (asks the visitor to shorten the
+  text), `contact_unavailable` (switches to the notice), and any
   other error. The Turnstile widget is reset after every failed attempt
   because tokens are single-use. Messages are the starter's own ja/en texts
   in `contact-form.astro`.

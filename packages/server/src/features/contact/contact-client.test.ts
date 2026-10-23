@@ -58,6 +58,28 @@ describe('submitContact', () => {
     });
   });
 
+  test('returns payload_too_large for a 413 from the API', async () => {
+    const result = await submitContact(input, {
+      fetch: fakeFetch(() =>
+        Response.json(
+          {
+            error: {
+              code: 'payload_too_large',
+              message: 'The message is too long.',
+            },
+          },
+          { status: 413 },
+        ),
+      ),
+    });
+    expect(result).toEqual({
+      ok: false,
+      code: 'payload_too_large',
+      status: 413,
+      message: 'The message is too long.',
+    });
+  });
+
   test('returns network_error when the request fails', async () => {
     const result = await submitContact(input, {
       locale: 'ja',

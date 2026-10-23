@@ -57,6 +57,8 @@ const text = {
     fieldTooLong: '文字数が上限を超えています。',
     rateLimited:
       '短い時間に送信が続いたため、一時的に受け付けを制限しています。しばらく待ってからもう一度お試しください。',
+    tooLarge:
+      '入力内容が長すぎるため送信できませんでした。文字数を減らしてから、もう一度お試しください。',
     error:
       'エラーのため送信できませんでした。時間をおいてもう一度お試しいただくか、メールまたはお電話でご連絡ください。',
     contactEmail: 'メール',
@@ -98,6 +100,7 @@ const text = {
     fieldTooLong: 'This is over the character limit.',
     rateLimited:
       'Too many messages were sent in a short time. Please wait a while and try again.',
+    tooLarge: 'Your message is too long to send. Shorten it and try again.',
     error:
       'Your message could not be sent because of an error. Please try again later, or contact us by email or phone.',
     contactEmail: 'Email',
@@ -292,6 +295,7 @@ const notices = [
             ['verify', text.verify],
             ['turnstile', text.turnstile],
             ['rate-limited', text.rateLimited],
+            ['too-large', text.tooLarge],
             ['error', text.error],
           ] as const
         ).map(([status, message]) => (
