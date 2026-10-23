@@ -21,3 +21,4 @@ record; supersede it with a new one and link both ways.
 | [0008](0008-contact-form-definition-in-d1.md)         | Contact form definition in D1 with immutable field ids        | accepted           |
 | [0009](0009-unread-read-status-and-suspected-spam.md) | Unread/read status, suspected spam flag, stored honeypot hits | accepted           |
 | [0010](0010-single-app-secret.md)                     | One `APP_SECRET` for the setup token and the derived keys     | accepted           |
+| [0011](0011-npm-trusted-publishing.md)                | Publish the server package with npm trusted publishing        | accepted           |

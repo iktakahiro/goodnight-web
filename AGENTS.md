@@ -175,5 +175,6 @@ details. Cover the security rules above with tests as the features are built.
 - Use English Conventional Commits and keep commits small and meaningful.
 - Work on a feature branch. Never push to `main`, force-push, or merge a PR
   unless the maintainer asks.
-- Do not publish npm packages, create repositories, or change repository
+- Do not publish npm packages (the `Release` workflow does, after the
+  maintainer approves it), create repositories, or change repository
   visibility.
