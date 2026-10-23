@@ -14,7 +14,9 @@ import { homeLayoutOptions, layoutOptions } from '../site/navigation';
 import { docsSection, groupSections } from '../site/navigation-tree';
 import { markdownFile, sitePath } from '../site/paths';
 import { i18n, localeFromPath } from '../site/i18n';
-import { LandingHero } from '../site/landing-hero';
+import { MotionConfig } from 'motion/react';
+import { heroTitleText, LandingHero } from '../site/landing/landing-hero';
+import { landingMdxComponents } from '../site/landing/landing-mdx-components';
 import { SiteFooter } from '../site/site-footer';
 
 /** Open Graph locale for each documentation language. */
@@ -45,7 +47,7 @@ export const Route = createFileRoute('/$')({
   head: ({ loaderData: page }) => {
     if (!page) return {};
     const url = `${__DOCS_SITE_URL__}${sitePath(page.slug ? `${page.slug}/` : '')}`;
-    const title = `${page.hero ? page.hero.title.replace(/\n/gu, ' ') : page.title} | goodnight-web`;
+    const title = `${page.hero ? heroTitleText(page.hero.title) : page.title} | goodnight-web`;
     return {
       meta: [
         { title },
@@ -97,13 +99,15 @@ function Content() {
   if (page.hero)
     return (
       <HomeLayout {...homeLayoutOptions(page.slug)}>
-        <div className='landing' id='main-content'>
-          <LandingHero page={page} />
-          <DocsBody className='landing-body'>
-            <MDX components={mdxComponents} />
-          </DocsBody>
+        {/* Motion follows the reduced motion setting; landing.css also shows
+            the final state then, and when scripting is off. */}
+        <MotionConfig reducedMotion='user'>
+          <div className='landing' id='main-content'>
+            <LandingHero page={page} />
+            <MDX components={landingMdxComponents} />
+          </div>
           <SiteFooter japanese={japanese} />
-        </div>
+        </MotionConfig>
       </HomeLayout>
     );
   return (

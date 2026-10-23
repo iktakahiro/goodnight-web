@@ -54,7 +54,8 @@ The light and dark files use the same geometry; only the colors change.
 - Docs site (`apps/docs`): `public/favicon.svg`, `public/favicon.ico`,
   `public/apple-touch-icon.png`, `public/icon-192.png`, and
   `public/icon-512.png` are copies. The navigation shows
-  `src/assets/logo-lockup-light.svg` or `logo-lockup-dark.svg`, also copies.
+  `src/assets/logo-lockup-light.svg` or `logo-lockup-dark.svg`, and the top
+  page shows `src/assets/app-icon.svg`; these are copies too.
 - `README.md` and `README.ja.md` show the lockups from this directory.
 
 The starter template does not use these files. Its favicon belongs to the

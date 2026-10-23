@@ -4,10 +4,20 @@ icon: BookOpen
 description: Guides for setting up and using goodnight-web, explanations of how it works, and reference pages.
 ---
 
-<Callout type='warn'>
-  goodnight-web is in development (M1) and not published yet. The pages below
-  describe the current code in the repository, which is tested locally.
-</Callout>
+goodnight-web is a starter kit for company and shop websites. It runs on Cloudflare: one Worker with Static Assets serves the pages and runs the API, and one D1 database stores the inquiries. The only other service is GitHub, where your website's repository lives. Slack notifications are optional.
+
+## What you get
+
+- **Pages and a blog.** A website built with Astro, with a home page, company profile, services, news, blog, contact page, and privacy policy, in Japanese and English. Blog posts are Markdown files in the repository.
+- **A contact form.** You add, remove, and reorder its fields in the admin screen, with no code changes and no deploy. Submissions are checked with Turnstile (Cloudflare's bot check) and rate limited. Each one is saved to D1 (Cloudflare's database) before the visitor gets a response.
+- **An admin screen for inquiries.** You sign in with a passkey: a fingerprint, face, or device PIN instead of a password. You can read inquiries, mark them unread or read, search by email address, review suspected spam separately, delete inquiries, export them as CSV, and edit the form fields.
+
+## Who it is for
+
+- A developer or a small web agency that builds websites for clients and hands them over.
+- Someone at a small company or startup who looks after the website. It also fits people without an engineering background who edit the site with AI tools.
+
+You do not need to write server code. The contact API and the admin screen come from an npm package that you do not edit. Some maintenance remains; [Maintenance](/docs/maintenance/) lists it.
 
 ## Start here
 
@@ -20,6 +30,7 @@ description: Guides for setting up and using goodnight-web, explanations of how 
 - [Architecture](/docs/architecture/): the parts of one website and what happens to a contact submission.
 - [Database](/docs/database/): the D1 tables, how queries are written, and how migrations reach your website and are applied.
 - [Distribution and updates](/docs/distribution/): what comes from the npm package and what you own in the starter, Dependabot updates, and why your repository must be private.
+- [Maintenance](/docs/maintenance/): the work that remains once your website runs, such as reviewing and merging update pull requests.
 - [How it works](/docs/how-it-works/): how each part works and why it is built that way, such as passkey sign-in and deleting old data without Cron.
 
 ## Reference

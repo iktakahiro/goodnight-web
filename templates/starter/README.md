@@ -22,10 +22,9 @@ maintain. What remains is reviewing and merging update pull requests (see
 
 ## Deploy
 
-> **DRAFT.** These steps have not been tested end to end yet.
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iktakahiro/goodnight-web-starter)
 
-1. Click **Deploy to Cloudflare**.
-   <!-- The button is added when the starter repository is published. -->
+1. Click **Deploy to Cloudflare** above.
 2. In the setup form, tick **Create private Git repository**. If you leave it
    unticked, the new repository is public.
 3. Enter the secrets listed below. Cloudflare creates the Worker and the D1
@@ -81,7 +80,7 @@ API refuses submissions.
 3. Set the **secret key** as the `TURNSTILE_SECRET` Worker secret.
 
 The documentation has a step-by-step page (Setup > Turnstile).
-<!-- Link added when the documentation site is published. -->
+<!-- Add a link here once the documentation site has a domain. -->
 
 ## First admin
 

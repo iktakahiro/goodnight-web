@@ -1,69 +1,96 @@
 ---
 title: 概要
-description: Cloudflare の Worker 1 つと D1 1 つで動く、ブログと問い合わせフォーム付きのWebサイトのテンプレートです。
+description: 会社やお店のWebサイトに必要な、ページ・お知らせ・ブログ・問い合わせフォームをそろえたスターターキットです。
 hero:
-  title: Webサイト・ブログ・問い合わせフォームを Cloudflare だけで
-  tagline: 1 つの Worker がページを配信し、問い合わせを受け付け、小さな管理画面を動かします。問い合わせは 1 つの D1 データベースに保存します。保守が必要なサーバーやランタイムはありません。
+  eyebrow: 今夜こそよく眠りたい人のための、Webサイトスターターキット
+  title: "これからのWebサイトは、\nシンプルな構成で。"
+  highlight: シンプルな構成
+  tagline: "会社やお店のWebサイトに必要な、\nページ・お知らせ・ブログ・問い合わせフォームを\nそろえたスターターキットです。"
 ---
 
-<Callout type='warn'>
-  **開発中（M1）です。** npm パッケージ、starter リポジトリ、Deploy
-  ボタンは、まだ公開していません。このサイトは、リポジトリにあるサーバーのパッケージと
-  starter を説明しています。どちらもローカル環境でテストしています。
-</Callout>
+<BuiltOn />
 
-## できること
+<LandingSection>
 
-goodnight-web を使うと、Webサイトによく必要な 3 つがそろいます。
+## 必要な機能だけを、自分のアカウントで動かす
 
-- **ページとブログ。** Astro で作るWebサイトです。トップ、会社概要、サービス、お知らせ、ブログ、問い合わせ、プライバシーポリシーのページがあり、日本語と英語に対応します。ブログの記事は、リポジトリの中の Markdown ファイルです。
-- **問い合わせフォーム。** 項目は管理画面で追加、削除、並べ替えでき、コードの編集もデプロイもいりません。送信は Turnstile（Cloudflare のボット対策）で確認し、回数を制限します。訪問者に応答する前に、D1（Cloudflare のデータベース）に保存します。
-- **管理画面。** 管理者はパスキー（指紋や顔認証、PIN でログインするしくみ）でログインします。問い合わせを読み、未読/既読を切り替え、メールアドレスで検索できます。スパムの疑いは分けて表示します。問い合わせの削除、CSV の書き出し、フォームの項目の編集もできます。
+CMS（Webサイトの管理システム）や外部のフォームサービスを使わず、利用するサービスと保守の作業を明確にしています。
 
-## 使うサービス
+<FeatureGrid>
+  <Feature visual='files' wide title='ページの更新は、ファイルを編集するだけ'>
+    手作業でも、AI ツールに頼んでも更新できます。
 
-すべて Cloudflare の上で動きます。ページを配信して API を動かす Worker（Static Assets 付き）1 つと、D1 データベース 1 つです。
+    <FeatureNote>
+      ※ Astro（ファイルからWebサイトを作るツール）を使っています。AI ツール向けのガイド（`AGENTS.md`）も入っています。
+    </FeatureNote>
 
-ほかに使うのは GitHub だけで、あなたのWebサイトのリポジトリをそこに置きます。Slack 通知は任意です。
+  </Feature>
+  <Feature visual='data' title='個人情報を、外部のフォームサービスに預けない'>
+    届いた問い合わせは自分のデータベースに保存されます。管理画面には、パスキー（顔や指紋を使うログイン）で入ります。
 
-## 向いている人
+    <FeatureNote>※ 自分の Cloudflare アカウントの D1 データベースに保存します。</FeatureNote>
 
-- 顧客のWebサイトを作って引き渡す開発者や、小さな制作会社。
-- 小さな会社やスタートアップで、Webサイトを担当している人。エンジニアでない人が、AI ツールでWebサイトを編集する使い方にも合います。
+  </Feature>
+  <Feature visual='pull-request' title='保守は、届いた更新の確認が中心'>
+    プログラムの更新は、変更の提案（PR）として GitHub に届きます。内容を確認して、反映（マージ）します。
 
-サーバーのコードを書く必要はありません。問い合わせ API と管理画面は npm パッケージで届き、その中身は編集しません。
+    <FeatureNote>
+      ※ 使うのは Cloudflare Workers・D1 と、GitHub のリポジトリ（コードの置き場所）です。[保守の作業一覧を見る →](/ja/docs/maintenance/)
+    </FeatureNote>
 
-## 残る保守
+  </Feature>
+  <Feature visual='starter' wide title='一から作らずに始められる'>
+    ページ、問い合わせフォーム、管理画面、データベース、更新の流れが最初からそろったスターターキットです。
 
-サーバーとランタイムの保守はなくなります。ただし、次の作業は残ります。あらかじめ予定に入れてください。
+    <FeatureNote>
+      ※ Deploy to Cloudflare ボタンから、自分のアカウントに用意できます。
+    </FeatureNote>
 
-- **依存関係の更新 PR を確認してマージする。** goodnight-web の修正は、あなたのリポジトリに Dependabot（更新の PR を自動で作る GitHub の機能）の PR として届きます。自動ではマージされないので、確認してマージしてください。
-- **Webサイト自体の依存関係を更新する。** Astro や Tailwind CSS などです。これも Dependabot の PR で届きます。
-- **Cloudflare の変更に対応する。** 新しい `compatibility_date`（Workers の動作の基準日）や、無料プランの上限の変更などです。
-- **リポジトリを private（非公開）に保つ。** Worker のシークレット（Worker に保存する秘密の値）も安全に管理してください。
-- **プライバシーポリシーを専門家に確認してもらう。** 公開する前に済ませてください。
+    <DeployButton variant="secondary" />
 
-## 次に読むページ
+  </Feature>
+</FeatureGrid>
 
-<Cards>
-  <Card icon={<Rocket />} title='はじめかた' href='/ja/docs/getting-started/'>
-    Deploy to Cloudflare ボタンでWebサイトを用意する手順。
-  </Card>
-  <Card icon={<Layers />} title='構成' href='/ja/docs/architecture/'>
-    Worker、D1、連携するサービスと、フォームが送信されたときの流れ。
-  </Card>
-  <Card
-    icon={<Package />}
-    title='配布と更新のしくみ'
-    href='/ja/docs/distribution/'
-  >
-    自分で持つもの、npm パッケージから入るもの、更新の届き方。
-  </Card>
-  <Card
-    icon={<ShieldCheck />}
-    title='セキュリティモデル'
-    href='/ja/docs/security/'
-  >
-    管理画面と問い合わせフォームの守り方と、守れない範囲。
-  </Card>
-</Cards>
+</LandingSection>
+
+<LandingSection id='architecture' tone='night'>
+
+## すべて、自分の Cloudflare アカウントの中に
+
+問い合わせが届いてから読むまでの流れです。コードは GitHub に置きます。
+
+<LandingArchitecture />
+
+<CloudflareNote>
+
+### Cloudflare とは
+
+Cloudflare は、Webサイトを世界中に速く届け、攻撃から守るサービスを提供している会社です。Webサイトの配信だけでなく、プログラムを動かす仕組みやデータベースも提供しています。
+
+このスターターキットは、Webサイト・問い合わせの受付・データベース・管理画面のすべてを、自分の Cloudflare アカウントの中で動かします。関わるサービスが少ないので、何を自分で管理しているかがはっきりします。
+
+</CloudflareNote>
+
+</LandingSection>
+
+<LandingSection id='admin'>
+
+<AdminShowcase>
+
+## 問い合わせは、ひとつの管理画面で確認できる
+
+- 未読と既読を分けて管理します
+- スパムの疑いがあるものも、消さずに別に表示します
+- メールアドレスで検索し、CSV でエクスポートできます
+
+</AdminShowcase>
+
+</LandingSection>
+
+<ClosingCta>
+
+## さっそく始めてみよう
+
+Deploy to Cloudflare ボタンから、自分の Cloudflare アカウントに用意できます。手順はドキュメントにまとめています。
+
+</ClosingCta>

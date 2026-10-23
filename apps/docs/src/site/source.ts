@@ -12,7 +12,19 @@ export const docs = defineDocs({
     async: true,
     schema: pageSchema.extend({
       description: z.string().min(1),
-      hero: z.object({ title: z.string(), tagline: z.string() }).optional(),
+      // `title` breaks into lines at `\n`; `highlight` is a phrase in it that
+      // gets the underline.
+      hero: z
+        .object({
+          eyebrow: z.string(),
+          title: z.string(),
+          highlight: z.string(),
+          tagline: z.string(),
+        })
+        .refine((hero) => hero.title.includes(hero.highlight), {
+          message: 'hero.highlight must be part of hero.title',
+        })
+        .optional(),
     }),
   },
 });

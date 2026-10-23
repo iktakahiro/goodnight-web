@@ -1,67 +1,99 @@
 ---
 title: Overview
-description: A website template with a blog and a contact form that runs on one Cloudflare Worker and one D1 database.
+description: A starter kit for company and shop websites, with pages, news, a blog, and a contact form built in.
 hero:
-  title: A website, a blog, and a contact form on Cloudflare
-  tagline: One Worker serves the pages, receives inquiries, and runs a small admin screen. One D1 database stores the inquiries. There is no server or runtime for you to patch.
+  eyebrow: A website starter kit for people who want to sleep well tonight
+  title: "Your next website,\nbuilt on a simple setup."
+  highlight: a simple setup
+  tagline: A starter kit for company and shop websites, with pages, news, a blog, and a contact form built in.
 ---
 
-<Callout type='warn'>
-  **Work in progress (M1).** Nothing is published yet: no npm package, no
-  starter repository, no Deploy button. These pages describe the server package
-  and the starter in the repository. Both are tested locally.
-</Callout>
+<BuiltOn />
 
-## What you get
+<LandingSection>
 
-goodnight-web gives you the three things most websites need:
+## Run only what you need, in your own account
 
-- **Pages and a blog.** A website built with Astro, with a home page, company profile, services, news, blog, contact page, and privacy policy, in Japanese and English. Blog posts are Markdown files in the repository.
-- **A contact form.** You add, remove, and reorder its fields in the admin screen, with no code changes and no deploy. Submissions are checked with Turnstile (Cloudflare's bot check) and rate limited. Each one is saved to D1 (Cloudflare's database) before the visitor gets a response.
-- **An admin screen for inquiries.** You sign in with a passkey: a fingerprint, face, or device PIN instead of a password. You can read inquiries, mark them unread or read, search by email address, review suspected spam separately, delete inquiries, export them as CSV, and edit the form fields.
+No CMS (content management system) and no third-party form service, so it is clear which services you use and what needs maintaining.
 
-## What it runs on
+<FeatureGrid>
+  <Feature visual='files' wide title='Update pages by editing files'>
+    Do it by hand, or ask an AI tool to do it.
 
-Everything runs on Cloudflare: one Worker with Static Assets, which serves the pages and runs the API, and one D1 database.
+    <FeatureNote>
+      \* Built with Astro (a tool that builds websites from files). Includes a
+      guide for AI tools (`AGENTS.md`).
+    </FeatureNote>
 
-The only other service is GitHub, where your website's repository lives. Slack notifications are optional.
-
-## Who it is for
-
-- A developer or a small web agency that builds websites for clients and hands them over.
-- Someone at a small company or startup who looks after the website. It also fits people without an engineering background who edit the site with AI tools.
-
-You do not need to write server code. The contact API and the admin screen come from an npm package that you do not edit.
-
-## What you still maintain
-
-There are no servers or runtimes to maintain. Some work remains, so plan for it:
-
-- **Review and merge dependency update pull requests.** Fixes to goodnight-web arrive in your repository as pull requests from Dependabot, GitHub's tool that opens update pull requests. They are not merged automatically; you review and merge them.
-- **Update the website's own dependencies**, such as Astro and Tailwind CSS. These also arrive as Dependabot pull requests.
-- **Keep up with Cloudflare changes**, such as a new `compatibility_date` (the date that sets which Workers runtime behavior you get) or a change to a free plan limit.
-- **Keep your repository private.** Also keep your Worker secrets (private values stored with the Worker) safe.
-- **Have a professional review your privacy policy** before you publish it.
-
-## Where to go next
-
-<Cards>
-  <Card icon={<Rocket />} title='Getting started' href='/docs/getting-started/'>
-    Set up your website with the Deploy to Cloudflare button.
-  </Card>
-  <Card icon={<Layers />} title='Architecture' href='/docs/architecture/'>
-    The Worker, D1, and the services around them, and what happens when a
-    visitor submits the contact form.
-  </Card>
-  <Card
-    icon={<Package />}
-    title='Distribution and updates'
-    href='/docs/distribution/'
+  </Feature>
+  <Feature visual='data' title='Keep personal data out of third-party form services'
   >
-    What you own, what comes from the npm package, and how updates reach you.
-  </Card>
-  <Card icon={<ShieldCheck />} title='Security model' href='/docs/security/'>
-    How the admin screen and the contact form are protected, and what is out of
-    scope.
-  </Card>
-</Cards>
+    Inquiries are saved to your own database. You read them in an admin panel you sign in to with a passkey (your face or fingerprint).
+
+    <FeatureNote>\* Stored in a D1 database in your own Cloudflare account.</FeatureNote>
+
+  </Feature>
+  <Feature visual='pull-request' title='Maintenance is mostly reviewing updates'>
+    Software updates arrive on GitHub as proposed changes (PRs). You review and apply (merge) them.
+
+    <FeatureNote>
+      \* Uses Cloudflare Workers, D1, and a GitHub repository (where your code
+      lives). [See the full maintenance list →](/docs/maintenance/)
+    </FeatureNote>
+
+  </Feature>
+  <Feature visual='starter' wide title='Start without building from scratch'>
+    A starter kit with pages, a contact form, an admin panel, a database, and an update flow in place from day one.
+
+    <FeatureNote>
+      \* Set it up in your own account with the Deploy to Cloudflare button.
+    </FeatureNote>
+
+    <DeployButton variant="secondary" />
+
+  </Feature>
+</FeatureGrid>
+
+</LandingSection>
+
+<LandingSection id='architecture' tone='night'>
+
+## Everything inside your own Cloudflare account
+
+How an inquiry travels from the form to you. Your code lives on GitHub.
+
+<LandingArchitecture />
+
+<CloudflareNote>
+
+### What is Cloudflare?
+
+Cloudflare is a company whose services deliver websites quickly around the world and help protect them from attacks. Beyond delivering websites, it also offers ways to run programs and store data in databases.
+
+This starter kit runs your website, contact form, database, and admin panel all inside your own Cloudflare account. With few services involved, it is clear what you are in charge of.
+
+</CloudflareNote>
+
+</LandingSection>
+
+<LandingSection id='admin'>
+
+<AdminShowcase>
+
+## Read every inquiry in one admin panel
+
+- Mark as read or unread
+- Keep suspected spam in its own view
+- Search by email, export to CSV
+
+</AdminShowcase>
+
+</LandingSection>
+
+<ClosingCta>
+
+## Get started
+
+Set it up in your own Cloudflare account with the Deploy to Cloudflare button. The docs walk you through each step.
+
+</ClosingCta>
