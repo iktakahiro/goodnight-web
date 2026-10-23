@@ -75,8 +75,12 @@ added only when a page needs real interactivity.
 - Secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`,
   `IP_HASH_SECRET`, `TURNSTILE_SECRET`, optional `SLACK_WEBHOOK_URL`) are
   listed with comments in `.dev.vars.example`. `package.json`
-  `cloudflare.bindings` has a Markdown description in Japanese and English
-  for each secret, variable, and binding, for the Deploy button form.
+  `cloudflare.bindings` has a short English Markdown description for each
+  secret, variable, and binding, for the Deploy button form (English only: the
+  form has no language switch). Keep each one to 150 characters or fewer.
+  Cloudflare's documentation names no limit, but in the real form (reported
+  2026-10-23) descriptions of 193 and 196 characters showed and those of 257
+  or more did not.
 - Scripts: `deploy` is `wrangler d1 migrations apply DB --remote && wrangler
   deploy`; `deploy:check` is `wrangler deploy --dry-run` (CI runs it through
   `turbo run deploy:check`); `preview` builds, applies migrations locally,
@@ -167,6 +171,12 @@ English `::error::` annotation and job summary when
 `github.event.repository.private` is not `true`. It lives in
 `templates/starter/.github`, so GitHub does not run it in this repository; it
 runs only in the copies that the Deploy button creates.
+
+The Deploy form's **Create private Git repository** box is not ticked by
+default, and Cloudflare documents no URL parameter or other way to tick it
+for the user (the button URL takes only `url`). The starter README and the
+documentation therefore tell users to tick it, and this workflow catches the
+copies that were created as public.
 
 ## Dependabot
 

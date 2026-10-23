@@ -26,13 +26,13 @@ maintain. What remains is reviewing and merging update pull requests (see
 
 1. Click **Deploy to Cloudflare** above.
 2. In the setup form, tick **Create private Git repository**. If you leave it
-   unticked, the new repository is public.
+   unticked, the new repository is public, and the **Visibility check**
+   workflow in it fails on every push.
 3. Enter the secrets listed below. Cloudflare creates the Worker and the D1
    database and deploys the site.
 4. If the repository was created as public anyway, make it private on
    GitHub: **Settings > General > Danger Zone > Change visibility >
-   Private**. The **Visibility check** workflow fails while the repository is
-   public.
+   Private**.
 
 If you use `npm create cloudflare` instead, it creates the project on your
 computer only. Create the GitHub repository yourself and choose **Private**.

@@ -28,12 +28,12 @@ API、問い合わせを読むための管理画面を配信し、1つの D1 デ
 
 1. 上の **Deploy to Cloudflare** ボタンを押します。
 2. 設定画面で **Create private Git repository** にチェックを入れます。
-   チェックを入れないと、作られるリポジトリは公開（public）になります。
+   チェックを入れないと、作られるリポジトリは公開（public）になり、その中の
+   **Visibility check** ワークフローが push のたびに失敗します。
 3. 下の表のシークレットを入力します。Cloudflare が Worker と D1
    データベースを作り、サイトをデプロイします。
 4. それでもリポジトリが公開で作られた場合は、GitHub で非公開にします:
    **Settings > General > Danger Zone > Change visibility > Private**。
-   公開の間は **Visibility check** ワークフローが失敗します。
 
 `npm create cloudflare` を使う場合、プロジェクトは手元のコンピューターに
 作られるだけです。GitHub のリポジトリは自分で作り、**Private** を選んで
