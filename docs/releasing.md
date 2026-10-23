@@ -6,6 +6,9 @@ from npm. Publishing is a manual step for the maintainer; CI never publishes.
 
 ## Before the first publish (once)
 
+Done for 0.1.0, which `iktakahiro` published on 2026-10-23. Kept here for
+reference.
+
 1. Sign in to npmjs.com with an account that has two-factor authentication
    turned on (required to publish; use "Authorization and writes").
 2. Create the organization: **Add Organization**, name `goodnight-web`, the
@@ -65,11 +68,17 @@ was checked" in [starter.md](starter.md)).
 3. Sites that were already copied update through their own Dependabot
    pull requests, or the `update-check` workflow.
 
-## Provenance (optional, after the first publish)
+## Provenance
 
-The package must exist on npm before a trusted publisher can be configured.
-Then, on npmjs.com open the package **Settings > Trusted publisher**, add the
-GitHub repository `iktakahiro/goodnight-web` and a release workflow, give that
-workflow `id-token: write`, and publish with `npm publish --provenance`. The
-repository must be public for provenance. After that, turn on "Require
-two-factor authentication and disallow tokens" for the package.
+The maintainer publishes by hand with `npm publish`, as above, so the
+published versions carry no provenance attestation. This repository
+intentionally has no publish workflow, and CI holds no npm token.
+
+If provenance is wanted later, the option is npm trusted publishing from
+GitHub Actions (OIDC): on npmjs.com open the package **Settings > Trusted
+publisher**, add the GitHub repository `iktakahiro/goodnight-web` and a
+release workflow, give that workflow `id-token: write`, and publish from it.
+npm then records provenance for each version. The repository must be public
+for provenance. After that, turn on "Require two-factor authentication and
+disallow tokens" for the package. Adding that workflow is a separate
+decision; record it in [decisions/](decisions/README.md).

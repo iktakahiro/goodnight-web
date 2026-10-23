@@ -229,8 +229,9 @@ repository, `@goodnight-web/server` was installed from the tarball made by
 `bun pm pack`, and `npm install`, `astro build`, `astro check`,
 `wrangler deploy --dry-run`, `wrangler d1 migrations apply DB --local`, and
 `node e2e/run.ts` all passed. The real button flow (repository creation,
-resource provisioning, Workers Builds) can be tested only with a public
-repository and a published package.
+resource provisioning, Workers Builds) can be tested only from a public
+repository. `@goodnight-web/server` 0.1.0 is published on npm (maintainer
+`iktakahiro`, 2026-10-23).
 
 ## End-to-end test
 
