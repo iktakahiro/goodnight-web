@@ -32,6 +32,27 @@ export const scrollEdges = ({
 });
 
 /**
+ * Returns the nearest scrollLeft that reveals a range inside a left-to-right
+ * scroller. Start and end are content coordinates; padding keeps the range
+ * clear of the scroller's edges. Oversized ranges align to their start.
+ * The result is clamped to the scroller's available horizontal range.
+ */
+export const scrollLeftToReveal = (
+  { scrollLeft, scrollWidth, clientWidth }: ScrollMetrics,
+  start: number,
+  end: number,
+  padding = 0,
+): number => {
+  let target = scrollLeft;
+  if (start < scrollLeft + padding || end - start > clientWidth - padding * 2) {
+    target = start - padding;
+  } else if (end > scrollLeft + clientWidth - padding) {
+    target = end - clientWidth + padding;
+  }
+  return Math.max(0, Math.min(target, scrollWidth - clientWidth));
+};
+
+/**
  * Follows the {@link scrollEdges} of an element while it scrolls, resizes,
  * or its content changes size.
  *

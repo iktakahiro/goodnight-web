@@ -61,6 +61,26 @@ export const formatNumber = (value: number, locale: Locale): string =>
   new Intl.NumberFormat(INTL_LOCALE[locale]).format(value);
 
 /**
+ * Formats a country name in the admin locale with its trimmed, uppercase
+ * code: `日本（JP）` in Japanese, matching the full-width parentheses the
+ * Japanese catalog uses, and `Japan (JP)` in English. Returns the input
+ * unchanged for invalid or unknown codes or Intl errors.
+ */
+export const formatCountry = (code: string, locale: Locale): string => {
+  const region = code.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(region)) return code;
+  try {
+    const name = new Intl.DisplayNames(INTL_LOCALE[locale], {
+      type: 'region',
+    }).of(region);
+    if (!name || name === region) return code;
+    return locale === 'ja' ? `${name}（${region}）` : `${name} (${region})`;
+  } catch {
+    return code;
+  }
+};
+
+/**
  * Returns the 1-based range of items shown on `page`, for "51–100 of 120".
  * `from` is 0 when there are no items.
  */
