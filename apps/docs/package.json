@@ -9,6 +9,8 @@
     "preview": "bun scripts/preview.ts",
     "deploy:check": "bun --bun wrangler deploy --dry-run",
     "type-check": "tsc -p tsconfig.json",
+    "og": "bun scripts/og/generate.ts",
+    "og:fonts": "bun scripts/og/fonts.ts",
     "test": "bun scripts/check-static.ts"
   },
   "dependencies": {
