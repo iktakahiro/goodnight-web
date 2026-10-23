@@ -14,11 +14,11 @@ hero:
 
 ## Run your whole website in your own Cloudflare account
 
-The website, contact form, admin panel, and database all run in your own Cloudflare account. The only services you need are Cloudflare and GitHub.
-
-Inquiry data is neither stored nor sent anywhere outside Cloudflare. If you set a Slack webhook, Slack receives only a new-inquiry notice and a link to the admin panel, never what the visitor typed. Admin sign-in uses a passkey only, with no password, and you can add Cloudflare Access for another layer of protection.
+The website, contact form, admin panel, and database all run in your own Cloudflare account.
 
 <LandingArchitecture />
+
+Inquiry content stays inside Cloudflare, and even with Slack notifications, only a new-inquiry notice and a link to the admin panel are sent. Admin sign-in is passkey only, and you can add Cloudflare Access.
 
 <FeatureNote>
   \* goodnight-web is not a SaaS for running websites. It is a starter kit for
@@ -39,13 +39,11 @@ Inquiry data is neither stored nor sent anywhere outside Cloudflare. If you set 
 
   </Feature>
   <Feature visual='data' title='Personal data management without external form services'>
-    The contact form is already built. Inquiries are saved to your own database, and you read them in the admin panel.
-
-    <FeatureNote>\* Inquiries are stored in a D1 database inside your own Cloudflare account.</FeatureNote>
+    The contact form is already built. Inquiries are stored in a D1 database in your own Cloudflare account, and you read them in the admin panel.
 
   </Feature>
   <Feature visual='starter' title='Start without building from scratch'>
-    A starter kit with pages, a contact form, an admin panel, and a database in place from day one.
+    This starter kit includes pages, a contact form, an admin panel, and a database from day one.
 
     <DeployButton variant="secondary" />
 
@@ -58,12 +56,10 @@ Inquiry data is neither stored nor sent anywhere outside Cloudflare. If you set 
 
 <AdminShowcase>
 
-## Manage form fields and submissions in the admin panel
+## Read inquiries and edit the form in the admin panel
 
-- Add, remove, and reorder fields, and set required fields and choices, with no code change
-- Mark as read or unread
-- Keep suspected spam in its own view
-- Search by email, export to CSV
+- The basics of handling inquiries are covered: read/unread, a separate suspected-spam view, search by email, and CSV export
+- Edit form fields without code changes
 
 </AdminShowcase>
 
