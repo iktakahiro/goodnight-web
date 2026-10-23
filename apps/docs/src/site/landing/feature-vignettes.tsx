@@ -13,8 +13,8 @@ const copy = {
     ],
     database: 'Your own database',
     inquiries: [
-      ['Emily Carter', 'emily@example.com', '10-23 09:12'],
-      ['Hanako Yamada', 'yamada@example.com', '10-22 17:40'],
+      ['Maya Brooks', 'brooks@example.com', '10-23 09:12'],
+      ['Daniel Reyes', 'reyes@example.com', '10-22 17:40'],
     ],
     pipeline: [
       ['GitHub', 'You push the files', 'git push'],
@@ -41,8 +41,8 @@ const copy = {
     ],
     database: 'ご自身のデータベース',
     inquiries: [
-      ['山田 花子', 'yamada@example.com', '10-23 09:12'],
-      ['Emily Carter', 'emily@example.com', '10-22 17:40'],
+      ['小林 凛', 'kobayashi@example.jp', '10-23 09:12'],
+      ['伊藤 結', 'ito@example.jp', '10-22 17:40'],
     ],
     pipeline: [
       ['GitHub', 'ファイルを push', 'git push'],

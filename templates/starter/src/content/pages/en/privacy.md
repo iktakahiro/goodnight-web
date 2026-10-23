@@ -70,7 +70,7 @@ The public pages of this site do not use cookies for analytics or advertising.
 To ask us to tell you the purpose of use, disclose, correct, add to, or delete your personal information, stop using or erase it, or stop providing it to third parties, contact us below. We will confirm your identity and then respond as required by law.
 
 - Company: Yunagi Works Co., Ltd.
-- Representative: Hanako Yamada, Representative Director
+- Representative: Yui Ito, Representative Director
 - Address: 1-2-3 Yunagi-machi, Kanazawa, Ishikawa 920-0000, Japan
 - Contact: Personal Information Desk (email: info@example.com)
 

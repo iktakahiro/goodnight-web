@@ -13,7 +13,7 @@ import { mkdir, readdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { chromium, type Locator } from 'playwright';
 import type { Locale } from '../src/shared/messages.ts';
-import { insertSamples, samples } from './samples.ts';
+import { insertSamples, sampleSets } from './samples.ts';
 import {
   ADMIN_EMAIL,
   SETUP_TOKEN,
@@ -52,9 +52,9 @@ type Size = { width: number; height: number };
 
 const manifest: Record<string, Partial<Record<Locale, Size>>> = {};
 
-/** The sample shown in the detail figures: Japanese for ja, English for en. */
+/** The sample shown in the detail figures, from the set of the locale. */
 const detailSample = (locale: Locale) => {
-  const sample = samples[locale === 'ja' ? 0 : 1];
+  const sample = sampleSets[locale][locale === 'ja' ? 0 : 1];
   if (!sample) throw new Error('missing sample');
   return sample;
 };
@@ -214,8 +214,10 @@ const main = async () => {
     /** Runs `take` once for every language and color scheme. */
     const eachVariant = async (
       take: (locale: Locale, scheme: Scheme) => Promise<void>,
+      beforeLocale?: (locale: Locale) => Promise<void>,
     ) => {
       for (const locale of locales) {
+        await beforeLocale?.(locale);
         for (const scheme of schemes) await take(locale, scheme);
       }
     };
@@ -246,7 +248,9 @@ const main = async () => {
     await page
       .getByRole('button', { name: ui('ja', 'setup.goToList') })
       .click();
-    await insertSamples(stateDir, NOW);
+    // Each UI language shows the sample set in its own language. The list
+    // and detail figures put it in before they are taken.
+    const useSamples = (locale: Locale) => insertSamples(stateDir, NOW, locale);
 
     // Passkey sign-in.
     await page.getByRole('button', { name: ui('ja', 'admin.signOut') }).click();
@@ -273,22 +277,28 @@ const main = async () => {
     const pageContent = page.locator('#main > *').last();
     const listFigure = async (
       name: string,
-      path: string,
+      path: string | ((locale: Locale) => string),
       ready?: (locale: Locale) => Locator,
     ) =>
       eachVariant(async (locale, scheme) => {
-        await open(path, locale, scheme);
+        await open(
+          typeof path === 'string' ? path : path(locale),
+          locale,
+          scheme,
+        );
         await page.getByTestId('inquiry-row').first().waitFor();
         await ready?.(locale).waitFor();
         await dismissSlackNote(locale);
         await shoot(name, locale, scheme, await downTo(pageContent));
-      });
+      }, useSamples);
     await listFigure('inquiry-list', '/admin?view=unread');
     await listFigure('inquiry-spam', '/admin?view=spam', () =>
       page.getByTestId('spam-view-hint'),
     );
-    await listFigure('inquiry-search', '/admin?q=example.jp', () =>
-      page.getByTestId('search-active'),
+    await listFigure(
+      'inquiry-search',
+      (locale) => `/admin?q=${locale === 'ja' ? 'example.jp' : 'example.com'}`,
+      () => page.getByTestId('search-active'),
     );
 
     // The detail, and the confirmation before a delete.
@@ -305,7 +315,13 @@ const main = async () => {
         .getByRole('button', { name: ui(locale, 'detail.cancel') })
         .click();
       await page.getByRole('alertdialog').waitFor({ state: 'hidden' });
-    });
+    }, useSamples);
+    // Reseeding for each language unread the first detail again. Both
+    // inquiries shown above count as read for the figures that follow.
+    await queryDatabase(
+      stateDir,
+      `UPDATE submissions SET status = 'read', read_at = created_at + 3600000 WHERE id IN ('${sampleSets.ja[0]?.id}', '${sampleSets.en[1]?.id}')`,
+    );
 
     // The form editor with the starting form (version 1), its preview, and
     // a new field with its settings open. The new field is not saved.

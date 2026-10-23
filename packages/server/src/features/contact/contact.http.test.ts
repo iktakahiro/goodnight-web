@@ -567,7 +567,7 @@ describe('GET /api/contact/form', () => {
       id: 'f_name',
       type: 'text',
       label: { ja: 'お名前', en: 'Name' },
-      placeholder: { ja: '山田 太郎', en: 'Taro Yamada' },
+      placeholder: { ja: '青木 蒼', en: 'Maya Brooks' },
       required: true,
       maxLength: 100,
     });

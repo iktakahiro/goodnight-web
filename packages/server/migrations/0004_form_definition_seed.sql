@@ -24,8 +24,8 @@ VALUES (1, json('{
         "en": "Name"
       },
       "placeholder": {
-        "ja": "山田 太郎",
-        "en": "Taro Yamada"
+        "ja": "青木 蒼",
+        "en": "Maya Brooks"
       },
       "required": true,
       "maxLength": 100,
