@@ -21,11 +21,15 @@ import {
   sendSlackNotification,
 } from '../notify/slack.ts';
 import { pruneIfDue } from '../retention/prune.ts';
-import { insertSubmission } from '../submissions/submission-store.ts';
+import {
+  countSubmissionsSince,
+  insertSubmission,
+} from '../submissions/submission-store.ts';
 import { getContactAvailability } from './contact-availability.ts';
 import {
   CONTACT_FIELD_LIMITS,
   CONTACT_HONEYPOT_FIELD,
+  CONTACT_HOURLY_INSERT_QUOTA,
   CONTACT_MAX_BODY_BYTES,
   CONTACT_TURNSTILE_ACTION,
   contactFieldErrors,
@@ -34,6 +38,8 @@ import {
 import { SPAM_SUSPECT_THRESHOLD, scoreSubmission } from './spam-score.ts';
 import { verifyTurnstile } from './turnstile.ts';
 import { safeErrorMessage } from '../../shared/log-error.ts';
+
+const HOUR_MS = 60 * 60 * 1000;
 
 /** A field of the public form: what the contact form needs to render it. */
 export interface PublicFormField {
@@ -260,7 +266,16 @@ export const contactRoutes = new Hono<HonoEnv>()
     const suspectedSpam = honeypot || spam.score >= SPAM_SUSPECT_THRESHOLD;
     const spamReasons = honeypot ? ['honeypot', ...spam.reasons] : spam.reasons;
 
-    // 6. Save before responding.
+    // 6. Global quota across all senders, after Turnstile and validation so
+    //    only submissions that would be stored count. Over it, nothing is
+    //    stored and the visitor is told to try again later.
+    const storedLastHour = await countSubmissionsSince(env.DB, now - HOUR_MS);
+    if (storedLastHour >= CONTACT_HOURLY_INSERT_QUOTA) {
+      console.warn('contact: hourly insert quota reached; nothing stored');
+      return apiError(c, 503, 'contact_busy');
+    }
+
+    // 7. Save before responding.
     const id = ulid(now);
     try {
       await insertSubmission(env.DB, {
@@ -285,7 +300,7 @@ export const contactRoutes = new Hono<HonoEnv>()
     if (honeypot)
       console.info('contact: honeypot filled; stored as suspected spam');
 
-    // 7. After the response: notification (never for suspected spam) and
+    // 8. After the response: notification (never for suspected spam) and
     //    pruning.
     const webhookUrl = env.SLACK_WEBHOOK_URL;
     if (!suspectedSpam && isSlackWebhookUrl(webhookUrl)) {

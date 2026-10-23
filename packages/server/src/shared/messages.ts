@@ -8,6 +8,8 @@ const en = {
   // API errors. The key after `error.` is the `code` in error responses.
   'error.contact_unavailable':
     'The contact form is not available yet. Please try again later.',
+  'error.contact_busy':
+    'The contact form is receiving too many messages right now. Please try again later.',
   'error.forbidden_origin':
     'This request came from a page that is not allowed.',
   'error.unsupported_media_type': 'Send the request as JSON.',
@@ -90,6 +92,8 @@ export type MessageCatalog = Readonly<Record<MessageKey, string>>;
 const ja: MessageCatalog = {
   'error.contact_unavailable':
     'お問い合わせフォームは準備中です。時間をおいてお試しください。',
+  'error.contact_busy':
+    'ただいまお問い合わせが集中しているため、受け付けられません。時間をおいてお試しください。',
   'error.forbidden_origin': '許可されていないページからの送信です。',
   'error.unsupported_media_type': 'JSON 形式で送信してください。',
   'error.payload_too_large': '送信内容が長すぎます。',

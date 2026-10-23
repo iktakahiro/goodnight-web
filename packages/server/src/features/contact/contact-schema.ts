@@ -20,6 +20,16 @@ export const CONTACT_HONEYPOT_FIELD = 'gnw_hp_x';
  */
 export const CONTACT_MAX_BODY_BYTES = 32 * 1024;
 
+/**
+ * Most submissions stored in any one hour, across all senders. When this
+ * many rows were stored in the last hour, `POST /api/contact` answers 503
+ * `contact_busy` and stores nothing, after Turnstile and validation. It caps
+ * how fast D1 can be filled by someone who pays for Turnstile solves from
+ * many addresses. A small site gets far fewer inquiries than this, so real
+ * visitors are not affected.
+ */
+export const CONTACT_HOURLY_INSERT_QUOTA = 500;
+
 /** Maximum lengths of the fixed contact fields, in characters. */
 export const CONTACT_FIELD_LIMITS = {
   email: 254,

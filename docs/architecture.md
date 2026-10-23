@@ -124,7 +124,8 @@ fields in the browser, so a form edit needs no build or deploy.
    and check that `hostname` is the request's hostname (or one of
    `options.contact.turnstileHostnames`) and that `action` is `contact`. On
    failure return 400 (`turnstile_failed`) and save nothing.
-4. Apply the Rate Limiting binding with `ip_hash` as the key. Over the limit
+4. Apply the Rate Limiting binding, keyed by the HMAC of the IPv4 address
+   or of the IPv6 /64 prefix. Over the limit
    returns 429.
 5. Validate the fixed parts with `contactRequestSchema` from
    `@goodnight-web/server/contact` (email, `consent` must be `true`,
@@ -140,7 +141,11 @@ fields in the browser, so a form edit needs no build or deploy.
    or a filled honeypot sets `suspected_spam`; the reason `honeypot` is
    added to `spam_reasons` before the score reasons. The status is always
    `unread`.
-6. Insert the row into D1 (`email`, `fields` keyed by field id,
+6. Count the rows stored in the last hour (`created_at` index). At
+   `CONTACT_HOURLY_INSERT_QUOTA` (500) or more, return 503 (`contact_busy`)
+   and store nothing. This caps how fast D1 can grow when someone pays for
+   Turnstile solves from many addresses; a small site never gets near it.
+   Then insert the row into D1 (`email`, `fields` keyed by field id,
    `form_version`, `locale`, and the operational columns), then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:

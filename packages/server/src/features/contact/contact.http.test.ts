@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
 import { insertFormVersion } from '../contact-form/form-store.ts';
 import { captureConsole } from '../../testing/console-capture.ts';
+import { testSubmission } from '../../testing/submissions.ts';
+import { insertSubmission } from '../submissions/submission-store.ts';
+import { CONTACT_HOURLY_INSERT_QUOTA } from './contact-schema.ts';
 import {
   mockExternalFetch,
   TURNSTILE_OK,
@@ -243,6 +246,57 @@ describe('POST /api/contact', () => {
       await hmacSha256Hex(SECRETS.IP_HASH_SECRET, '2001:db8:1:3::1'),
     ]);
     expect(dumpDatabase(worker.sqlite)).not.toContain('2001:db8');
+  });
+
+  describe('hourly insert quota', () => {
+    const fill = async (worker: TestWorker, count: number, age: number) => {
+      for (let i = 0; i < count; i++) {
+        await insertSubmission(
+          worker.env.DB,
+          testSubmission(`q${String(i).padStart(4, '0')}`, {
+            createdAt: Date.now() - age,
+          }),
+        );
+      }
+    };
+
+    test('refuses with 503 contact_busy and stores nothing once full', async () => {
+      const worker = createTestWorker();
+      await fill(worker, CONTACT_HOURLY_INSERT_QUOTA, 60 * 1000);
+      const response = await post(worker, validBody());
+      expect(response.status).toBe(503);
+      expect((await response.json()).error.code).toBe('contact_busy');
+      expect(rows(worker)).toHaveLength(CONTACT_HOURLY_INSERT_QUOTA);
+      // Checked after Turnstile, so a failed token still gets its own error.
+      expect(external.turnstileCalls()).toHaveLength(1);
+      // A honeypot hit gets the same answer.
+      const trap = await post(worker, validBody({ gnw_hp_x: 'filled' }));
+      expect(trap.status).toBe(503);
+      expect((await trap.json()).error.code).toBe('contact_busy');
+    });
+
+    test('counts only the last hour', async () => {
+      const worker = createTestWorker();
+      await fill(worker, CONTACT_HOURLY_INSERT_QUOTA, 61 * 60 * 1000);
+      expect((await post(worker, validBody())).status).toBe(200);
+    });
+
+    test('accepts submissions below the quota', async () => {
+      const worker = createTestWorker();
+      await fill(worker, CONTACT_HOURLY_INSERT_QUOTA - 1, 60 * 1000);
+      expect((await post(worker, validBody())).status).toBe(200);
+      expect((await post(worker, validBody())).status).toBe(503);
+    });
+
+    test('validation errors come first', async () => {
+      const worker = createTestWorker();
+      await fill(worker, CONTACT_HOURLY_INSERT_QUOTA, 60 * 1000);
+      const response = await post(
+        worker,
+        validBody({ email: 'not an address' }),
+      );
+      expect(response.status).toBe(400);
+    });
   });
 
   test('the old honeypot name is an unknown key', async () => {
