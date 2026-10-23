@@ -43,12 +43,12 @@ const en = {
     'Only people who registered a passkey on this site can sign in.',
 
   'setup.lead':
-    'Enter the SETUP_TOKEN secret and an email address listed in ADMIN_EMAILS. Then register a passkey on this device.',
+    'Enter the value of the {name} secret and an email address listed in ADMIN_EMAILS. Then register a passkey on this device.',
   'setup.step1': 'Check the setup token',
   'setup.step2': 'Register a passkey',
   'setup.step3': 'Done',
   'setup.stepOf': 'Step {current} of {total}',
-  'setup.tokenHint': 'The value of the SETUP_TOKEN secret in Cloudflare.',
+  'setup.tokenHint': 'The value of the {name} secret in Cloudflare.',
   'setup.emailHint': 'An email address listed in ADMIN_EMAILS.',
   'setup.nameHint': 'Optional. Shown in the admin screen.',
   'setup.continue': 'Continue',
@@ -289,6 +289,10 @@ const en = {
   'notice.slack':
     'Slack notifications are off (optional). Set SLACK_WEBHOOK_URL to be notified in Slack when a new inquiry arrives. Notifications contain no personal data.',
   'notice.slackLink': 'About notifications',
+  'notice.slackInvalidTitle':
+    'The Slack webhook URL is not in the expected format',
+  'notice.slackInvalidBody':
+    'SLACK_WEBHOOK_URL is set, but it is not in the form https://hooks.slack.com/services/T…/B…/…, so Slack notifications are not sent. Inquiries are still saved. Copy the webhook URL from Slack again and set it as SLACK_WEBHOOK_URL.',
   'notice.close': 'Dismiss',
 
   'forbidden.title': 'This account cannot use the admin screen',
@@ -337,12 +341,12 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
     'このサイトに Passkey を登録した人だけがログインできます。',
 
   'setup.lead':
-    'シークレット SETUP_TOKEN の値と、ADMIN_EMAILS に含まれるメールアドレスを入力してください。そのあと、この端末に Passkey を登録します。',
+    'シークレット {name} の値と、ADMIN_EMAILS に含まれるメールアドレスを入力してください。そのあと、この端末に Passkey を登録します。',
   'setup.step1': 'セットアップトークンの確認',
   'setup.step2': 'Passkeyの登録',
   'setup.step3': '完了',
   'setup.stepOf': 'ステップ {current} / {total}',
-  'setup.tokenHint': 'Cloudflare に設定したシークレット SETUP_TOKEN の値です。',
+  'setup.tokenHint': 'Cloudflare に設定したシークレット {name} の値です。',
   'setup.emailHint': 'ADMIN_EMAILS に含まれるメールアドレスのいずれかです。',
   'setup.nameHint': '任意です。管理画面に表示されます。',
   'setup.continue': '次へ',
@@ -587,6 +591,9 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'notice.slack':
     'Slack への通知はオフです（任意）。SLACK_WEBHOOK_URL を設定すると、新しいお問い合わせが届いたときに Slack へ通知します。通知に個人情報は含まれません。',
   'notice.slackLink': '通知について',
+  'notice.slackInvalidTitle': 'Slack の Webhook URL の形式が正しくありません',
+  'notice.slackInvalidBody':
+    'SLACK_WEBHOOK_URL は設定されていますが、https://hooks.slack.com/services/T…/B…/… の形式ではないため、Slack には通知しません。お問い合わせは保存されています。Slack で Webhook URL をもう一度コピーして、SLACK_WEBHOOK_URL に設定してください。',
   'notice.close': '閉じる',
 
   'forbidden.title': 'このアカウントでは管理画面を使えません',

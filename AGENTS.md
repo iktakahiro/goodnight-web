@@ -62,8 +62,9 @@ The planned layout. Some workspaces do not exist yet. See
 These rules are part of the product. Do not weaken them to make a feature or a
 test easier.
 
-- Never store a raw IP address. Store only `HMAC-SHA256(ip, IP_HASH_SECRET)`.
-  Do not log raw IPs either.
+- Never store a raw IP address. Store only `HMAC-SHA256(ip, IP_HASH_SECRET)`,
+  where `IP_HASH_SECRET` is the set value or, when it is unset, the key
+  derived from `APP_SECRET` (docs/decisions/0010). Do not log raw IPs either.
 - Fail closed. When a required setting or secret is missing, disable the
   feature instead of running without it. For example, without
   `TURNSTILE_SECRET` the contact API returns 503 and the form says it is not
@@ -71,13 +72,19 @@ test easier.
 - The admin UI and the admin API never work without authentication. There is
   no development bypass, default account, or shared key. Better Auth with
   passkeys is always required, even when Cloudflare Access is also used.
-- The first admin can be created only with `SETUP_TOKEN` and an address in
-  `ADMIN_EMAILS`. Setup closes once an admin exists.
+- The first admin can be created only with the setup token and an address in
+  `ADMIN_EMAILS`. The setup token is `SETUP_TOKEN` when it is set, otherwise
+  `APP_SECRET`; never both. Setup closes once an admin exists.
+- Derive keys from `APP_SECRET` only with HKDF-SHA-256 and a fixed label per
+  purpose (`src/shared/app-secret.ts`). A variable that is set always wins
+  over a derived key, and a set value that is too short is never replaced. An
+  `APP_SECRET` shorter than 32 characters fills nothing in. Do not change a
+  label: it signs every admin out and changes every IP hash.
 - Save a contact submission to D1 before responding. Notifications and cleanup
   run in `ctx.waitUntil` and never change the response.
 - Slack notifications contain no personal data and no form values: only the
-  count, the received time, and the admin URL. Suspected spam is never
-  notified.
+  site name, the path of the page the form was on, the received time, and
+  the admin URL. Suspected spam is never notified.
 - Do not drop doubtful submissions. A filled honeypot or a spam score of
   `SPAM_SUSPECT_THRESHOLD` or more stores the submission with
   `suspected_spam = 1`; it is not a status. Store nothing before Turnstile
@@ -87,8 +94,9 @@ test easier.
   never against one sent by the client. Reject unknown field keys.
 - Verify Turnstile on the server, including `hostname` and `action`. Check
   `Origin` and the body size before parsing.
-- Keep secrets in Worker secrets. Never return them to the browser or write
-  them to D1.
+- Keep secrets in Worker secrets. Never return them, or keys derived from
+  them, to the browser, and never write them to D1 or logs. Problem lists
+  name variables only.
 
 ## Database
 

@@ -15,8 +15,13 @@ import { Notice } from '../../shared/ui/notice.tsx';
  *   closed). Links to the Turnstile setup page in the documentation.
  * - Another setting the contact API needs is missing or too short: lists
  *   the names.
- * - Slack not configured: a quiet note, because Slack is optional. Shown
- *   only where `showSlack` is set (the list).
+ * - Slack not configured: a quiet note, because Slack is optional.
+ * - `SLACK_WEBHOOK_URL` set to something that is not a Slack incoming
+ *   webhook URL: a warning instead of the quiet note, because notifications
+ *   look set up but are never sent. The value is never shown.
+ *
+ * The Slack notices are shown only where `showSlack` is set (the list) and
+ * can be dismissed.
  */
 export const SetupNotices = ({
   showSlack = false,
@@ -31,8 +36,18 @@ export const SetupNotices = ({
     (name) => !name.startsWith('TURNSTILE_'),
   );
   const showContact = status.turnstileConfigured && otherMissing.length > 0;
-  const showSlackNote = showSlack && !status.slackConfigured && !slackDismissed;
-  if (status.turnstileConfigured && !showContact && !showSlackNote) {
+  const showSlackInvalid = showSlack && status.slackInvalid && !slackDismissed;
+  const showSlackNote =
+    showSlack &&
+    !status.slackConfigured &&
+    !status.slackInvalid &&
+    !slackDismissed;
+  if (
+    status.turnstileConfigured &&
+    !showContact &&
+    !showSlackInvalid &&
+    !showSlackNote
+  ) {
     return null;
   }
   return (
@@ -73,6 +88,34 @@ export const SetupNotices = ({
               })}
             </p>
           ) : null}
+        </Notice>
+      ) : null}
+      {showSlackInvalid ? (
+        <Notice
+          tone='warning'
+          data-testid='slack-invalid-notice'
+          icon={<TriangleExclamation aria-hidden='true' />}
+          title={t('notice.slackInvalidTitle')}
+        >
+          <p>{t('notice.slackInvalidBody')}</p>
+          <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+            <a
+              href={docsUrl(locale, '/docs/how-it-works/notifications/')}
+              target='_blank'
+              rel='noreferrer'
+              className='inline-flex items-center gap-1 rounded-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring'
+            >
+              {t('notice.slackLink')}
+              <ArrowUpRightFromSquare aria-hidden='true' className='size-3.5' />
+            </a>
+            <button
+              type='button'
+              onClick={() => setSlackDismissed(true)}
+              className='rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
+            >
+              {t('notice.close')}
+            </button>
+          </div>
         </Notice>
       ) : null}
       {showSlackNote ? (

@@ -1,5 +1,6 @@
 import { getAuth } from '../features/auth/auth.ts';
-import { ORIGIN, SECRETS, type TestWorker } from './test-worker.ts';
+import { resolveAppSecret } from '../shared/app-secret.ts';
+import { ORIGIN, type TestWorker } from './test-worker.ts';
 
 /** Name of Better Auth's session cookie on an https origin. */
 export const SESSION_COOKIE = '__Secure-better-auth.session_token';
@@ -12,7 +13,7 @@ export const runSetup = async (
   const response = await worker.fetch('/api/setup', {
     method: 'POST',
     headers: { origin: ORIGIN, 'content-type': 'application/json' },
-    body: JSON.stringify({ token: SECRETS.SETUP_TOKEN, email, name: 'Admin' }),
+    body: JSON.stringify({ token: worker.setupToken, email, name: 'Admin' }),
   });
   if (response.status !== 200) {
     throw new Error(
@@ -69,11 +70,12 @@ export const passkeySignIn = async (
   worker: TestWorker,
   userId: string,
 ): Promise<string> => {
-  const context = await getAuth(worker.env, ORIGIN).$context;
+  const env = await resolveAppSecret(worker.env);
+  const context = await getAuth(env, ORIGIN).$context;
   const session = await context.internalAdapter.createSession(userId);
   const value = await signCookieValue(
     session.token,
-    SECRETS.BETTER_AUTH_SECRET,
+    env.BETTER_AUTH_SECRET ?? '',
   );
   return `${SESSION_COOKIE}=${value}`;
 };

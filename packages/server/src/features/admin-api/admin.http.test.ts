@@ -732,6 +732,7 @@ describe('admin API with an admin session', () => {
       contactMissing: [],
       contactTooShort: [],
       slackConfigured: false,
+      slackInvalid: false,
       retentionDays: 180,
       unreadCount: 1,
     });
@@ -739,6 +740,50 @@ describe('admin API with an admin session', () => {
     const text = JSON.stringify(status);
     for (const value of Object.values(worker.env)) {
       if (typeof value === 'string') expect(text).not.toContain(value);
+    }
+  });
+
+  test('GET /status reports a valid Slack webhook URL', async () => {
+    const url =
+      'https://hooks.slack.com/services/T0SECRET1/B0SECRET2/Zq9Secret';
+    worker.env.SLACK_WEBHOOK_URL = url;
+    const response = await get('/api/admin/status');
+    const text = await response.text();
+    expect(JSON.parse(text)).toMatchObject({
+      slackConfigured: true,
+      slackInvalid: false,
+    });
+    for (const part of ['hooks.slack.com', 'SECRET', 'Zq9Secret']) {
+      expect(text).not.toContain(part);
+    }
+  });
+
+  test('GET /status reports an invalid Slack webhook URL without it', async () => {
+    for (const url of [
+      'https://hooks.slack.com/services/T0SECRET1/B0SECRET2/Zq9Secret/',
+      'https://slack-mirror.example/services/T0SECRET1/B0SECRET2/Zq9Secret',
+      'not-a-url-Zq9Secret',
+    ]) {
+      worker.env.SLACK_WEBHOOK_URL = url;
+      const response = await get('/api/admin/status');
+      const text = await response.text();
+      expect(JSON.parse(text)).toMatchObject({
+        slackConfigured: false,
+        slackInvalid: true,
+      });
+      for (const part of ['hooks.slack.com', 'slack-mirror', 'SECRET', 'Zq9']) {
+        expect(text).not.toContain(part);
+      }
+    }
+  });
+
+  test('GET /status treats a blank Slack webhook URL as not set', async () => {
+    for (const url of [undefined, '', '  ']) {
+      worker.env.SLACK_WEBHOOK_URL = url;
+      expect(await (await get('/api/admin/status')).json()).toMatchObject({
+        slackConfigured: false,
+        slackInvalid: false,
+      });
     }
   });
 

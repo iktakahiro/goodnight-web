@@ -34,13 +34,15 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: true,
       open: true,
+      tokenName: 'SETUP_TOKEN',
       problems: [],
     });
     const unconfigured = createTestWorker({ env: { SETUP_TOKEN: undefined } });
     expect(await (await unconfigured.fetch('/api/setup')).json()).toEqual({
       configured: false,
       open: false,
-      problems: [{ name: 'SETUP_TOKEN', issue: 'missing' }],
+      tokenName: 'APP_SECRET',
+      problems: [{ name: 'APP_SECRET', issue: 'missing' }],
     });
   });
 
@@ -106,6 +108,7 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: true,
       open: false,
+      tokenName: null,
       problems: [],
     });
   });
@@ -138,6 +141,7 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: true,
       open: false,
+      tokenName: null,
       problems: [],
     });
     const response = await setup(worker, {
@@ -205,18 +209,21 @@ describe('/api/setup', () => {
     expect(worker.rateLimitKeys).toEqual(Array(3).fill(`setup:${ipHash}`));
   });
 
+  // Without the secret and without APP_SECRET, the setting to add is
+  // APP_SECRET, which fills the secret in.
   test.each([
-    ['SETUP_TOKEN', 'setup_unavailable'],
-    ['ADMIN_EMAILS', 'setup_unavailable'],
-    ['IP_HASH_SECRET', 'setup_unavailable'],
-    ['CONTACT_RATE_LIMITER', 'setup_unavailable'],
-    ['BETTER_AUTH_SECRET', 'auth_unavailable'],
-  ])('fails closed with 503 without %s', async (name, code) => {
+    ['SETUP_TOKEN', 'setup_unavailable', 'APP_SECRET'],
+    ['ADMIN_EMAILS', 'setup_unavailable', 'ADMIN_EMAILS'],
+    ['IP_HASH_SECRET', 'setup_unavailable', 'APP_SECRET'],
+    ['CONTACT_RATE_LIMITER', 'setup_unavailable', 'CONTACT_RATE_LIMITER'],
+    ['BETTER_AUTH_SECRET', 'auth_unavailable', 'APP_SECRET'],
+  ])('fails closed with 503 without %s', async (name, code, reported) => {
     const worker = createTestWorker({ env: { [name]: undefined } });
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: false,
       open: false,
-      problems: [{ name, issue: 'missing' }],
+      tokenName: name === 'SETUP_TOKEN' ? 'APP_SECRET' : 'SETUP_TOKEN',
+      problems: [{ name: reported, issue: 'missing' }],
     });
     const response = await setup(worker, {
       token: SECRETS.SETUP_TOKEN,
@@ -240,6 +247,7 @@ describe('/api/setup', () => {
       expect(await (await worker.fetch('/api/setup')).json()).toEqual({
         configured: false,
         open: false,
+        tokenName: 'SETUP_TOKEN',
         problems: [{ name, issue: 'too_short' }],
       });
       const response = await setup(worker, {
@@ -268,6 +276,7 @@ describe('/api/setup', () => {
       expect(state).toEqual({
         configured: false,
         open: false,
+        tokenName: 'SETUP_TOKEN',
         problems: [{ name, issue: 'weak' }],
       });
       // The value itself is never returned.
@@ -304,6 +313,7 @@ describe('/api/setup', () => {
     expect(await (await worker.fetch('/api/setup')).json()).toEqual({
       configured: false,
       open: false,
+      tokenName: null,
       problems: [],
     });
   });

@@ -3,7 +3,7 @@ import { and, eq, notExists } from 'drizzle-orm';
 import { getDatabase } from '../../db/database.ts';
 import { passkey, settings } from '../../db/schema.ts';
 import type { GoodnightEnv } from '../../env.ts';
-import { secretState } from '../../shared/secret-length.ts';
+import { secretProblem } from '../../shared/app-secret.ts';
 import { parseAdminEmails } from '../auth/admin-emails.ts';
 import { unsupportedAuthVariables } from '../auth/unsupported-variables.ts';
 
@@ -15,6 +15,7 @@ import { unsupportedAuthVariables } from '../auth/unsupported-variables.ts';
  */
 export interface SetupProblem {
   name:
+    | 'APP_SECRET'
     | 'SETUP_TOKEN'
     | 'ADMIN_EMAILS'
     | 'BETTER_AUTH_SECRET'
@@ -31,6 +32,12 @@ export interface SetupProblem {
  * (`IP_HASH_SECRET` and the `CONTACT_RATE_LIMITER` binding). The three
  * secrets must be at least `MIN_SECRET_LENGTH` characters and not weak, and no
  * `UNSUPPORTED_AUTH_VARIABLES` may be set. Names only; never values.
+ *
+ * `APP_SECRET` stands in for the three secrets when they are not set, so a
+ * secret that is neither set nor filled in is reported as `APP_SECRET`, once
+ * (`secretProblem`).
+ *
+ * @param env - A resolved env (`resolveAppSecret`).
  */
 export const setupProblems = (env: GoodnightEnv): SetupProblem[] => {
   const problems: SetupProblem[] = [];
@@ -39,8 +46,10 @@ export const setupProblems = (env: GoodnightEnv): SetupProblem[] => {
     'BETTER_AUTH_SECRET',
     'IP_HASH_SECRET',
   ] as const) {
-    const state = secretState(env[name]);
-    if (state !== 'ok') problems.push({ name, issue: state });
+    const problem = secretProblem(env, name);
+    if (problem && !problems.some(({ name }) => name === problem.name)) {
+      problems.push(problem);
+    }
   }
   if (parseAdminEmails(env.ADMIN_EMAILS).length === 0) {
     problems.push({ name: 'ADMIN_EMAILS', issue: 'missing' });

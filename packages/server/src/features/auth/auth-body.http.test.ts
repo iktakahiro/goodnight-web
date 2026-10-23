@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
+import { resolveAppSecret } from '../../shared/app-secret.ts';
 import { signInAsAdmin } from '../../testing/admin-session.ts';
 import {
   createTestWorker,
@@ -18,8 +19,8 @@ const jsonOfSize = (bytes: number): string => {
 };
 
 // Counts the requests that reach Better Auth's handler.
-const watchHandler = (worker: TestWorker) => {
-  const auth = getAuth(worker.env, ORIGIN);
+const watchHandler = async (worker: TestWorker) => {
+  const auth = getAuth(await resolveAppSecret(worker.env), ORIGIN);
   return spyOn(auth, 'handler');
 };
 
@@ -37,7 +38,7 @@ afterEach(() => {
 describe('/api/auth request bodies', () => {
   test('a 20 MiB body gets 413 and never reaches Better Auth', async () => {
     const worker = createTestWorker();
-    const handler = watchHandler(worker);
+    const handler = await watchHandler(worker);
     restore = () => handler.mockRestore();
     const response = await worker.fetch(VERIFY_PATH, {
       method: 'POST',
@@ -52,7 +53,7 @@ describe('/api/auth request bodies', () => {
 
   test('a chunked body without Content-Length is counted and gets 413', async () => {
     const worker = createTestWorker();
-    const handler = watchHandler(worker);
+    const handler = await watchHandler(worker);
     restore = () => handler.mockRestore();
     const chunk = new TextEncoder().encode('x'.repeat(16 * 1024));
     let sent = 0;
@@ -78,7 +79,7 @@ describe('/api/auth request bodies', () => {
 
   test('a body just under the limit reaches Better Auth', async () => {
     const worker = createTestWorker();
-    const handler = watchHandler(worker);
+    const handler = await watchHandler(worker);
     restore = () => handler.mockRestore();
     const body = jsonOfSize(AUTH_MAX_BODY_BYTES - 1024);
     expect(body.length).toBeGreaterThan(63 * 1024 - 1);
@@ -115,7 +116,7 @@ describe('/api/auth request bodies', () => {
     '',
   ])('Content-Type %p gets 415', async (contentType) => {
     const worker = createTestWorker();
-    const handler = watchHandler(worker);
+    const handler = await watchHandler(worker);
     restore = () => handler.mockRestore();
     const response = await worker.fetch(VERIFY_PATH, {
       method: 'POST',
@@ -183,7 +184,7 @@ describe('/api/auth request bodies', () => {
 
   test('GET requests are passed through unchanged', async () => {
     const worker = createTestWorker();
-    const handler = watchHandler(worker);
+    const handler = await watchHandler(worker);
     restore = () => handler.mockRestore();
     const response = await worker.fetch('/api/auth/get-session');
     expect(response.status).toBe(200);

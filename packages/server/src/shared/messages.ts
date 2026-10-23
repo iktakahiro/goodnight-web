@@ -30,9 +30,9 @@ const en = {
   'error.forbidden': 'Your account cannot use the admin screen.',
   'error.passkey_required': 'Register a passkey to continue.',
   'error.auth_unavailable':
-    'Sign-in is not configured. Set BETTER_AUTH_SECRET (a random value of at least 32 characters) for this site, and do not set BETTER_AUTH_TRUSTED_ORIGINS or BETTER_AUTH_SECRETS.',
+    'Sign-in is not configured. Set APP_SECRET (at least 32 characters) for this site. If BETTER_AUTH_SECRET is set, it must also be at least 32 characters, and do not set BETTER_AUTH_TRUSTED_ORIGINS or BETTER_AUTH_SECRETS.',
   'error.setup_unavailable':
-    'Setup is not configured. Set SETUP_TOKEN (a random value of at least 32 characters) and ADMIN_EMAILS for this site.',
+    'Setup is not configured. Set APP_SECRET (at least 32 characters) and ADMIN_EMAILS for this site. If SETUP_TOKEN, BETTER_AUTH_SECRET, or IP_HASH_SECRET is set, it must also be at least 32 characters.',
   'error.setup_closed': 'Setup is already complete.',
   'error.invalid_setup_token': 'The setup token is not correct.',
   'error.email_not_allowed': 'This email address is not in ADMIN_EMAILS.',
@@ -77,10 +77,16 @@ const en = {
   'admin.turnstileNoticeLink': 'How to set up Turnstile',
   'admin.language': 'Language',
 
-  // Slack notification. No personal data and no message body.
-  'notify.newInquiry': '1 new inquiry',
-  'notify.receivedAt': 'Received: {time}',
-  'notify.open': 'Open the admin screen',
+  // Slack notification. No personal data and no message body. `{site}` is
+  // the site name, already escaped for Slack; `notify.body` is also the
+  // fallback text, without bold.
+  'notify.header': '🌙 New inquiry',
+  'notify.body': 'A new inquiry arrived on {site}.',
+  'notify.receivedAt': 'Received',
+  'notify.page': 'Page',
+  'notify.privacy':
+    'This notification does not include personal data or anything typed into the form.',
+  'notify.open': 'Open in admin',
 } as const;
 
 /** Message keys. Every locale defines every key. */
@@ -116,9 +122,9 @@ const ja: MessageCatalog = {
   'error.forbidden': 'このアカウントでは管理画面を使えません。',
   'error.passkey_required': 'Passkey を登録してください。',
   'error.auth_unavailable':
-    'ログインに必要な設定がありません。このサイトに BETTER_AUTH_SECRET（32 文字以上のランダムな値）を設定し、BETTER_AUTH_TRUSTED_ORIGINS と BETTER_AUTH_SECRETS は設定しないでください。',
+    'ログインに必要な設定がありません。このサイトに APP_SECRET（32 文字以上）を設定してください。BETTER_AUTH_SECRET を設定している場合は、それも 32 文字以上にしてください。BETTER_AUTH_TRUSTED_ORIGINS と BETTER_AUTH_SECRETS は設定しないでください。',
   'error.setup_unavailable':
-    'セットアップに必要な設定がありません。このサイトに SETUP_TOKEN（32 文字以上のランダムな値）と ADMIN_EMAILS を設定してください。',
+    'セットアップに必要な設定がありません。このサイトに APP_SECRET（32 文字以上）と ADMIN_EMAILS を設定してください。SETUP_TOKEN、BETTER_AUTH_SECRET、IP_HASH_SECRET を設定している場合は、それも 32 文字以上にしてください。',
   'error.setup_closed': 'セットアップは完了しています。',
   'error.invalid_setup_token': 'セットアップトークンが正しくありません。',
   'error.email_not_allowed':
@@ -162,9 +168,13 @@ const ja: MessageCatalog = {
   'admin.turnstileNoticeLink': 'Turnstile の設定方法',
   'admin.language': '言語',
 
-  'notify.newInquiry': '新しいお問い合わせが 1 件あります',
-  'notify.receivedAt': '受信日時: {time}',
-  'notify.open': '管理画面を開く',
+  'notify.header': '🌙 新しいお問い合わせ',
+  'notify.body': '{site} に新しいお問い合わせが届きました。',
+  'notify.receivedAt': '受信日時',
+  'notify.page': 'ページ',
+  'notify.privacy':
+    'この通知には、個人情報やフォームの入力内容を含めていません。',
+  'notify.open': '管理画面で開く',
 };
 
 /** Message catalogs for every locale. */

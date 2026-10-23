@@ -13,8 +13,9 @@ export default createGoodnightWorker({ locale: 'ja' });
 ```
 
 Options: `locale` (`ja` or `en`: Slack messages, CSV headers when none is
-asked for, and API messages when `Accept-Language` matches neither) and
-`contact.turnstileHostnames` (hostnames accepted from Turnstile siteverify;
+asked for, and API messages when `Accept-Language` matches neither),
+`siteName` (the site name in Slack messages; defaults to the request's
+hostname), and `contact.turnstileHostnames` (hostnames accepted from Turnstile siteverify;
 defaults to the request's hostname).
 
 The contact form fields are not options. Admins edit them in the admin UI
@@ -30,9 +31,18 @@ version, so old inquiries keep their own labels. The documentation site's
 - a D1 binding `DB` with
   `"migrations_dir": "node_modules/@goodnight-web/server/migrations"`
 - a Rate Limiting binding `CONTACT_RATE_LIMITER`
-- the variable `TURNSTILE_SITE_KEY` and the secrets `SETUP_TOKEN`,
-  `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, `IP_HASH_SECRET`, `TURNSTILE_SECRET`,
-  and optionally `SLACK_WEBHOOK_URL`
+- the variable `TURNSTILE_SITE_KEY` and the secrets `APP_SECRET` (32
+  characters or more), `ADMIN_EMAILS`, `TURNSTILE_SECRET`, and optionally
+  `SLACK_WEBHOOK_URL` (`https://hooks.slack.com/services/T…/B…/…`;
+  another value is ignored, and the admin list shows a warning)
+
+`APP_SECRET` stands in for `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and
+`IP_HASH_SECRET`. When `BETTER_AUTH_SECRET` or `IP_HASH_SECRET` is not set,
+its key is derived from `APP_SECRET` with HKDF-SHA-256. When `SETUP_TOKEN` is
+not set, the setup screen accepts `APP_SECRET`. A site that sets the three
+variables keeps using them, with the same sessions and IP hashes; each one
+that is set wins over `APP_SECRET`. Keep `APP_SECRET` after setup: changing or
+removing it signs every admin out and changes IP hashes.
 
 A feature whose settings are missing is turned off: for example, the contact
 API answers 503 until Turnstile is set up.

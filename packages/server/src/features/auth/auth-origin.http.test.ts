@@ -82,6 +82,7 @@ describe('Better Auth variables that goodnight-web does not support', () => {
       expect(await (await worker.fetch('/api/setup')).json()).toEqual({
         configured: false,
         open: false,
+        tokenName: 'SETUP_TOKEN',
         problems: [{ name, issue: 'unsupported' }],
       });
     },

@@ -39,8 +39,10 @@ Design decisions are recorded in [decisions/](decisions/README.md).
   `/api/*`, `/admin`, and `/admin/*` reach Hono (`run_worker_first`). The
   bare `/admin` must be listed: `/admin/*` does not match it.
 - **Hono** routes the API. `createGoodnightWorker(options)` takes options
-  from the site (locale, Turnstile hostnames) and reads bindings and secrets from `env` on every request.
-  Requests it does not handle go to the `ASSETS` binding.
+  from the site (locale, site name, Turnstile hostnames) and reads bindings and secrets from `env` on every request.
+  Its first middleware replaces `c.env` with the resolved env, in which
+  `APP_SECRET` stands in for the secrets that are not set (see "Secrets and
+  bindings" below). Requests it does not handle go to the `ASSETS` binding.
 - **Better Auth** is built from the env bindings and cached per isolate,
   keyed by the `env` object and the request origin. A new `env` object (new
   bindings or secrets) gets a new instance. Building it costs about 5 ms of
@@ -72,23 +74,45 @@ Design decisions are recorded in [decisions/](decisions/README.md).
 | `DB`                   | D1 binding         | All persistent data                                        | Worker cannot run              |
 | `ASSETS`               | Static Assets      | The site's pages                                           | non-API paths return 404       |
 | `CONTACT_RATE_LIMITER` | Rate Limiting      | Contact, setup, and passkey sign-in requests per `ip_hash` | contact, setup, sign-in 503    |
-| `SETUP_TOKEN`          | secret             | Required to create the first admin, 32 characters or more  | setup 503                      |
+| `APP_SECRET`           | secret             | Root secret for the three below, 32 characters or more     | the three below must be set    |
+| `SETUP_TOKEN`          | secret, optional   | Token to create the first admin; default `APP_SECRET`      | setup 503 without `APP_SECRET` |
 | `ADMIN_EMAILS`         | secret or variable | Comma-separated addresses that may be admins               | setup 503, admin API 403       |
-| `BETTER_AUTH_SECRET`   | secret             | Better Auth signing secret, 32 characters or more          | auth, setup, and admin API 503 |
-| `IP_HASH_SECRET`       | secret             | HMAC key for `ip_hash`, 32 characters or more              | contact, setup, sign-in 503    |
+| `BETTER_AUTH_SECRET`   | secret, optional   | Better Auth signing secret; default derived                | auth, setup, admin API 503 \*  |
+| `IP_HASH_SECRET`       | secret, optional   | HMAC key for `ip_hash`; default derived                    | contact, setup, sign-in 503 \* |
 | `TURNSTILE_SECRET`     | secret             | Turnstile siteverify                                       | contact API 503                |
 | `TURNSTILE_SITE_KEY`   | variable (public)  | Turnstile widget; the form reads it from the config API    | contact API 503                |
-| `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification                |
+| `SLACK_WEBHOOK_URL`    | secret, optional   | New-inquiry notification; only `https://hooks.slack.com/…` | no notification, admin notice  |
 | `ACCESS_AUD`           | variable, optional | Cloudflare Access audience tag(s), comma-separated         | no Access token check          |
 | `ACCESS_TEAM_DOMAIN`   | variable, optional | Cloudflare Access team domain                              | no Access token check          |
 
+\* Only when neither the variable nor a usable `APP_SECRET` is set.
+
+A site needs only `APP_SECRET` and `ADMIN_EMAILS` among these secrets
+([0010](decisions/0010-single-app-secret.md)). The Worker resolves them in
+its first middleware (`resolveAppSecret` in `src/shared/app-secret.ts`):
+
+- `BETTER_AUTH_SECRET` and `IP_HASH_SECRET`: the value set for the variable,
+  or when it is unset or empty, a key derived from `APP_SECRET` with
+  HKDF-SHA-256 (empty salt, `info` `goodnight-web:better-auth` or
+  `goodnight-web:ip-hash`, 32 bytes as 64 hex characters).
+- `SETUP_TOKEN`: the value set for the variable, or when it is unset or
+  empty, `APP_SECRET` itself.
+
+A value set for the variable always wins, so a site with the four variables
+keeps its keys. A set value that is too short is not replaced. Changing or
+removing `APP_SECRET` changes the derived keys: every admin is signed out and
+new IP hashes differ.
+
 The Rate Limiting binding name is fixed
-([0003](decisions/0003-rate-limit-binding.md)). `SETUP_TOKEN`,
-`BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` shorter than 32 characters
-(`MIN_SECRET_LENGTH` in `src/shared/secret-length.ts`) count as missing. The
-admin API reports which contact settings are missing or too short (names
-only, never values) in `GET /api/admin/status` (`contactMissing`,
-`contactTooShort`). `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` must be set
+([0003](decisions/0003-rate-limit-binding.md)). `APP_SECRET`,
+`SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` shorter than 32
+characters (`MIN_SECRET_LENGTH` in `src/shared/secret-length.ts`) count as
+missing; a short `APP_SECRET` fills nothing in. The admin API reports which
+contact settings are missing or too short (names only, never values) in
+`GET /api/admin/status` (`contactMissing`, `contactTooShort`), and
+`GET /api/setup` reports the settings that keep setup off (`problems`). A
+secret that is neither set nor filled in is reported as `APP_SECRET`; a
+variable that is set but too short is reported under its own name. `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` must be set
 together; with only one, the admin areas answer 503.
 
 ## Contact flow
@@ -106,8 +130,9 @@ fields in the browser, so a form edit needs no build or deploy.
 `POST /api/contact` runs these steps in order
 (`packages/server/src/features/contact/contact-routes.ts`):
 
-0. If `TURNSTILE_SECRET`, `TURNSTILE_SITE_KEY`, `IP_HASH_SECRET`, or the
-   `CONTACT_RATE_LIMITER` binding is missing, return 503
+0. If `TURNSTILE_SECRET`, `TURNSTILE_SITE_KEY`, `IP_HASH_SECRET` (set or
+   derived from `APP_SECRET`), or the `CONTACT_RATE_LIMITER` binding is
+   missing, return 503
    (`contact_unavailable`) without reading the body.
 1. Check that `Origin` is the Worker's own origin, that `Content-Type` is
    JSON, and that the body is at most 32 KB. The size is checked against
@@ -149,17 +174,25 @@ fields in the browser, so a form edit needs no build or deploy.
    `form_version`, `locale`, and the operational columns), then return 200. If the insert fails, return 500.
    The response does not depend on anything after this step.
 7. In `ctx.waitUntil`:
-   - if the row is not suspected spam and `SLACK_WEBHOOK_URL` is a Slack
-     webhook URL,
-     post "1 new inquiry", the received time (a Slack date token), and the
-     admin URL to Slack and set `notified_at`. No field value is sent, not
-     even a select answer, so nothing the visitor typed reaches Slack.
+   - if the row is not suspected spam and `SLACK_WEBHOOK_URL` has the
+     incoming webhook form `https://hooks.slack.com/services/T…/B…/…`
+     (`isSlackWebhookUrl`: nothing after the last segment),
+     post a Block Kit message to Slack and set `notified_at`. It holds the
+     site name (`options.siteName`, or the request's hostname), the path of
+     the page the form was on (`pagePath` without query or fragment, left
+     out when absent), the received time (a Slack date token with
+     `{date_num} {time}` and a UTC fallback), and a button to the admin URL.
+     The site name and path are escaped so they cannot format text, link,
+     or mention, and are cut to 80 and 100 characters. No field value is
+     sent, not even a select answer, and no email, IP, or user agent, so
+     nothing the visitor typed reaches Slack.
      There is no retry; the unread count in the admin UI covers missed
      notifications.
    - prune old rows (see below).
 
-`ip_hash` is `HMAC-SHA256(ip, IP_HASH_SECRET)` of `CF-Connecting-IP`. The raw
-IP is sent to Turnstile siteverify but never stored or logged.
+`ip_hash` is `HMAC-SHA256(ip, IP_HASH_SECRET)` of `CF-Connecting-IP`, where
+`IP_HASH_SECRET` is the set value or the key derived from `APP_SECRET`. The
+raw IP is sent to Turnstile siteverify but never stored or logged.
 
 Error responses are `{ "error": { "code", "message", "fields"? } }`. The
 message is Japanese or English depending on `Accept-Language`. The browser
@@ -248,15 +281,17 @@ nothing until the next one.
 
 1. 503 without `BETTER_AUTH_SECRET`, `SETUP_TOKEN`, `ADMIN_EMAILS`,
    `IP_HASH_SECRET`, or the `CONTACT_RATE_LIMITER` binding, or when one of
-   the three secrets is shorter than 32 characters. Setup never runs without
+   the three secrets is shorter than 32 characters. `APP_SECRET` fills the
+   three secrets in when they are not set. Setup never runs without
    its attempt limit. (Before this, the app-wide checks below require HTTPS
    and, when configured, a Cloudflare Access token.)
 2. 403 unless `Origin` is the Worker's origin. Better Auth skips its own
    origin check for server-side calls, so the route checks it.
 3. 429 over the rate limit (`setup:<ip_hash>` on the same binding).
 4. 403 `setup_closed` once a passkey was ever registered.
-5. 403 `invalid_setup_token` unless the token matches `SETUP_TOKEN`
-   (constant-time compare).
+5. 403 `invalid_setup_token` unless the token matches `SETUP_TOKEN`, or
+   `APP_SECRET` when `SETUP_TOKEN` is not set (constant-time compare). When
+   `SETUP_TOKEN` is set, `APP_SECRET` is not accepted.
 6. 403 `email_not_allowed` unless the address is in `ADMIN_EMAILS`
    (case-insensitive).
 7. A server-only Better Auth plugin endpoint creates the user (or reuses it,

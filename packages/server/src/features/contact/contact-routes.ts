@@ -316,6 +316,8 @@ export const contactRoutes = new Hono<HonoEnv>()
             locale: options.locale,
             receivedAt: now,
             adminUrl: `${origin}/admin/inquiries/${id}`,
+            siteName: options.siteName ?? new URL(c.req.url).hostname,
+            pagePath: data.pagePath,
           }),
         }),
       );
