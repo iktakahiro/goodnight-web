@@ -3,6 +3,7 @@ import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
 import { isAllowedOrigin, readBodyWithLimit } from '../../shared/request.ts';
+import { ipRateLimitKey } from '../../shared/ip-rate-limit.ts';
 import { ulid } from '../../shared/ulid.ts';
 import {
   FORM_LIMITS,
@@ -211,8 +212,11 @@ export const contactRoutes = new Hono<HonoEnv>()
       return apiError(c, 400, 'turnstile_failed');
     }
 
-    // 4. Rate limit per ip_hash.
-    const { success } = await limiter.limit({ key: ipHash });
+    // 4. Rate limit per client: the IPv4 address, or the IPv6 /64 prefix,
+    //    hashed like ip_hash.
+    const { success } = await limiter.limit({
+      key: await ipRateLimitKey(ipHashSecret, ip),
+    });
     if (!success) return apiError(c, 429, 'rate_limited');
 
     // 5. Validation against the current form definition, and spam score.

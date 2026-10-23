@@ -34,6 +34,23 @@ describe('/api/auth passkey sign-in', () => {
     expect(dumpDatabase(worker.sqlite)).not.toContain(CLIENT_IP);
   });
 
+  test('counts IPv6 clients by their /64 prefix', async () => {
+    const worker = createTestWorker({ rateLimit: 2 });
+    const from = (ip: string) =>
+      worker.fetch(OPTIONS_PATH, { headers: { 'cf-connecting-ip': ip } });
+    expect((await from('2001:db8:1:2::1')).status).toBe(200);
+    expect((await from('2001:db8:1:2::2')).status).toBe(200);
+    expect((await from('2001:db8:1:2::3')).status).toBe(429);
+    expect((await from('2001:db8:9:9::1')).status).toBe(200);
+    const prefix = await hmacSha256Hex(
+      SECRETS.IP_HASH_SECRET,
+      '2001:db8:1:2::/64',
+    );
+    expect(worker.rateLimitKeys.slice(0, 3)).toEqual(
+      Array(3).fill(`auth:${prefix}`),
+    );
+  });
+
   test('counts verify-authentication and slash variants on the same key', async () => {
     const worker = createTestWorker({ rateLimit: 2 });
     const verify = await worker.fetch(

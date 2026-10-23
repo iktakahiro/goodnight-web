@@ -117,7 +117,7 @@ The contact API checks a submission like this before it saves it. [Contact form 
 
 - `Origin`, `Content-Type`, and the body size are checked before the body is parsed.
 - Turnstile is verified on the server, including `hostname` and `action`.
-- The Rate Limiting binding limits submissions per `ip_hash`.
+- The Rate Limiting binding limits submissions per hashed IP address (per /64 prefix for IPv6).
 - A filled honeypot field does not change the response. The submission is stored as suspected spam only if it passes Turnstile, the rate limit, and validation. The honeypot value itself is not stored.
 - A high spam score also flags a submission as suspected spam. Suspected spam gets no Slack notification and is listed separately in the admin screen.
 - There is no API key in the page. A key that the browser can read is not a secret, so it would only give a false sense of protection.

@@ -117,7 +117,7 @@ npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id
 
 - 本文を読む前に、`Origin`、`Content-Type`、本文のサイズを確認します。
 - Turnstile をサーバー側で検証し、`hostname` と `action` も確認します。
-- Rate Limiting binding で、`ip_hash` ごとに送信回数を制限します。
+- Rate Limiting binding で、ハッシュにした IP アドレスごとに送信回数を制限します。IPv6 では /64 のプレフィックスごとに数えます。
 - honeypot 欄が埋まっていても、応答は変えません。その送信も Turnstile、回数制限、検証を通ったときだけ、スパムの疑いとして保存します。honeypot 欄の値そのものは保存しません。
 - スパムスコアが高い送信にも、スパムの疑いの印を付けます。スパムの疑いは Slack に通知せず、管理画面では分けて表示します。
 - ページに API キーを入れません。ブラウザが読めるキーは秘密ではなく、守っているという誤解を生むだけです。

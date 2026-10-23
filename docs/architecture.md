@@ -52,7 +52,10 @@ Design decisions are recorded in [decisions/](decisions/README.md).
   (`passkey/generate-authenticate-options` and
   `passkey/verify-authentication`) itself, with the key `auth:<ip_hash>` on
   the Rate Limiting binding. Over the limit returns 429; without the binding
-  or `IP_HASH_SECRET` they return 503.
+  or `IP_HASH_SECRET` they return 503. Every rate limit key (contact, setup,
+  sign-in) is an HMAC of the IPv4 address or of the IPv6 /64 prefix
+  (`ipRateLimitKey` in `src/shared/ip-rate-limit.ts`); the stored `ip_hash`
+  still hashes the full address.
 - **D1** stores submissions, settings, and the Better Auth tables. All of
   them are defined in one Drizzle schema
   (`packages/server/src/db/schema.ts`). Every query goes through the Drizzle

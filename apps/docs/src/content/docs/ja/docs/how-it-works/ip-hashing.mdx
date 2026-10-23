@@ -9,7 +9,7 @@ goodnight-web は、訪問者の IP アドレスを保存もログ出力もし�
 
 - 問い合わせが送信されるたびに、Worker は `ip_hash = HMAC-SHA256(ip, IP_HASH_SECRET)` を計算します。
 - D1 に保存するのは `ip_hash` だけです。生の IP アドレスは D1 に書かず、ログにも出しません。
-- Rate Limiting binding のキーにも `ip_hash` を使います。
+- Rate Limiting binding のキーにも、同じ方法で作った HMAC を使います。IPv6 アドレスでは、アドレス全体ではなく /64 のプレフィックスからハッシュを作ります。
 
 ## コードでは
 
@@ -45,11 +45,14 @@ export const hmacSha256Hex = async (
 };
 ```
 
-同じハッシュを回数制限のキーにします。セットアップと Passkey でのログインも同じハッシュを使います。接頭辞（`setup:` か `auth:`）を付けるので、それぞれ別に数えます。
+回数制限のキーも同じ方法で作ります。違いは 1 つだけで、IPv6 アドレスでは先頭の 64 ビット（/64 のプレフィックス）だけから HMAC を作ります。IPv6 の契約者 1 人には、ふつう /64 がまるごと割り当てられます。アドレスごとに数えると、アドレスを変えるだけで上限に届かなくなるからです。IPv4 アドレスと、IPv6 の形で書かれた IPv4 アドレス（`::ffff:192.0.2.1`）は、そのまま数えます。セットアップと Passkey でのログインも同じキーを使います。接頭辞（`setup:` か `auth:`）を付けるので、それぞれ別に数えます。
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
-// 4. Rate limit per ip_hash.
-const { success } = await limiter.limit({ key: ipHash });
+// 4. Rate limit per client: the IPv4 address, or the IPv6 /64 prefix,
+//    hashed like ip_hash.
+const { success } = await limiter.limit({
+  key: await ipRateLimitKey(ipHashSecret, ip),
+});
 if (!success) return apiError(c, 429, 'rate_limited');
 ```
 

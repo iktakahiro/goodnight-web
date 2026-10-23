@@ -228,6 +228,23 @@ describe('POST /api/contact', () => {
     }
   });
 
+  test('IPv6 clients share the rate limit per /64 prefix', async () => {
+    const worker = createTestWorker({ rateLimit: 2 });
+    const from = (ip: string) =>
+      post(worker, validBody(), { headers: { 'cf-connecting-ip': ip } });
+    expect((await from('2001:db8:1:2::1')).status).toBe(200);
+    expect((await from('2001:db8:1:2::2')).status).toBe(200);
+    expect((await from('2001:db8:1:2:ffff::3')).status).toBe(429);
+    expect((await from('2001:db8:1:3::1')).status).toBe(200);
+    // ip_hash still hashes the full address; no address is stored.
+    expect(rows(worker).map((row) => row.ip_hash)).toEqual([
+      await hmacSha256Hex(SECRETS.IP_HASH_SECRET, '2001:db8:1:2::1'),
+      await hmacSha256Hex(SECRETS.IP_HASH_SECRET, '2001:db8:1:2::2'),
+      await hmacSha256Hex(SECRETS.IP_HASH_SECRET, '2001:db8:1:3::1'),
+    ]);
+    expect(dumpDatabase(worker.sqlite)).not.toContain('2001:db8');
+  });
+
   test('the old honeypot name is an unknown key', async () => {
     const worker = createTestWorker();
     const response = await post(worker, validBody({ website: '' }));
