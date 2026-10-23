@@ -1,18 +1,20 @@
 /**
- * Reads a request body as text, stopping once it exceeds `maxBytes`.
+ * Reads a request body as bytes, stopping once it exceeds `maxBytes`.
  *
  * Checks `Content-Length` first and then counts the bytes actually read, so a
- * missing or false header cannot bypass the limit.
+ * missing or false header (a chunked body, for example) cannot bypass the
+ * limit. The stream is cancelled as soon as the count passes `maxBytes`.
  *
- * @returns The body text, or `null` when the body is larger than `maxBytes`.
+ * @returns The body bytes (empty when there is no body), or `null` when the
+ *   body is larger than `maxBytes`.
  */
-export const readBodyWithLimit = async (
+export const readBytesWithLimit = async (
   request: Request,
   maxBytes: number,
-): Promise<string | null> => {
+): Promise<Uint8Array<ArrayBuffer> | null> => {
   const declared = Number(request.headers.get('content-length') ?? '0');
   if (Number.isFinite(declared) && declared > maxBytes) return null;
-  if (!request.body) return '';
+  if (!request.body) return new Uint8Array(0);
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -32,8 +34,31 @@ export const readBodyWithLimit = async (
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder().decode(bytes);
+  return bytes;
 };
+
+/**
+ * Reads a request body as text, stopping once it exceeds `maxBytes`
+ * ({@link readBytesWithLimit}).
+ *
+ * @returns The body text, or `null` when the body is larger than `maxBytes`.
+ */
+export const readBodyWithLimit = async (
+  request: Request,
+  maxBytes: number,
+): Promise<string | null> => {
+  const bytes = await readBytesWithLimit(request, maxBytes);
+  return bytes === null ? null : new TextDecoder().decode(bytes);
+};
+
+/**
+ * Returns whether a `Content-Type` value is exactly the `application/json`
+ * media type. Parameters such as `charset=utf-8` are allowed; any other type,
+ * including one that only contains `application/json` (such as
+ * `multipart/form-data-application/json`), is not.
+ */
+export const isJsonContentType = (value: string | null | undefined): boolean =>
+  (value ?? '').split(';', 1)[0]?.trim().toLowerCase() === 'application/json';
 
 /**
  * Returns whether the request's `Origin` header is the request's own origin.

@@ -3,6 +3,7 @@ import * as z from 'zod';
 import packageJson from '../../../package.json' with { type: 'json' };
 import type { HonoEnv } from '../../hono-env.ts';
 import { apiError } from '../../shared/api-error.ts';
+import { isJsonContentType, readBodyWithLimit } from '../../shared/request.ts';
 import { secretState } from '../../shared/secret-length.ts';
 import { getContactAvailability } from '../contact/contact-availability.ts';
 import {
@@ -115,6 +116,12 @@ export const submissionUpdateSchema = z
       update.status !== undefined || update.suspectedSpam !== undefined,
   );
 
+/**
+ * Largest accepted body of `PATCH /api/admin/submissions/:id`, in bytes. The
+ * update holds two small values.
+ */
+export const SUBMISSION_UPDATE_MAX_BODY_BYTES = 4 * 1024;
+
 /** Body of `GET /api/admin/status`. Never contains secret values. */
 export interface AdminStatus {
   version: string;
@@ -207,7 +214,9 @@ const choiceFilter = (
  *   (throttled) in the background.
  * - `GET /submissions/:id`: one submission; marks an unread one as read.
  * - `PATCH /submissions/:id` with {@link submissionUpdateSchema}: sets the
- *   status (`unread` or `read`) or the suspected spam flag.
+ *   status (`unread` or `read`) or the suspected spam flag. The body must be
+ *   `application/json` (415) and at most
+ *   {@link SUBMISSION_UPDATE_MAX_BODY_BYTES} (413).
  * - `DELETE /submissions/:id`: deletes it.
  * - `GET /submissions.csv?view=&q=&version=&field=&value=&lang=`: CSV
  *   export of the same filters, streamed in batches of rows.
@@ -381,9 +390,17 @@ export const adminRoutes = new Hono<HonoEnv>()
     return c.json(await toAdminSubmission(c, submission));
   })
   .patch('/submissions/:id', async (c) => {
+    if (!isJsonContentType(c.req.header('content-type'))) {
+      return apiError(c, 415, 'unsupported_media_type');
+    }
+    const text = await readBodyWithLimit(
+      c.req.raw,
+      SUBMISSION_UPDATE_MAX_BODY_BYTES,
+    );
+    if (text === null) return apiError(c, 413, 'payload_too_large');
     let body: unknown;
     try {
-      body = await c.req.json();
+      body = JSON.parse(text);
     } catch {
       return apiError(c, 400, 'invalid_json');
     }

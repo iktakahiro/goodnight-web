@@ -18,6 +18,7 @@ import {
   updateSubmission,
 } from '../submissions/submission-store.ts';
 import type { SubmissionStatus } from '../submissions/submission-status.ts';
+import { SUBMISSION_UPDATE_MAX_BODY_BYTES } from './admin-routes.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -425,6 +426,27 @@ describe('admin API with an admin session', () => {
       status: 'read',
     });
     expect(missing.status).toBe(404);
+  });
+
+  test('PATCH rejects a body over the cap and a non-JSON type', async () => {
+    await seed(worker, 'abc');
+    const big = await worker.fetch('/api/admin/submissions/abc', {
+      method: 'PATCH',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        status: 'read',
+        pad: 'x'.repeat(SUBMISSION_UPDATE_MAX_BODY_BYTES),
+      }),
+    });
+    expect(big.status).toBe(413);
+    expect((await big.json()).error.code).toBe('payload_too_large');
+    const text = await worker.fetch('/api/admin/submissions/abc', {
+      method: 'PATCH',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'text/plain' },
+      body: JSON.stringify({ status: 'read' }),
+    });
+    expect(text.status).toBe(415);
+    expect((await getSubmission(worker.env.DB, 'abc'))?.status).toBe('unread');
   });
 
   test('sets and clears the suspected spam flag', async () => {
