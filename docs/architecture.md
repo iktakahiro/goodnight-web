@@ -372,8 +372,8 @@ The UI does not use TanStack Start; the Worker serves the static build.
   detail screens show a notice that the contact form is not accepting
   submissions, with a link to the Turnstile setup page in the documentation.
   The documentation origin is one constant, `DOCS_BASE_URL` in
-  `admin-ui/src/shared/docs-links.ts` (`https://goodnight-web.invalid` until
-  the site has a domain). Other missing contact settings are listed by name.
+  `admin-ui/src/shared/docs-links.ts` (`https://goodnight-web.dev`). Other
+  missing contact settings are listed by name.
   When Slack is not configured, the list shows a quieter note that can be
   dismissed.
 - **Languages.** The UI picks Japanese or English from `navigator.languages`;

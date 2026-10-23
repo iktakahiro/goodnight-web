@@ -2,11 +2,8 @@ import type { Locale } from '../../../src/shared/messages.ts';
 
 /**
  * Origin of the goodnight-web documentation site.
- *
- * TODO: replace with the real domain once the documentation site has one.
- * `.invalid` never resolves, so a wrong link is obvious.
  */
-export const DOCS_BASE_URL = 'https://goodnight-web.invalid';
+export const DOCS_BASE_URL = 'https://goodnight-web.dev';
 
 /**
  * Returns the documentation URL for `path` (for example
