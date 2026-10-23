@@ -214,6 +214,20 @@ describe('POST /api/contact', () => {
     expect(rows(worker)).toHaveLength(2);
   });
 
+  test('any honeypot value flags the submission and gets the same answer', async () => {
+    for (const gnw_hp_x of ['x'.repeat(5000), 1, { a: 1 }, ['a'], true]) {
+      const worker = createTestWorker();
+      const response = await post(worker, validBody({ gnw_hp_x }));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+      expect(rows(worker)[0]).toMatchObject({
+        suspected_spam: 1,
+        spam_reasons: '["honeypot"]',
+      });
+      expect(dumpDatabase(worker.sqlite)).not.toContain('x'.repeat(100));
+    }
+  });
+
   test('the old honeypot name is an unknown key', async () => {
     const worker = createTestWorker();
     const response = await post(worker, validBody({ website: '' }));

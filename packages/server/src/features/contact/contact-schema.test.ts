@@ -40,6 +40,33 @@ describe('contactRequestSchema', () => {
     ).toBe(false);
   });
 
+  test('cleans pagePath and rejects control and format characters', () => {
+    expect(
+      contactRequestSchema.parse({ ...base, pagePath: ' /ja/contact\n' })
+        .pagePath,
+    ).toBe('/ja/contact');
+    for (const pagePath of [
+      '/a\u0001b',
+      '/a\u0085b',
+      '/a\u202eb',
+      '/a\u200bb',
+      '/a\u2066b',
+      '/a b',
+    ]) {
+      expect(
+        contactRequestSchema.safeParse({ ...base, pagePath }).success,
+      ).toBe(false);
+    }
+  });
+
+  test('accepts any honeypot value', () => {
+    for (const gnw_hp_x of ['x'.repeat(5000), 1, { a: 1 }, ['a'], true]) {
+      expect(
+        contactRequestSchema.safeParse({ ...base, gnw_hp_x }).success,
+      ).toBe(true);
+    }
+  });
+
   test('requires fields to be an object', () => {
     for (const fields of [null, [], 'x', 1]) {
       expect(contactRequestSchema.safeParse({ ...base, fields }).success).toBe(

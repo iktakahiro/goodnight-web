@@ -63,7 +63,7 @@ API は次の表の上から順に確認します。軽い確認ほど先にす�
 - **名前は `gnw_hp_x` です。** ブラウザやパスワード管理アプリにとって意味のない名前にしています。`website` や `url` のような名前だと自動入力され、本物の人の問い合わせに印が付いてしまいます。
 - **自動入力を止めます。** `autocomplete="off"` と `data-*` 属性で、よく使われるパスワード管理アプリ（1Password、LastPass、Bitwarden など）にこの欄を無視するよう伝えます。
 - **応答は変わりません。** honeypot が埋まった送信にも、有効な Turnstile のトークンと入力の検証が必要で、回数制限にも数えます。通れば理由 `honeypot` を付けて保存し、通らなければ、honeypot 欄が空の同じリクエストと同じエラーを返し、何も保存しません。ボットは応答から、わなにかかったかどうかを判別できません。
-- **値は保存しません。** honeypot 欄に入力された値そのものは残しません。
+- **値は保存しません。** honeypot 欄に入力された値そのものは残しません。値の長さは問わないため、長い値でも応答は変わりません。
 
 サーバーは、この欄が埋まっているかを記録するだけで、先へ進みます。
 
@@ -74,7 +74,9 @@ API は次の表の上から順に確認します。軽い確認ほど先にす�
 //    suspected spam (docs/decisions/0009).
 const honeypotValue = input[CONTACT_HONEYPOT_FIELD];
 const honeypot =
-  typeof honeypotValue === 'string' && honeypotValue.trim() !== '';
+  typeof honeypotValue === 'string'
+    ? honeypotValue.trim() !== ''
+    : honeypotValue !== undefined && honeypotValue !== null;
 ```
 
 ### Turnstile

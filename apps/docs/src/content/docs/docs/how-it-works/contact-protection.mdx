@@ -63,7 +63,7 @@ The field is moved off screen and hidden from screen readers (`aria-hidden`). Th
 - **The name is `gnw_hp_x`.** It means nothing to browsers and password managers. A name such as `website` or `url` invites autofill, and an autofilled honeypot would flag a real person's inquiry.
 - **Autofill is turned off.** `autocomplete="off"` and the `data-*` attributes ask the common password managers (1Password, LastPass, Bitwarden, and others) to leave the field alone.
 - **The response does not change.** A submission with a filled honeypot still needs a valid Turnstile token, counts against the rate limit, and must pass validation, like any other. If it passes, it is saved with the reason `honeypot`. If not, the client gets the same error as the same request with an empty honeypot, and nothing is saved. A bot cannot tell from the response that it hit the trap.
-- **The value is not stored.** What was typed into the honeypot field is never saved.
+- **The value is not stored.** What was typed into the honeypot field is never saved. Any value is accepted, however long, so a long value does not change the response either.
 
 The server only notes whether the field is filled and carries on:
 
@@ -74,7 +74,9 @@ The server only notes whether the field is filled and carries on:
 //    suspected spam (docs/decisions/0009).
 const honeypotValue = input[CONTACT_HONEYPOT_FIELD];
 const honeypot =
-  typeof honeypotValue === 'string' && honeypotValue.trim() !== '';
+  typeof honeypotValue === 'string'
+    ? honeypotValue.trim() !== ''
+    : honeypotValue !== undefined && honeypotValue !== null;
 ```
 
 ### Turnstile

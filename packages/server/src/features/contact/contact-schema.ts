@@ -38,11 +38,13 @@ export const CONTACT_FIELD_LIMITS = {
  *   the current version, the API answers 409 `form_outdated`.
  * - `locale`: the language of the page (`ja` or `en`).
  * - `turnstileToken`: the token from the Turnstile widget.
- * - `gnw_hp_x`: the honeypot field ({@link CONTACT_HONEYPOT_FIELD}). It is
- *   never stored.
+ * - `gnw_hp_x`: the honeypot field ({@link CONTACT_HONEYPOT_FIELD}). Any
+ *   value is accepted, and it is never stored.
  * - `elapsedMs`: milliseconds between showing the form and submitting it.
  *   Used for the spam score.
- * - `pagePath`: the path of the page that holds the form.
+ * - `pagePath`: the path of the page that holds the form. Cleaned like a
+ *   single-line field, then it must start with `/` and hold no whitespace,
+ *   control, or format characters.
  *
  * Any other top-level key is rejected. The email is cleaned before the
  * check: control characters are removed and whitespace is trimmed.
@@ -62,12 +64,19 @@ export const contactRequestSchema = z.strictObject({
   formVersion: z.number().int().min(1).optional(),
   locale: z.enum(['ja', 'en']).optional(),
   turnstileToken: z.string().min(1).max(2048),
-  [CONTACT_HONEYPOT_FIELD]: z.string().max(500).optional(),
+  // Any value is accepted, so a filled honeypot never changes the response
+  // (docs/decisions/0009). It is never stored.
+  [CONTACT_HONEYPOT_FIELD]: z.unknown().optional(),
   elapsedMs: z.number().int().min(0).optional(),
   pagePath: z
     .string()
-    .max(CONTACT_FIELD_LIMITS.pagePath)
-    .regex(/^\/[^\s]*$/)
+    .transform(singleLine)
+    .pipe(
+      z
+        .string()
+        .max(CONTACT_FIELD_LIMITS.pagePath)
+        .regex(/^\/[^\s\p{Cc}\p{Cf}]*$/u),
+    )
     .optional(),
 });
 

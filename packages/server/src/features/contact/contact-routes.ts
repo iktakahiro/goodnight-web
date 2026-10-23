@@ -188,7 +188,9 @@ export const contactRoutes = new Hono<HonoEnv>()
     //    suspected spam (docs/decisions/0009).
     const honeypotValue = input[CONTACT_HONEYPOT_FIELD];
     const honeypot =
-      typeof honeypotValue === 'string' && honeypotValue.trim() !== '';
+      typeof honeypotValue === 'string'
+        ? honeypotValue.trim() !== ''
+        : honeypotValue !== undefined && honeypotValue !== null;
 
     // 3. Turnstile, including hostname and action. Failure stores nothing.
     const token = input.turnstileToken;
