@@ -109,8 +109,8 @@ export const siteConfig: SiteConfig = {
       {
         label: { ja: '代表者', en: 'Representative' },
         value: {
-          ja: '代表取締役 山田 花子',
-          en: 'Hanako Yamada, Representative Director',
+          ja: '代表取締役 伊藤 結',
+          en: 'Yui Ito, Representative Director',
         },
       },
       {
