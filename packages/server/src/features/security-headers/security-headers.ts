@@ -34,8 +34,9 @@ const COMMON_HEADERS: Readonly<Record<string, string>> = {
 /**
  * Adds security headers to every response for `/api/*` and `/admin/*`. API
  * responses also get `Cache-Control: no-store`, unless a public API route
- * set `c.var.cacheControl` and answered with success. HTTPS responses get
- * HSTS.
+ * set `c.var.cacheControl` and answered with success. Admin UI responses
+ * other than 2xx and 304 get `Cache-Control: no-store` too. HTTPS responses
+ * get HSTS.
  * Other responses passed through to Static Assets are not changed; the site
  * sets its own headers.
  *
@@ -62,6 +63,10 @@ export const securityHeaders = createMiddleware<HonoEnv>(async (c, next) => {
     const cacheControl =
       area === 'api' && c.res.ok ? c.get('cacheControl') : undefined;
     headers.set('Cache-Control', cacheControl ?? 'no-store');
+  } else if (!c.res.ok && c.res.status !== 304) {
+    // Admin UI errors and redirects (Access denials, the HTTPS redirect,
+    // missing files) must not be cached by the browser.
+    headers.set('Cache-Control', 'no-store');
   }
   if (new URL(c.req.url).protocol === 'https:') {
     headers.set('Strict-Transport-Security', 'max-age=31536000');

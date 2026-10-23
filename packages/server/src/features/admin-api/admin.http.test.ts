@@ -59,6 +59,7 @@ const ENDPOINTS: [string, string][] = [
   ['GET', '/api/admin/submissions/abc'],
   ['PATCH', '/api/admin/submissions/abc'],
   ['DELETE', '/api/admin/submissions/abc'],
+  ['POST', '/api/admin/submissions/abc/read'],
   ['GET', '/api/admin/submissions.csv'],
   ['GET', '/api/admin/form'],
   ['PUT', '/api/admin/form'],
@@ -344,9 +345,23 @@ describe('admin API with an admin session', () => {
     expect(response.status).toBe(400);
   });
 
-  test('the detail view marks an unread submission as read', async () => {
+  test('the detail view changes nothing', async () => {
     await seed(worker, 'abc');
     const detail = await (await get('/api/admin/submissions/abc')).json();
+    expect(detail).toMatchObject({ id: 'abc', status: 'unread', readAt: null });
+    expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
+      status: 'unread',
+      readAt: null,
+    });
+    const list = await (await get('/api/admin/submissions')).json();
+    expect(list.unreadCount).toBe(1);
+  });
+
+  test('POST /submissions/:id/read marks an unread submission as read', async () => {
+    await seed(worker, 'abc');
+    const detail = await (
+      await send('POST', '/api/admin/submissions/abc/read')
+    ).json();
     expect(detail).toMatchObject({
       id: 'abc',
       status: 'read',
@@ -367,12 +382,31 @@ describe('admin API with an admin session', () => {
     expect(detail).not.toHaveProperty('fields');
     const list = await (await get('/api/admin/submissions')).json();
     expect(list.unreadCount).toBe(0);
+    expect(
+      (await send('POST', '/api/admin/submissions/missing/read')).status,
+    ).toBe(404);
     expect((await get('/api/admin/submissions/missing')).status).toBe(404);
   });
 
-  test('the detail view returns the stored state', async () => {
+  test('POST /submissions/:id/read needs the site origin', async () => {
     await seed(worker, 'abc');
-    const detail = await (await get('/api/admin/submissions/abc')).json();
+    const response = await send(
+      'POST',
+      '/api/admin/submissions/abc/read',
+      undefined,
+      'https://evil.example',
+    );
+    expect(response.status).toBe(403);
+    expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
+      status: 'unread',
+    });
+  });
+
+  test('marking read returns the stored state', async () => {
+    await seed(worker, 'abc');
+    const detail = await (
+      await send('POST', '/api/admin/submissions/abc/read')
+    ).json();
     const stored = await getSubmission(worker.env.DB, 'abc');
     expect(stored).toMatchObject({ status: 'read' });
     expect(detail).toMatchObject({
@@ -382,10 +416,12 @@ describe('admin API with an admin session', () => {
     });
   });
 
-  test('the detail view keeps the read time of a read submission', async () => {
+  test('marking read keeps the read time of a read submission', async () => {
     await seed(worker, 'abc');
     await updateSubmission(worker.env.DB, 'abc', { status: 'read' }, 1234);
-    const detail = await (await get('/api/admin/submissions/abc')).json();
+    const detail = await (
+      await send('POST', '/api/admin/submissions/abc/read')
+    ).json();
     expect(detail).toMatchObject({ status: 'read', readAt: 1234 });
     expect(await getSubmission(worker.env.DB, 'abc')).toMatchObject({
       status: 'read',

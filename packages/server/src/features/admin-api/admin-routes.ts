@@ -212,7 +212,11 @@ const choiceFilter = (
  *   invalid or unknown parameter is 400). Sorted by received time only;
  *   `q` searches the email address only. Also runs retention pruning
  *   (throttled) in the background.
- * - `GET /submissions/:id`: one submission; marks an unread one as read.
+ * - `GET /submissions/:id`: one submission. It changes nothing.
+ * - `POST /submissions/:id/read` (no body): marks an unread submission as
+ *   read, keeping an earlier `read_at`, and returns it. The admin UI calls
+ *   it when it opens an unread inquiry, so a GET (which skips the Origin
+ *   check) never changes state.
  * - `PATCH /submissions/:id` with {@link submissionUpdateSchema}: sets the
  *   status (`unread` or `read`) or the suspected spam flag. The body must be
  *   `application/json` (415) and at most
@@ -380,12 +384,12 @@ export const adminRoutes = new Hono<HonoEnv>()
     });
   })
   .get('/submissions/:id', async (c) => {
-    const id = c.req.param('id');
-    const found = await getSubmission(c.env.DB, id);
-    const submission =
-      found?.status === 'unread'
-        ? await markRead(c.env.DB, id, Date.now())
-        : found;
+    const submission = await getSubmission(c.env.DB, c.req.param('id'));
+    if (!submission) return apiError(c, 404, 'not_found');
+    return c.json(await toAdminSubmission(c, submission));
+  })
+  .post('/submissions/:id/read', async (c) => {
+    const submission = await markRead(c.env.DB, c.req.param('id'), Date.now());
     if (!submission) return apiError(c, 404, 'not_found');
     return c.json(await toAdminSubmission(c, submission));
   })

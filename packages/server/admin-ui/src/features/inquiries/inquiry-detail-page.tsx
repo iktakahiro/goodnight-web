@@ -50,6 +50,7 @@ import { fieldValueText, labelText } from './field-value.ts';
 import {
   deleteInquiry,
   fetchInquiry,
+  markInquiryRead,
   updateInquiry,
   type InquiryUpdate,
 } from './inquiries-api.ts';
@@ -346,17 +347,20 @@ const DetailSkeleton = () => {
 /**
  * One inquiry: the message, contact details, the read/unread switch, the
  * suspected spam mark with its reasons, and delete with a confirmation
- * dialog. Opening it marks an unread inquiry as read (server side). This is
- * the page that Slack notifications link to.
+ * dialog. Opening it marks an unread inquiry as read with an explicit
+ * `POST`, after the read-only `GET`. This is the page that Slack
+ * notifications link to.
  */
 export const InquiryDetailPage = ({ id }: { id: string }) => {
   const { locale, t } = useI18n();
   const { refreshStatus } = useAdminSession();
   const inquiry = useAsync(async () => {
     const result = await fetchInquiry(id);
+    if (result.status !== 'unread') return result;
     // Opening an unread inquiry marks it read: update the header count.
+    const read = await markInquiryRead(id);
     refreshStatus();
-    return result;
+    return read;
   }, id);
   useSignInOnUnauthorized(inquiry.status === 'error' ? inquiry.error : null);
   const router = useRouter();
