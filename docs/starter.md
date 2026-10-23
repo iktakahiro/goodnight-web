@@ -69,6 +69,18 @@ added only when a page needs real interactivity.
   binding `CONTACT_RATE_LIMITER` (5 per 60 s, namespace `1001`,
   [0003](decisions/0003-rate-limit-binding.md)); and the variable
   `TURNSTILE_SITE_KEY`, empty by default.
+- `workers_dev: true` and `preview_urls: false`, both explicit. A new site
+  has no custom domain, so workers.dev is the only way to reach `/admin` for
+  setup. After a custom domain is attached, the owner sets
+  `"workers_dev": false` in the file and commits: wrangler 4.151.3 turns
+  workers.dev on at every deploy when the config has no routes and the key is
+  unset, so a dashboard toggle does not last. Preview URLs give each
+  uploaded version a public address that shares the production D1 and
+  secrets; when the key is unset Cloudflare enables them whenever workers.dev
+  is on. With them off, a pull request that Workers Builds builds (if the
+  owner keeps non-production branch builds on) gets a build result but no
+  public address. Owners review an update with the Update check comment and
+  status, the build result, and `npm run preview` locally.
 - The D1 binding has no `database_id`. `wrangler dev`, `d1 migrations apply
   --local`, and `deploy --dry-run` work without it. Cloudflare creates the
   database and writes the ID when the Deploy button first deploys the site.

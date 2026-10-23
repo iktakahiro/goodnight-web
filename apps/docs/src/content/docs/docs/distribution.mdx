@@ -73,8 +73,10 @@ The workflow needs no token and no permissions. The workflow lives in the starte
    ```
 
 3. Dependabot opens one pull request in your repository. It changes `package.json` and `package-lock.json`.
-4. Workers Builds builds the pull request and shows a preview.
-5. You check the preview and merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
+4. If Workers Builds builds non-production branches (a setting of the Worker's build configuration in the Cloudflare dashboard), it builds the pull request and shows whether the build passed. The build gets no public address: the starter turns preview URLs off (`"preview_urls": false` in `wrangler.jsonc`).
+5. You review the pull request: the Update check comment and status, the build result if there is one, and the changes. To try the update before merging, check out the pull request's branch and run `npm run preview` on your computer. Then merge. The deploy script runs `wrangler d1 migrations apply DB --remote && wrangler deploy`, so the database is migrated before the new code runs.
+
+Preview URLs stay off because each preview version would run with your production D1 database and secrets at a public address, before you merge it. If you want them, set `"preview_urls": true` knowing that.
 
 There is no one-click update in the admin screen. It would need a token that can write to your GitHub repository, stored in the Worker. goodnight-web does not give the Worker that access.
 

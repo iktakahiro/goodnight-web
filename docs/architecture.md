@@ -567,7 +567,12 @@ folder), the same pin installs the package from npm.
    repository. Security updates are not delayed by the cooldown. The
    starter's Update check workflow comments whether the pull request is an
    official update, and the starter's README tells users to merge only those.
-3. The user's CI or Workers Builds builds the pull request and shows a preview.
+3. If the user keeps Workers Builds' non-production branch builds on, the
+   pull request is built and shows a build result. The starter sets
+   `preview_urls: false`, so the build gets no public preview URL (a preview
+   version would share the production D1 and secrets). The user reviews the
+   Update check comment and status, the build result, and can run
+   `npm run preview` locally.
 4. The user merges the pull request. The deploy script runs
    `wrangler d1 migrations apply DB --remote && wrangler deploy`, so migrations
    are applied before the new code runs.

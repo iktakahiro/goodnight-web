@@ -94,6 +94,14 @@ The documentation has a step-by-step page (Setup > Turnstile).
 
 Setup closes once the first admin exists.
 
+A passkey works only on the domain it was registered on, so attach your own
+domain to the Worker before step 1 if you have one. Then set
+`"workers_dev": false` in `wrangler.jsonc` and commit it, so the
+`workers.dev` address is turned off. Do not use the switch in the Cloudflare
+dashboard: every deploy applies `wrangler.jsonc` again. Preview URLs are off
+(`"preview_urls": false`): each preview version would run with your
+production database and secrets at a public address.
+
 ## Edit the site
 
 - Company details, menu, and colors: `site.config.ts`. See

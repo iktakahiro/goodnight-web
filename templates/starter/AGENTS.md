@@ -13,7 +13,10 @@ Cloudflare Worker with one D1 database.
 - `site.config.ts`: company name, address, phone, email, the company profile
   table, navigation, and theme colors.
 - `wrangler.jsonc`: only the value of `vars.TURNSTILE_SITE_KEY` (the public
-  Turnstile site key) and the Worker `name`.
+  Turnstile site key), the Worker `name`, and `workers_dev` (set it to
+  `false` once the site has its own domain). Keep `preview_urls` false
+  unless the person asks for preview URLs and understands that every preview
+  runs with the production database and secrets.
 - `src/pages/`: the pages. Pages in `src/pages/[...lang]/` are built once per
   language. Each page keeps its Japanese and English text side by side in a
   `text` object at the top of the file.

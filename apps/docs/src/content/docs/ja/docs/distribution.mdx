@@ -73,8 +73,10 @@ starter の `.github/workflows/visibility-check.yml` は、push のたびに動�
    ```
 
 3. Dependabot が、あなたのリポジトリに PR を 1 つ作ります。変更するのは `package.json` と `package-lock.json` です。
-4. Workers Builds がその PR をビルドし、プレビューを表示します。
-5. プレビューを確認して、マージします。`deploy` スクリプトは `wrangler d1 migrations apply DB --remote && wrangler deploy` を実行します。新しいコードが動く前に、データベースのマイグレーションが済みます。
+4. Workers Builds が本番以外のブランチもビルドする設定（Cloudflare ダッシュボードの、Worker のビルド設定）になっていれば、その PR をビルドし、ビルドが通ったかどうかを表示します。公開のアドレスは作られません。starter はプレビュー URL を無効にしているからです（`wrangler.jsonc` の `"preview_urls": false`）。
+5. PR を確認します。見るのは、更新チェックのコメントとステータス、ビルドの結果（あれば）、変更内容です。マージする前に試したいときは、PR のブランチを手元に取り出し、`npm run preview` を実行します。確認が済んだらマージします。`deploy` スクリプトは `wrangler d1 migrations apply DB --remote && wrangler deploy` を実行します。新しいコードが動く前に、データベースのマイグレーションが済みます。
+
+プレビュー URL を無効にしているのは、プレビューの各バージョンが、マージ前の状態のまま、本番の D1 データベースとシークレットを使って公開のアドレスで動くからです。必要な場合は、そのことを理解したうえで `"preview_urls": true` にしてください。
 
 管理画面からのワンクリック更新はありません。ワンクリックで更新するには、あなたの GitHub リポジトリに書き込めるトークンを Worker に持たせる必要があります。goodnight-web は、Worker にその権限を持たせません。
 
