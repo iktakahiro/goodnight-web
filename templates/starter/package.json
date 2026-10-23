@@ -53,7 +53,7 @@
         "description": "The D1 database for contact messages and admin accounts. The tables are created by `npm run deploy`.\n\nお問い合わせと管理者アカウントを保存する D1 データベースです。テーブルは `npm run deploy` で作られます。"
       },
       "CONTACT_RATE_LIMITER": {
-        "description": "Limits contact form submissions, setup attempts, and passkey sign-ins per visitor (5 per minute).\n\nお問い合わせの送信、セットアップ、パスキーでのログインを、訪問者ごとに制限します（1 分あたり 5 回）。"
+        "description": "Limits contact form submissions, setup attempts, and passkey sign-ins per visitor (5 per minute).\n\nお問い合わせの送信、セットアップ、Passkey でのログインを、訪問者ごとに制限します（1 分あたり 5 回）。"
       }
     }
   }
