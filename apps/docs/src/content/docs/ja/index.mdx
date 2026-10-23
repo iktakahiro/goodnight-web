@@ -10,14 +10,27 @@ hero:
 
 <BuiltOn />
 
+<LandingSection id='architecture' tone='night'>
+
+## Webサイト運営が、ご自身のCloudflareアカウントで完結
+
+Webサイト、問い合わせフォーム、管理画面、データベースのすべてが、ご自身の Cloudflare アカウントの中で動きます。必要なサービスは、Cloudflare と GitHub だけです。
+
+問い合わせフォームの投稿データは、Cloudflare の外に蓄積も送信もしません。Slack 通知用の Webhook を設定した場合も、Slack に送るのは新着の通知と管理画面へのリンクだけで、投稿データは含みません。管理画面のログインは Passkey だけで、パスワードは使いません。Cloudflare Access を組み合わせて、さらに安全にもできます。
+
+<LandingArchitecture />
+
+<FeatureNote>
+  ※
+  goodnight-webはWebサイト運営のSaaSではありません。セルフホスティングを支援するスターターキットの配布と、構築支援のドキュメントを公開しています。
+</FeatureNote>
+
+</LandingSection>
+
 <LandingSection>
 
-## CMSも外部のフォームサービスも使わない
-
-ページは静的なファイルで管理し、問い合わせは自分のデータベースに保存します。必要なサービスは、Cloudflare と GitHub だけです。
-
 <FeatureGrid>
-  <Feature visual='files' wide title='コンテンツは、静的なファイルで管理する'>
+  <Feature visual='files' title='コンテンツは、静的なファイルで管理する'>
     ページ、お知らせ、ブログは、Markdown などの静的なファイルです。GitHub で管理し、Astro を使ってビルドします。
 
     <FeatureNote>
@@ -26,20 +39,12 @@ hero:
 
   </Feature>
   <Feature visual='data' title='個人情報を、外部のフォームサービスに預けない'>
-    問い合わせフォームは実装済みです。届いた内容は自分のデータベースに保存され、管理画面で確認できます。ログインは Passkey だけで、パスワードは使いません。
+    問い合わせフォームは実装済みです。届いた内容は自分のデータベースに保存され、管理画面で確認できます。
 
     <FeatureNote>※ 問い合わせは、自分の Cloudflare アカウント内の D1 データベースに保存します。</FeatureNote>
 
   </Feature>
-  <Feature visual='build' title='ビルド済みのファイルを、そのまま配信する'>
-    Webサイトは SSG でビルドし、できあがったファイルをそのまま Cloudflare から配信します。表示のたびにサーバーで組み立てないので、素早く表示されます。
-
-    <FeatureNote>
-      ※ 配信には、Cloudflare Workers の Static Assets を使います。
-    </FeatureNote>
-
-  </Feature>
-  <Feature visual='starter' wide title='一から作らずに始められる'>
+  <Feature visual='starter' title='一から作らずに始められる'>
     ページ、問い合わせフォーム、管理画面、データベースが最初からそろったスターターキットです。
 
     <DeployButton variant="secondary" />
@@ -49,22 +54,13 @@ hero:
 
 </LandingSection>
 
-<LandingSection id='architecture' tone='night'>
-
-## すべて自分のCloudflareアカウントで動く
-
-Webサイト、問い合わせフォーム、管理画面、データベースは、どれも自分のアカウントの中にあります。点線の枠は、必要なときに追加できる Cloudflare の機能です。
-
-<LandingArchitecture />
-
-</LandingSection>
-
 <LandingSection id='admin'>
 
 <AdminShowcase>
 
-## 問い合わせは、ひとつの管理画面で確認できる
+## 管理画面でフォームの項目と投稿内容を管理
 
+- 項目の追加・削除・並べ替えと、必須や選択肢の設定を、コードを変えずにできます
 - 未読と既読を分けて管理します
 - スパムの疑いがあるものも、消さずに別に表示します
 - メールアドレスで検索し、CSV でエクスポートできます
