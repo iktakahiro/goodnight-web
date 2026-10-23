@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { runSetup, signInAsAdmin } from '../../testing/admin-session.ts';
+import {
+  passkeySignIn,
+  runSetup,
+  signInAsAdmin,
+} from '../../testing/admin-session.ts';
 import {
   CookieJar,
   SoftAuthenticator,
@@ -154,6 +158,66 @@ describe('admin API without a valid admin session', () => {
       ).toEqual({ n: 1 });
     },
   );
+
+  test('a removed admin loses every session, also after the address is added back', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    const userId = (
+      worker.sqlite.query('SELECT id FROM user').get() as { id: string }
+    ).id;
+    const other = await passkeySignIn(worker, userId);
+    const sessions = () =>
+      worker.sqlite.query('SELECT COUNT(*) AS n FROM session').get();
+    // The setup session is still there too.
+    expect(sessions()).toEqual({ n: 3 });
+    worker.env.ADMIN_EMAILS = 'second@example.com';
+    const response = await worker.fetch('/api/admin/me', {
+      headers: { cookie },
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe('forbidden');
+    expect(sessions()).toEqual({ n: 0 });
+    worker.env.ADMIN_EMAILS = 'admin@example.com';
+    for (const old of [cookie, other]) {
+      const again = await worker.fetch('/api/admin/me', {
+        headers: { cookie: old },
+      });
+      expect(again.status).toBe(401);
+    }
+  });
+
+  test('a failed session cleanup does not change the 403', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    worker.env.ADMIN_EMAILS = 'second@example.com';
+    const pause = worker.pauseAt(/^delete from "session"/i);
+    void pause.reached.then(() => pause.release(new Error('D1 down')));
+    const logs = captureConsole();
+    let response: Response;
+    let logged: string;
+    try {
+      response = await worker.fetch('/api/admin/me', { headers: { cookie } });
+      logged = logs.text();
+    } finally {
+      logs.restore();
+    }
+    expect(response.status).toBe(403);
+    expect(logged).toContain('session cleanup failed');
+  });
+
+  test('admin API reads do not extend the session', async () => {
+    const worker = createTestWorker();
+    const cookie = await signInAsAdmin(worker);
+    // Make the session old enough that Better Auth would refresh it.
+    const soon = Date.now() + 60 * 60 * 1000;
+    worker.sqlite.exec(`UPDATE session SET expires_at = ${soon}`);
+    expect(
+      (await worker.fetch('/api/admin/me', { headers: { cookie } })).status,
+    ).toBe(200);
+    expect(
+      worker.sqlite.query('SELECT expires_at AS e FROM session').get(),
+    ).toEqual({ e: soon });
+  });
 
   test('a removed address gets no admin access from a new passkey sign-in', async () => {
     const worker = createTestWorker();

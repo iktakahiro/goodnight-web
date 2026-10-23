@@ -314,10 +314,14 @@ the Worker's own `Origin` (CSRF). There is no development bypass.
 
 `ip_hash` is never returned by the admin API.
 
-Removing an address from `ADMIN_EMAILS` locks its sessions out at the next
-request, but the user, sessions, and passkeys stay in D1 and work again if
-the address is added back. The docs site's security page gives the
-`wrangler d1 execute` command that deletes them.
+`requireAdmin` reads the session with `disableRefresh`, so admin API calls
+never extend a session. Removing an address from `ADMIN_EMAILS` locks its
+sessions out at the next admin API request, and that request deletes all of
+the user's sessions in `ctx.waitUntil` (best effort; the response is 403
+either way). The user and passkeys stay in D1, so the person can sign in
+again if the address is added back, but old sessions are gone. The docs
+site's security page gives the `wrangler d1 execute` command that deletes
+the user and passkeys.
 
 ### Admin UI
 

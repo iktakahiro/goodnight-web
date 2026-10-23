@@ -29,7 +29,7 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ログイン                       | Better Auth の Passkey だけです。メールとパスワードでのログインは無効です。パスワードのハッシュ処理は、Workers 無料プランの CPU 上限を超えることがあります（[better-auth#8860](https://github.com/better-auth/better-auth/issues/8860)）。[Passkey でのログイン](/ja/docs/how-it-works/passkeys/)を参照してください。 |
 | セッション                     | 管理 API が受け付けるのは、そのユーザーの最初の Passkey 以降に作られたセッションだけです。セットアップで作られたセッションは管理者のセッションになりません。[セッションとセットアップ](#sessions-and-setup)を参照してください。                                                                                       |
-| `ADMIN_EMAILS`                 | リクエストのたびに読み直します。アドレスを外すと、次のリクエストからそのセッションは使えません。[管理者を外す](#removing-an-admin)を参照してください。                                                                                                                                                                |
+| `ADMIN_EMAILS`                 | リクエストのたびに読み直します。アドレスを外すと、次のリクエストからそのセッションでは管理 API を使えず、そのリクエストでセッションも削除します。[管理者を外す](#removing-an-admin)を参照してください。                                                                                                               |
 | HTTPS                          | 管理画面、管理 API、セットアップ、ログイン、問い合わせ API は `https://` でだけ動きます。[HTTPS](#https) を参照してください。                                                                                                                                                                                         |
 | Cloudflare Access              | 任意ですが、強く推奨します。50 ユーザーまで無料です。[Cloudflare Access](#cloudflare-access) を参照してください。                                                                                                                                                                                                     |
 | 最初の管理者                   | `SETUP_TOKEN` と、`ADMIN_EMAILS` にあるメールアドレスが必要です。最初の Passkey を登録するとセットアップは完了し、それ以降は使えません。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照してください。                                                                                                  |
@@ -101,9 +101,13 @@ WAF のルールは、Cloudflare アカウントに追加したドメイン（�
 
 ### 管理者を外す [#removing-an-admin]
 
-管理者を外すには、`ADMIN_EMAILS` からそのアドレスを消します。Worker はリクエストのたびに `ADMIN_EMAILS` を読むので、そのセッションは次のリクエストから 403 になります。Passkey でログインし直しても使えません。
+管理者を外すには、`ADMIN_EMAILS` からそのアドレスを消します。Worker はリクエストのたびに `ADMIN_EMAILS` を読むので、その管理者が次に管理 API へ送るリクエストは 403 になります。同じリクエストで、そのユーザーのセッションをすべて削除します。Passkey でログインし直しても使えません。次の管理 API へのリクエストがそのセッションを拒否し、同じように削除します。
 
-ユーザー、セッション、Passkey は D1 に残ります。そのため、同じアドレスを戻すとまた使えます。完全に消すには、次のコマンドを自分で実行してください（アドレスは置き換えます）。
+この確認の対象は管理 API（`/api/admin/*`）です。Passkey の追加など、`/api/auth/*` の下にある Better Auth 自身のエンドポイントは `ADMIN_EMAILS` を読みません。ただし、そこでできることでは、問い合わせやフォームには届きません。
+
+管理 API へのリクエストでは、セッションの有効期限を延ばしません。延ばすのは Better Auth 自身のセッションのエンドポイントだけです。そのため、外された管理者が管理 API を使ってセッションを保ち続けることはできません。
+
+ユーザーと Passkey は D1 に残ります。そのため、同じアドレスを戻すと、同じ Passkey でまたログインできます。古いセッションは削除済みなので戻りません。ユーザーと Passkey を完全に消すには、次のコマンドをご自身で実行してください（アドレスは置き換えます）。
 
 ```sh
 npx wrangler d1 execute DB --remote --command "DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = 'old@example.com'); DELETE FROM user WHERE email = 'old@example.com';"
