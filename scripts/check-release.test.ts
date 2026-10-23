@@ -3,6 +3,7 @@ import {
   checkServerManifest,
   checkStarterManifest,
   checkTarballFiles,
+  parsePackJson,
   type PackageJson,
 } from './check-release.ts';
 
@@ -78,5 +79,45 @@ describe('checkTarballFiles', () => {
       ['0000_initial.sql', '0001_next.sql'],
     );
     expect(problems).toHaveLength(3);
+  });
+});
+
+describe('parsePackJson', () => {
+  const entry = {
+    name: '@goodnight-web/server',
+    files: [{ path: 'README.md' }, { path: 'src/index.ts' }],
+  };
+  const expected = ['package/README.md', 'package/src/index.ts'];
+
+  test('reads the array that npm 11 and earlier print', () => {
+    expect(parsePackJson(JSON.stringify([entry]))).toEqual(expected);
+  });
+
+  test('reads the object keyed by package name that npm 12 prints', () => {
+    expect(
+      parsePackJson(JSON.stringify({ '@goodnight-web/server': entry })),
+    ).toEqual(expected);
+  });
+
+  test('throws with the raw output for an empty object', () => {
+    expect(() => parsePackJson('{}')).toThrow(/unexpected output.*\{\}/);
+  });
+
+  test('throws with the raw output for text that is not JSON', () => {
+    expect(() => parsePackJson('npm warn something')).toThrow(
+      /npm warn something/,
+    );
+  });
+
+  test('throws for an entry without files and for a malformed file', () => {
+    expect(() => parsePackJson('[{"name":"x"}]')).toThrow(/unexpected output/);
+    expect(() => parsePackJson('[{"files":[{"size":1}]}]')).toThrow(
+      /unexpected output/,
+    );
+  });
+
+  test('truncates long output in the error', () => {
+    const long = 'x'.repeat(2000);
+    expect(() => parsePackJson(long)).toThrow(/2000 characters/);
   });
 });

@@ -116,16 +116,58 @@ export const checkTarballFiles = (
 const readJson = (path: string): PackageJson =>
   JSON.parse(readFileSync(path, 'utf8')) as PackageJson;
 
-/** The tarball's file list from `npm pack --dry-run` (no scripts, no write). */
-const listTarball = (packageDir: string): string[] => {
-  const output = execFileSync(
-    'npm',
-    ['pack', '--dry-run', '--json', '--ignore-scripts'],
-    { cwd: packageDir, encoding: 'utf8' },
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const OUTPUT_LIMIT = 500;
+
+const unexpectedOutput = (output: string): Error =>
+  new Error(
+    `unexpected output from \`npm pack --dry-run --json\`: ${
+      output.length > OUTPUT_LIMIT
+        ? `${output.slice(0, OUTPUT_LIMIT)}... (${output.length} characters)`
+        : output
+    }`,
   );
-  const [result] = JSON.parse(output) as { files: { path: string }[] }[];
-  return (result?.files ?? []).map((file) => `package/${file.path}`);
+
+/**
+ * The file list from the JSON that `npm pack --dry-run --json` prints. npm 11
+ * and earlier print an array with one entry per package; npm 12 prints an
+ * object keyed by package name. Throws, with the raw output, for any other
+ * shape.
+ */
+export const parsePackJson = (output: string): string[] => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw unexpectedOutput(output);
+  }
+  const entries: unknown[] = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed)
+      ? Object.values(parsed)
+      : [];
+  const [entry] = entries;
+  if (entries.length !== 1 || !isRecord(entry) || !Array.isArray(entry.files)) {
+    throw unexpectedOutput(output);
+  }
+  return entry.files.map((file: unknown) => {
+    if (!isRecord(file) || typeof file.path !== 'string') {
+      throw unexpectedOutput(output);
+    }
+    return `package/${file.path}`;
+  });
 };
+
+/** The tarball's file list from `npm pack --dry-run` (no scripts, no write). */
+const listTarball = (packageDir: string): string[] =>
+  parsePackJson(
+    execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+      cwd: packageDir,
+      encoding: 'utf8',
+    }),
+  );
 
 if (import.meta.main) {
   const root = join(import.meta.dir, '..');
