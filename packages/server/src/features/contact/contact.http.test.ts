@@ -773,6 +773,31 @@ describe('Slack notification', () => {
     expect(rows(worker)[0]?.notified_at).toBeNull();
   });
 
+  test('a redirect from the webhook is not followed and not a delivery', async () => {
+    external.restore();
+    external = mockExternalFetch({
+      slack: () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: 'https://attacker.example/hook' },
+        }),
+    });
+    const worker = createTestWorker({ env: { SLACK_WEBHOOK_URL: SLACK_URL } });
+    const logs = captureConsole();
+    try {
+      expect((await post(worker, validBody())).status).toBe(200);
+    } finally {
+      logs.restore();
+    }
+    expect(external.slackCalls().map((call) => call.redirect)).toEqual([
+      'manual',
+    ]);
+    expect(external.calls.map((c) => c.url)).not.toContain(
+      'https://attacker.example/hook',
+    );
+    expect(rows(worker)[0]?.notified_at).toBeNull();
+  });
+
   test('a webhook URL that is not Slack is never called', async () => {
     const worker = createTestWorker({
       env: { SLACK_WEBHOOK_URL: 'https://attacker.example/hook' },

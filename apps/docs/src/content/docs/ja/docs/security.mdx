@@ -92,7 +92,7 @@ Worker にも Access のトークンを確認させるには、次の 2 つを�
 | `ACCESS_AUD`         | Access アプリケーションの **Application Audience (AUD) Tag**。カンマで区切って複数指定できます。 |
 | `ACCESS_TEAM_DOMAIN` | チームドメイン。たとえば `your-team.cloudflareaccess.com` です。                                 |
 
-両方あると、Worker は上のパスで `Cf-Access-Jwt-Assertion` ヘッダーを確認します。最初の管理者を作るセットアップにも、正しいトークンが必要になります。確認するのは、RS256 の署名、発行者、aud、`exp`、`nbf` です（[Cloudflare: JWT の検証](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)）。署名の鍵は `https://<チームドメイン>/cdn-cgi/access/certs` から取得し、Worker が 1 時間キャッシュします。
+両方あると、Worker は上のパスで `Cf-Access-Jwt-Assertion` ヘッダーを確認します。最初の管理者を作るセットアップにも、正しいトークンが必要になります。確認するのは、RS256 の署名、発行者、aud、`exp`、`nbf` です（[Cloudflare: JWT の検証](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)）。署名の鍵は `https://<チームドメイン>/cdn-cgi/access/certs` から取得し、Worker が 1 時間キャッシュします。取得に失敗したときは 10 秒間は取得し直さず、その間のリクエストには 503 を返します。
 
 - トークンがない、または正しくないときは 403（`access_denied`）を返します。
 - 2 つの設定の片方しかないとき、`ACCESS_TEAM_DOMAIN` がホスト名だけの形でないとき、署名の鍵を取得できないときは、これらのパスは 503（`access_unavailable`）を返します。

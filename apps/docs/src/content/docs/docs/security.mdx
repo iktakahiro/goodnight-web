@@ -92,7 +92,7 @@ To have the Worker check the Access token as well, set both of these:
 | `ACCESS_AUD`         | The Access application's **Application Audience (AUD) Tag**. Several tags can be given, separated by commas. |
 | `ACCESS_TEAM_DOMAIN` | Your team domain, such as `your-team.cloudflareaccess.com`.                                                  |
 
-With both set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the paths above, so setup of the first admin also needs a valid token. It checks the RS256 signature, the issuer, the audience, `exp`, and `nbf` ([Cloudflare: validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)). The signing keys come from `https://<team domain>/cdn-cgi/access/certs`, and the Worker caches them for an hour.
+With both set, the Worker checks the `Cf-Access-Jwt-Assertion` header on the paths above, so setup of the first admin also needs a valid token. It checks the RS256 signature, the issuer, the audience, `exp`, and `nbf` ([Cloudflare: validate JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)). The signing keys come from `https://<team domain>/cdn-cgi/access/certs`, and the Worker caches them for an hour. If fetching them fails, the Worker does not try again for 10 seconds, and requests in between get 503.
 
 - A missing or invalid token gets 403 (`access_denied`).
 - Those paths return 503 (`access_unavailable`) when only one of the two settings is set, when `ACCESS_TEAM_DOMAIN` is not a plain hostname, or when the keys cannot be fetched.

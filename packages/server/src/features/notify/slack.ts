@@ -76,6 +76,9 @@ export const sendSlackNotification = async ({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
+      // The URL is checked to be on hooks.slack.com; do not follow a
+      // redirect elsewhere. A redirect counts as a failed delivery.
+      redirect: 'manual',
     });
     if (!response.ok) {
       console.warn(`slack: webhook returned ${response.status}`);

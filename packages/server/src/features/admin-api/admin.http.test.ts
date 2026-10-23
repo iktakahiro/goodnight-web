@@ -697,6 +697,28 @@ describe('admin API with an admin session', () => {
     expect(text).toContain(`"' =cmd|""/c calc""!A1"`);
   });
 
+  test('a failed CSV stream ends with a generic error, not the query', async () => {
+    await seed(worker, 'abc');
+    const pause = worker.pauseAt(/^select .* from "submissions"/s);
+    const logs = captureConsole();
+    try {
+      const response = await get('/api/admin/submissions.csv?q=secret-search');
+      expect(response.status).toBe(200);
+      const reading = response.text().then(
+        () => null,
+        (error: unknown) => error,
+      );
+      await pause.reached;
+      pause.release(new Error('D1 failed: params secret-search'));
+      const failure = await reading;
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toBe('csv export failed');
+      expect(logs.text()).toContain('csv export failed');
+    } finally {
+      logs.restore();
+    }
+  });
+
   test('GET /status reports configuration without secret values', async () => {
     await seed(worker, 'abc');
     const status = await (await get('/api/admin/status')).json();

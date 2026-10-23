@@ -371,7 +371,9 @@ export const adminRoutes = new Hono<HonoEnv>()
           );
         } catch (error) {
           console.error('csv export failed:', safeErrorMessage(error));
-          controller.error(error);
+          // A generic error: the runtime may log the reason of an errored
+          // stream, and a failed query carries its bound values.
+          controller.error(new Error('csv export failed'));
         }
       },
       cancel: async () => {
