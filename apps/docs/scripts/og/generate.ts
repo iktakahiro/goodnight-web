@@ -30,6 +30,62 @@ function titleLine(line: string, highlight: string): string {
   return `${escapeHtml(line.slice(0, start))}<em>${escapeHtml(highlight)}<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path d="M3 8.5C60 4.5 120 3.5 180 5s90 2.5 117 1.5" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg></em>${escapeHtml(line.slice(start + highlight.length))}`;
 }
 
+/**
+ * Scatters stars over the sky, in the page. A seeded generator (`seed`) picks
+ * the positions, so a run always draws the same sky, and stars keep clear of
+ * the logo, the text, and the screenshot. Most are small and faint, some are
+ * a little larger, and a few are brighter.
+ */
+function scatterStars(seed: number) {
+  let state = seed * 2654435761;
+  const random = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const clear = 16;
+  const boxes: DOMRect[] = [];
+  for (const selector of ['.logo', '.window']) {
+    const el = document.querySelector(selector);
+    if (el) boxes.push(el.getBoundingClientRect());
+  }
+  // Measure the text itself, not the block that holds it.
+  for (const el of document.querySelectorAll('h1 span, p span')) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    boxes.push(range.getBoundingClientRect());
+  }
+  const sky = document.getElementById('sky');
+  const placed: [number, number][] = [];
+  for (let n = 0; n < 420; n++) {
+    const x = random() * 1200;
+    const y = random() * 630;
+    const roll = random();
+    const size = roll < 0.6 ? 1.5 : roll < 0.88 ? 2 : roll < 0.965 ? 2.6 : 3.2;
+    const opacity =
+      size === 1.5
+        ? 0.14 + random() * 0.3
+        : size === 2
+          ? 0.4 + random() * 0.3
+          : 0.75 + random() * 0.25;
+    const blocked =
+      boxes.some(
+        (b) =>
+          x > b.left - clear &&
+          x < b.right + clear &&
+          y > b.top - clear &&
+          y < b.bottom + clear,
+      ) || placed.some(([px, py]) => Math.hypot(px - x, py - y) < 16);
+    if (blocked) continue;
+    placed.push([x, y]);
+    const star = document.createElement('i');
+    star.className = 'star';
+    star.style.cssText = `left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${size}px;height:${size}px;opacity:${opacity.toFixed(2)}`;
+    sky?.append(star);
+  }
+}
+
 async function page(copy: OgCopy): Promise<string> {
   const [regular, bold, inter, logo, shot] = await Promise.all([
     dataUrl(`${fonts}/noto-sans-cjk-jp-regular.otf`, 'font/otf'),
@@ -54,8 +110,7 @@ body {
   color: #f3efff;
   background: linear-gradient(180deg, #1b0f33, #24124a);
 }
-.star { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #efe9ff; opacity: 0.6; }
-.star.s { width: 2px; height: 2px; opacity: 0.45; }
+.star { position: absolute; border-radius: 50%; background: #efe9ff; }
 .logo { position: absolute; left: 72px; top: 60px; height: 62px; }
 .copy { position: absolute; left: 72px; top: 176px; }
 h1 { font-size: ${ja ? 64 : 68}px; font-weight: ${ja ? 700 : 800}; line-height: ${ja ? 1.3 : 1.18}; letter-spacing: ${ja ? '-0.01em' : '-0.03em'}; }
@@ -75,15 +130,7 @@ p span { display: block; }
 .window img { display: block; width: 720px; }
 </style>
 <body>
-<i class="star" style="left:520px;top:70px"></i>
-<i class="star s" style="left:640px;top:112px"></i>
-<i class="star s" style="left:922px;top:58px"></i>
-<i class="star" style="left:1088px;top:104px"></i>
-<i class="star s" style="left:1146px;top:206px"></i>
-<i class="star s" style="left:980px;top:268px"></i>
-<i class="star s" style="left:38px;top:300px"></i>
-<i class="star" style="left:360px;top:568px"></i>
-<i class="star s" style="left:140px;top:590px"></i>
+<div id="sky"></div>
 <img class="logo" src="${logo}" alt="">
 <div class="copy">
   <h1>${copy.title.map((line) => `<span>${titleLine(line, copy.highlight)}</span>`).join('')}</h1>
@@ -111,6 +158,7 @@ try {
     const tab = await context.newPage();
     await tab.setContent(await page(copy), { waitUntil: 'load' });
     await tab.evaluate(() => document.fonts.ready);
+    await tab.evaluate(scatterStars, copy.locale === 'ja' ? 1 : 2);
     const png = await tab.screenshot({ type: 'png' });
     await Bun.write(`${docs}/public/${copy.output}`, png);
     console.log(`${copy.output}: ${(png.length / 1024).toFixed(0)} KB`);

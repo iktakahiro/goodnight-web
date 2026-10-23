@@ -5,8 +5,11 @@
 - `public/images/og/og-ja.png` (the default for the site and every Japanese page)
 - `public/images/og/og-en.png` (every English page)
 
-The title, highlight, and sentence under it come from the `hero` block of
-`src/content/docs/ja/index.mdx` and `src/content/docs/index.mdx`. The logo is
+The title and highlight come from the `hero` block of
+`src/content/docs/ja/index.mdx` and `src/content/docs/index.mdx`. The sub line
+under the title (where the kit runs) is written in `copy.ts`, because it
+differs from the page eyebrow. The stars are drawn from a seeded generator and
+keep clear of the text, logo, and screenshot, so a run always gives the same sky. The logo is
 `brand/goodnight-web-lockup-dark.svg`, and the screenshot is the inquiry list
 in `public/images/admin/`. Run `bun run og` and commit the PNGs whenever the
 hero copy, the logo, or that screenshot changes. The alt text and file names

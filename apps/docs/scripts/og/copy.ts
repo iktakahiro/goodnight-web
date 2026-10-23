@@ -7,7 +7,7 @@ export interface OgCopy {
   /** Hero title lines; the last line carries the highlight. */
   title: string[];
   highlight: string;
-  /** The sentence under the title, broken where the image breaks it. */
+  /** The sub line under the title, one string per line of the image. */
   eyebrow: string[];
   /** Screenshot shown in the browser frame, relative to `public/`. */
   screenshot: string;
@@ -17,7 +17,11 @@ export interface OgCopy {
 
 const root = resolve(import.meta.dirname, '../..');
 
-/** Reads the `hero` block of a docs top page, so the image never drifts from the page. */
+/**
+ * Reads the `hero` block of a docs top page, so the title never drifts from
+ * the page. The sub line is written here instead: the image says where the
+ * kit runs, while the page eyebrow says who it is for.
+ */
 async function readHero(file: string) {
   const source = await Bun.file(`${root}/src/content/docs/${file}`).text();
   const frontmatter = /^---\n([\s\S]*?)\n---/u.exec(source)?.[1];
@@ -25,12 +29,6 @@ async function readHero(file: string) {
     .hero as { title: string; highlight: string; eyebrow: string } | undefined;
   if (!hero) throw new Error(`${file} has no hero block.`);
   return hero;
-}
-
-/** Where the Japanese eyebrow breaks into two lines: after the first 、. */
-function breakEyebrow(eyebrow: string): string[] {
-  const at = eyebrow.indexOf('、');
-  return at < 0 ? [eyebrow] : [eyebrow.slice(0, at + 1), eyebrow.slice(at + 1)];
 }
 
 export async function readOgCopy(): Promise<OgCopy[]> {
@@ -41,7 +39,7 @@ export async function readOgCopy(): Promise<OgCopy[]> {
       locale: 'ja',
       title: ja.title.split('\n'),
       highlight: ja.highlight,
-      eyebrow: breakEyebrow(ja.eyebrow),
+      eyebrow: ['Cloudflareではじめる', 'Webサイトスターターキット'],
       screenshot: 'images/admin/inquiry-list-ja-light.webp',
       output: openGraphImages.ja.path,
     },
@@ -49,7 +47,7 @@ export async function readOgCopy(): Promise<OgCopy[]> {
       locale: 'en',
       title: en.title.split('\n'),
       highlight: en.highlight,
-      eyebrow: [en.eyebrow],
+      eyebrow: ['A website starter kit, on Cloudflare'],
       screenshot: 'images/admin/inquiry-list-en-light.webp',
       output: openGraphImages.en.path,
     },
