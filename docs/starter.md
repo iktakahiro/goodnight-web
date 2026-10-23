@@ -99,19 +99,21 @@ added only when a page needs real interactivity.
 - The D1 binding has no `database_id`. `wrangler dev`, `d1 migrations apply
   --local`, and `deploy --dry-run` work without it. Cloudflare creates the
   database and writes the ID when the Deploy button first deploys the site.
-- Secrets (`SETUP_TOKEN`, `ADMIN_EMAILS`, `BETTER_AUTH_SECRET`,
-  `IP_HASH_SECRET`, `TURNSTILE_SECRET`, optional `SLACK_WEBHOOK_URL`) are
-  listed with comments in `.dev.vars.example`. `package.json`
-  `cloudflare.bindings` has a short English Markdown description for each
-  secret, variable, and binding, for the Deploy button form (English only: the
-  form has no language switch). Keep each one to 150 characters or fewer.
+- Secrets (`APP_SECRET`, `ADMIN_EMAILS`, `TURNSTILE_SECRET`, optional
+  `SLACK_WEBHOOK_URL`) are listed with comments in `.dev.vars.example`. The
+  Deploy button reads the secrets for its form from that file (Cloudflare:
+  "Worker secrets can be defined in a `.dev.vars.example` or `.env.example`
+  file with a dotenv format"), so only uncommented keys belong there. The
+  optional `ACCESS_AUD`, `ACCESS_TEAM_DOMAIN`, and the separate-key overrides
+  `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET`
+  ([0010](decisions/0010-single-app-secret.md)) are commented out, so the
+  form does not ask for them. `package.json` `cloudflare.bindings` has a
+  short English Markdown description for each secret, variable, and binding,
+  for the Deploy button form (English only: the form has no language switch).
+  Keep each one to 150 characters or fewer.
   Cloudflare's documentation names no limit, but in the real form (reported
   2026-10-23) descriptions of 193 and 196 characters showed and those of 257
   or more did not.
-  `@goodnight-web/server` now accepts `APP_SECRET` in place of
-  `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET`
-  ([0010](decisions/0010-single-app-secret.md)). The starter keeps the four
-  variables until it pins a published server version with that change.
 - Scripts: `deploy` is `wrangler d1 migrations apply DB --remote && wrangler
   deploy`; `deploy:check` is `wrangler deploy --dry-run` (CI runs it through
   `turbo run deploy:check`); `preview` builds, applies migrations locally,
@@ -322,8 +324,12 @@ repository. `@goodnight-web/server` 0.1.0 is published on npm (maintainer
 Node APIs so users can run it with npm) builds the site, applies the
 migrations from `node_modules/@goodnight-web/server/migrations` to a fresh
 local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
-`E2E_PORT` (default 8841). Every secret is passed with `--var`, so a local
-`.dev.vars` does not change the result.
+`E2E_PORT` (default 8841). `E2E_SECRETS` picks the secrets, as in
+`packages/server/e2e`: `app-secret` (default) passes `APP_SECRET` and
+`ADMIN_EMAILS` only, as the Deploy form asks; `legacy` passes `SETUP_TOKEN`,
+`ADMIN_EMAILS`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET`. CI runs both.
+Every secret is passed with `--var`, and the other mode's secrets as empty
+values, so a local `.dev.vars` does not change the result.
 
 1. `src/worker.ts` without Turnstile keys: the home page in ja and en, the
    contact page shows "not available yet", `GET /api/contact/form` says
@@ -341,11 +347,13 @@ local D1 in `.wrangler/e2e-state`, and starts `wrangler dev` three times on
    server flags faster submissions as suspected spam (`too_fast`)), submits, and reads the row
    with `wrangler d1 execute DB --local`: email, `fields` (name, category,
    message), `form_version`, `status = unread`, `suspected_spam = 0`, empty
-   `spam_reasons`, `page_path`, and a 64-character hex `ip_hash`. Then it
+   `spam_reasons`, `page_path`, and a 64-character hex `ip_hash` keyed with
+   `IP_HASH_SECRET` or the key derived from `APP_SECRET`. Then it
    opens `/admin` in a Japanese browser context with a CDP virtual
-   authenticator (as in `packages/server/e2e`): setup with `SETUP_TOKEN` and
-   an `ADMIN_EMAILS` address, passkey registration (one resident credential,
-   one `passkey` row, `setup_closed_at` set), sign-out (the admin API answers
+   authenticator (as in `packages/server/e2e`): the setup screen names the
+   expected secret, setup with `APP_SECRET` (or `SETUP_TOKEN` in `legacy`
+   mode) and an `ADMIN_EMAILS` address, passkey registration (one resident
+   credential, one `passkey` row, `setup_closed_at` set), sign-out (the admin API answers
    401), passkey sign-in, the submitted inquiry in the list, the switch to
    English, the detail (marks it read), and marking it unread again, which
    is stored in D1. It fails on any CSP violation or page error in the admin UI.
