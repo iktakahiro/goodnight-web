@@ -43,10 +43,9 @@ computer only. Create the GitHub repository yourself and choose **Private**.
 Set these as Worker secrets in the Cloudflare dashboard (or in the deploy
 form). Never write them in a file in this repository. `.dev.vars.example`
 lists them with notes. The deploy form does not generate values for you:
-create `SETUP_TOKEN`, `BETTER_AUTH_SECRET`, and `IP_HASH_SECRET` with
-`openssl rand -base64 32`. A
-value that is too short or clearly not random (such as one character
-repeated) keeps the features that use it off.
+create `APP_SECRET` with `openssl rand -base64 32`. A value that is too short
+or clearly not random (such as one character repeated) keeps the features that
+use it off.
 
 | Name                               | Required | Purpose                                                                                                                                                                                                             |
 | ---------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,8 +91,8 @@ API refuses submissions.
    replaced by the one in `wrangler.jsonc` on the next deploy.
 3. Set the **secret key** as the `TURNSTILE_SECRET` Worker secret.
 
-The documentation has a step-by-step page (Setup > Turnstile).
-<!-- Add a link here once the documentation site has a domain. -->
+The documentation has a step-by-step page:
+[Setup > Turnstile](https://goodnight-web.dev/docs/setup/turnstile/).
 
 ## First admin
 

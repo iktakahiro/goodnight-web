@@ -28,7 +28,7 @@ description: Worker 1 つと D1 1 つで動く部品の一覧と、問い合わ�
 | 管理画面                  | React、TanStack Router・Form・Table で作り、Vite でビルドしたアプリ。ビルド済みの状態で `@goodnight-web/server` に入っていて、Worker が配信します。                                                                           |
 | Slack Webhook（任意）     | 新しい問い合わせを短く知らせます。個人情報は含めません。                                                                                                                                                                      |
 | Cloudflare Access（任意） | `/admin`、`/admin/*`、`/api/admin/*`、`/api/setup`、`/api/auth/*` の前に置く、もう 1 段のログイン。推奨ですが必須ではありません。`ACCESS_AUD` と `ACCESS_TEAM_DOMAIN` を設定すると、Worker も Access のトークンを確認します。 |
-| Cloudflare WAF（任意）    | 自分で設定するルールで、ドメインへのリクエストを Worker に届く前に制限します。WAF がなくても goodnight-web は同じように動きます。                                                                                             |
+| Cloudflare WAF（任意）    | ご自身で設定するルールで、ドメインへのリクエストを Worker に届く前に制限します。WAF がなくても goodnight-web は同じように動きます。                                                                                           |
 
 ## ルート
 
@@ -170,4 +170,4 @@ starter は、独自のデザイントークン（CSS 変数）を持ちます�
 ## 関連ページ
 
 - [しくみの詳細](/ja/docs/how-it-works/): 設計の判断を 1 つずつ説明しています。
-- [配布と更新のしくみ](/ja/docs/distribution/): どのファイルを自分で持つかを説明しています。
+- [配布と更新のしくみ](/ja/docs/distribution/): どのファイルをご自身で持つかを説明しています。
