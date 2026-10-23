@@ -28,6 +28,7 @@ Three constraints shape the design:
 | Admin screen                 | A React app (TanStack Router, Form, and Table) built with Vite. It ships prebuilt in `@goodnight-web/server` and is served by the Worker.                                                                                     |
 | Slack webhook (optional)     | Sends a short message when a new inquiry arrives. It contains no personal data.                                                                                                                                               |
 | Cloudflare Access (optional) | An extra sign-in layer in front of `/admin`, `/admin/*`, `/api/admin/*`, `/api/setup`, and `/api/auth/*`. Recommended, not required. With `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` set, the Worker also checks the Access token. |
+| Cloudflare WAF (optional)    | Rules you set in Cloudflare that filter requests to your domain before they reach the Worker. goodnight-web works the same without it.                                                                                        |
 
 ## Routes
 

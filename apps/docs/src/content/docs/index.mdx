@@ -12,42 +12,36 @@ hero:
 
 <LandingSection>
 
-## Run only what you need, in your own account
+## No CMS, no third-party form service
 
-No CMS (content management system) and no third-party form service, so it is clear which services you use and what needs maintaining.
+Pages are static files, and inquiries live in your own database. The only services you need are Cloudflare and GitHub.
 
 <FeatureGrid>
-  <Feature visual='files' wide title='Update pages by editing files'>
-    Do it by hand, or ask an AI tool to do it.
+  <Feature visual='files' wide title='Content is managed as static files'>
+    Pages, news, and the blog are static files such as Markdown. They are managed on GitHub and built with Astro.
 
     <FeatureNote>
-      \* Built with Astro (a tool that builds websites from files). Includes a
-      guide for AI tools (`AGENTS.md`).
+      \* A guide for AI tools, `AGENTS.md`, is included.
     </FeatureNote>
 
   </Feature>
   <Feature visual='data' title='Keep personal data out of third-party form services'
   >
-    Inquiries are saved to your own database. You read them in an admin panel you sign in to with a passkey (your face or fingerprint).
+    The contact form is already built. Inquiries are saved to your own database, and you read them in the admin panel. Sign-in uses a passkey only, with no password.
 
-    <FeatureNote>\* Stored in a D1 database in your own Cloudflare account.</FeatureNote>
+    <FeatureNote>\* Inquiries are stored in a D1 database inside your own Cloudflare account.</FeatureNote>
 
   </Feature>
-  <Feature visual='pull-request' title='Maintenance is mostly reviewing updates'>
-    Software updates arrive on GitHub as proposed changes (PRs). You review and apply (merge) them.
+  <Feature visual='build' title='Serve the built files as they are'>
+    The website is built as SSG, and the finished files are served as they are from Cloudflare. Pages are not assembled on a server for each visit, so they stay light.
 
     <FeatureNote>
-      \* Uses Cloudflare Workers, D1, and a GitHub repository (where your code
-      lives). [See the full maintenance list →](/docs/maintenance/)
+      \* Served with Static Assets on Cloudflare Workers.
     </FeatureNote>
 
   </Feature>
   <Feature visual='starter' wide title='Start without building from scratch'>
-    A starter kit with pages, a contact form, an admin panel, a database, and an update flow in place from day one.
-
-    <FeatureNote>
-      \* Set it up in your own account with the Deploy to Cloudflare button.
-    </FeatureNote>
+    A starter kit with pages, a contact form, an admin panel, and a database in place from day one.
 
     <DeployButton variant="secondary" />
 
@@ -58,21 +52,11 @@ No CMS (content management system) and no third-party form service, so it is cle
 
 <LandingSection id='architecture' tone='night'>
 
-## Everything inside your own Cloudflare account
+## Everything runs in your own Cloudflare account
 
-How an inquiry travels from the form to you. Your code lives on GitHub.
+The website, contact form, admin panel, and database all live in your own account. The dashed boxes are optional Cloudflare features you can add when you need them.
 
 <LandingArchitecture />
-
-<CloudflareNote>
-
-### What is Cloudflare?
-
-Cloudflare is a company whose services deliver websites quickly around the world and help protect them from attacks. Beyond delivering websites, it also offers ways to run programs and store data in databases.
-
-This starter kit runs your website, contact form, database, and admin panel all inside your own Cloudflare account. With few services involved, it is clear what you are in charge of.
-
-</CloudflareNote>
 
 </LandingSection>
 

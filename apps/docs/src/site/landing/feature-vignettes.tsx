@@ -1,12 +1,5 @@
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import {
-  CircleCheck,
-  FileText,
-  Folder,
-  GitMerge,
-  GitPullRequest,
-  Lock,
-} from 'lucide-react';
+import { Cloud, FileText, Folder, GitBranch, Hammer, Lock } from 'lucide-react';
 
 const copy = {
   en: {
@@ -23,8 +16,11 @@ const copy = {
       ['Emily Carter', 'emily@example.com', '10-23 09:12'],
       ['Hanako Yamada', 'yamada@example.com', '10-22 17:40'],
     ],
-    official: 'Official goodnight-web update',
-    merge: 'Merge pull request',
+    pipeline: [
+      ['GitHub', 'You push the files', 'git push'],
+      ['Astro', 'Builds the pages', 'astro build'],
+      ['Cloudflare', 'Serves the built files', 'dist/'],
+    ],
     tree: {
       content: 'News, blog',
       pages: 'Pages',
@@ -48,8 +44,11 @@ const copy = {
       ['山田 花子', 'yamada@example.com', '10-23 09:12'],
       ['Emily Carter', 'emily@example.com', '10-22 17:40'],
     ],
-    official: 'goodnight-web の公式アップデートです',
-    merge: 'マージ',
+    pipeline: [
+      ['GitHub', 'ファイルを push', 'git push'],
+      ['Astro', 'ページを生成', 'astro build'],
+      ['Cloudflare', '生成したファイルを配信', 'dist/'],
+    ],
     tree: {
       content: 'お知らせ・ブログ',
       pages: 'ページ',
@@ -98,7 +97,6 @@ function DataVignette({ text }: { text: Copy }) {
       <p className='vignette-data-head'>
         <Lock />
         <b>{text.database}</b>
-        <span data-brand='cloudflare-d1'>D1</span>
       </p>
       <ul>
         {text.inquiries.map(([name, email, time], index) => (
@@ -114,23 +112,24 @@ function DataVignette({ text }: { text: Copy }) {
   );
 }
 
-/** A Dependabot pull request with the update check comment. */
-function PullRequestVignette({ text }: { text: Copy }) {
+/** The path from the files in GitHub, through the build, to Cloudflare. */
+function BuildVignette({ text }: { text: Copy }) {
+  const icons = [GitBranch, Hammer, Cloud] as const;
   return (
-    <div className='vignette vignette-pr'>
-      <p className='vignette-pr-title'>
-        <GitPullRequest />
-        <b>Bump the goodnight-web group with 1 update</b>
-      </p>
-      <p className='vignette-pr-author'>dependabot[bot]</p>
-      <p className='vignette-pr-check'>
-        <CircleCheck />
-        {text.official}
-      </p>
-      <span className='vignette-pr-merge'>
-        <GitMerge />
-        {text.merge}
-      </span>
+    <div className='vignette vignette-build'>
+      <ol>
+        {text.pipeline.map(([name, step, command], index) => {
+          const Icon = icons[index] ?? Cloud;
+          return (
+            <li key={name}>
+              <Icon />
+              <b>{name}</b>
+              <span>{step}</span>
+              <code>{command}</code>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
@@ -164,7 +163,7 @@ function StarterVignette({ text }: { text: Copy }) {
 const vignettes = {
   files: FilesVignette,
   data: DataVignette,
-  'pull-request': PullRequestVignette,
+  build: BuildVignette,
   starter: StarterVignette,
 } as const;
 

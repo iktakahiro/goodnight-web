@@ -20,11 +20,8 @@
   --landing-button-text: #ffffff;
   --landing-shadow:
     0 1px 2px rgb(20 17 28 / 6%), 0 8px 24px -12px rgb(20 17 28 / 18%);
-  --landing-glow: rgb(116 59 196 / 10%);
   --landing-button-shadow:
     0 1px 0 rgb(255 255 255 / 15%) inset, 0 6px 16px -6px rgb(116 59 196 / 60%);
-  --landing-card-shadow:
-    0 1px 2px rgb(20 17 28 / 5%), 0 18px 36px -24px rgb(52 16 101 / 30%);
   --landing-shot-shadow:
     0 0 0 1px rgb(20 17 28 / 3%), 0 2px 4px rgb(20 17 28 / 5%),
     0 32px 64px -28px rgb(52 16 101 / 38%);
@@ -34,7 +31,7 @@
   --landing-accent-strong: #d3c4fd;
   --landing-bg: var(--color-fd-background);
   --landing-soft: #161619;
-  --landing-line: #26252b;
+  --landing-line: #2f2e36;
   --landing-line-strong: #3a3841;
   --landing-line-soft: #1d1c21;
   --landing-wash: #1c1726;
@@ -42,9 +39,7 @@
   --landing-shadow: 0 1px 2px rgb(0 0 0 / 50%);
   --landing-shot-shadow:
     0 0 0 1px rgb(255 255 255 / 3%), 0 32px 64px -24px rgb(0 0 0 / 90%);
-  --landing-card-shadow: 0 18px 36px -24px rgb(0 0 0 / 90%);
   --landing-vignette-bg: #131316;
-  --landing-glow: rgb(191 171 252 / 8%);
   --landing-button-shadow:
     0 1px 0 rgb(255 255 255 / 25%) inset, 0 6px 14px -8px rgb(0 0 0 / 70%);
 }
@@ -65,6 +60,7 @@ html:has(.landing):not(.dark) {
   --landing-line: rgb(226 216 255 / 14%);
   --landing-line-strong: rgb(226 216 255 / 30%);
   --landing-line-soft: rgb(226 216 255 / 10%);
+  --arch-wire: rgb(226 216 255 / 55%);
   --landing-button-text: #1c123b;
   --landing-button-shadow:
     0 1px 0 rgb(255 255 255 / 40%) inset, 0 8px 20px -10px rgb(0 0 0 / 70%);
@@ -103,7 +99,6 @@ html:has(.landing):not(.dark) {
   width: 3px;
   height: 3px;
   opacity: 0.8;
-  box-shadow: 0 0 6px 1px rgb(226 216 255 / 35%);
 }
 /* Side stars sit in the gutters beside the page width; narrower screens
    have no gutters, so they are not drawn there. */
@@ -124,7 +119,6 @@ html:has(.landing):not(.dark) {
   width: 30px;
   height: 30px;
   fill: #e4d8fb;
-  filter: drop-shadow(0 0 14px rgb(228 216 251 / 45%));
   transform: rotate(-12deg);
 }
 
@@ -148,7 +142,8 @@ html:has(.landing):not(.dark) {
 }
 /* Japanese: break at phrase boundaries and avoid one-character last lines.
    Headings keep the balanced wrap set above. */
-.landing :is(h1, h2, h3, p, li, small),
+.landing
+  :is(h1, h2, h3, p, li, small, .feature-note, .arch-node b, .arch-node span),
 .site-footer p {
   word-break: auto-phrase;
 }
@@ -196,18 +191,6 @@ html:has(.landing):not(.dark) {
   padding-block: 4.5rem 4rem;
   text-align: center;
 }
-.landing-hero::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  left: 50%;
-  top: 420px;
-  width: 900px;
-  height: 500px;
-  transform: translateX(-50%);
-  background: radial-gradient(closest-side, var(--landing-glow), transparent);
-  pointer-events: none;
-}
 .hero-eyebrow {
   margin: 0;
   color: var(--landing-muted);
@@ -236,6 +219,7 @@ html:has(.landing):not(.dark) {
   color: var(--landing-muted);
   font-size: 1.1875rem;
   line-height: 1.75;
+  text-wrap: balance;
 }
 .hero-phrase {
   display: inline-block;
@@ -457,34 +441,6 @@ html:has(.landing):not(.dark) {
 .dark .hero-site-image {
   filter: brightness(0.92);
 }
-.hero-label {
-  position: absolute;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--landing-line);
-  border-radius: 8px;
-  background: var(--landing-bg);
-  box-shadow: var(--landing-shadow);
-  color: var(--landing-ink);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-.hero-label svg {
-  width: 14px;
-  height: 14px;
-  color: var(--landing-muted);
-}
-.hero-label-admin {
-  top: -14px;
-  right: 20px;
-}
-.hero-label-site {
-  bottom: -14px;
-  left: 20px;
-}
 
 /* Built on */
 .built-on {
@@ -500,13 +456,10 @@ html:has(.landing):not(.dark) {
   min-height: 76px;
   padding-block: 0.75rem;
 }
-.built-on p {
-  margin: 0 0.5rem 0 0;
+.built-on-text {
   color: var(--landing-muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.9375rem;
+  white-space: nowrap;
 }
 .built-on-astro {
   display: inline-flex;
@@ -515,16 +468,13 @@ html:has(.landing):not(.dark) {
 }
 .built-on-astro img {
   width: auto;
-  height: 52px;
+  height: 40px;
 }
 .built-on-name {
-  padding: 6px 12px;
-  border: 1px solid var(--landing-line);
-  border-radius: 8px;
-  background: var(--landing-bg);
-  color: var(--landing-text);
-  font-size: 0.875rem;
+  color: var(--landing-ink);
+  font-size: 1.125rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 /* Sections. There are no eyebrow labels: the heading size and a hairline
@@ -590,16 +540,9 @@ html:has(.landing):not(.dark) {
   border: 1px solid var(--landing-line);
   border-radius: 12px;
   background: var(--landing-bg);
-  transition:
-    border-color 200ms,
-    box-shadow 200ms;
 }
 .feature-wide {
   grid-column: span 7;
-}
-.feature:hover {
-  border-color: var(--landing-line-strong);
-  box-shadow: var(--landing-card-shadow);
 }
 .feature-visual {
   display: grid;
@@ -608,13 +551,7 @@ html:has(.landing):not(.dark) {
   padding: 1.75rem 1.5rem;
   overflow: hidden;
   border-bottom: 1px solid var(--landing-line-soft);
-  background:
-    radial-gradient(
-      120% 90% at 50% 0%,
-      color-mix(in oklab, var(--landing-accent) 6%, transparent),
-      transparent 70%
-    ),
-    var(--landing-soft);
+  background: var(--landing-soft);
 }
 .feature-body {
   display: flex;
@@ -668,15 +605,10 @@ html:has(.landing):not(.dark) {
   border: 1px solid var(--landing-line);
   border-radius: 10px;
   background: var(--landing-bg);
-  box-shadow: var(--landing-card-shadow);
   color: var(--landing-text);
   font-size: 12px;
   line-height: 1.5;
   text-align: left;
-  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.feature:hover .vignette {
-  transform: translateY(-3px);
 }
 .vignette svg {
   flex: none;
@@ -791,13 +723,6 @@ html:has(.landing):not(.dark) {
   background: var(--landing-accent);
   color: var(--landing-button-text);
 }
-.vignette-data-head [data-brand] {
-  margin-left: auto;
-  padding: 1px 7px;
-  border: 1px solid var(--landing-line);
-  border-radius: 5px;
-  color: var(--landing-muted);
-}
 .vignette-data li {
   display: grid;
   grid-template-columns: 6px minmax(0, 1fr) auto;
@@ -839,57 +764,39 @@ html:has(.landing):not(.dark) {
   color: var(--landing-muted);
 }
 
-/* Pull request: a Dependabot update with the update check result. */
-.vignette-pr {
-  display: grid;
-  max-width: 360px;
-  gap: 8px;
-  padding: 14px 16px 16px;
+/* Build: the path from GitHub through the build to Cloudflare. */
+.vignette-build {
+  width: 100%;
+  max-width: 380px;
+  padding: 10px 14px;
 }
-.vignette-pr-title {
+.vignette-build li {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--landing-ink);
-  font-size: 12.5px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 0;
+  font-size: 12px;
 }
-.vignette-pr-title svg {
-  margin-top: 2px;
+.vignette-build li + li::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  height: 16px;
+  border-left: 1px dashed var(--landing-line-strong);
+}
+.vignette-build li svg {
   color: var(--landing-accent);
 }
-.vignette-pr-author {
-  margin-left: 21px !important;
+.vignette-build li b {
+  color: var(--landing-ink);
+}
+.vignette-build li span {
   color: var(--landing-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
 }
-.vignette-pr-check {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 2px !important;
-  padding: 7px 10px;
-  border: 1px solid var(--landing-line-soft);
-  border-radius: 6px;
-  background: var(--landing-soft);
-  color: var(--landing-ink);
-  font-weight: 600;
-}
-.vignette-pr-check svg {
-  color: var(--landing-accent);
-}
-.vignette-pr-merge {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  gap: 6px;
-  margin-top: 2px;
-  padding: 6px 14px;
-  border-radius: 7px;
-  background: var(--landing-accent);
-  box-shadow: var(--landing-button-shadow);
-  color: var(--landing-button-text);
-  font-weight: 700;
+.vignette-build li code {
+  margin-left: auto;
 }
 
 /* Starter kit: the top of the repository. */
@@ -935,216 +842,209 @@ html:has(.landing):not(.dark) {
   white-space: nowrap;
 }
 
-/* Architecture */
+/* Architecture: an infrastructure diagram. Desktop places the boxes on a
+   grid (actors, optional Cloudflare layers, the Worker, D1); the frames are
+   empty elements drawn behind the boxes. Narrow screens stack the boxes. */
 .arch {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) 128px;
-  align-items: center;
-  gap: 0 20px;
-  margin-top: 1.75rem;
+  grid-template-columns: 168px 48px 214px 52px minmax(0, 1fr) 52px 140px;
+  grid-template-rows: 2.25rem 2rem repeat(3, auto) auto;
+  gap: 14px 0;
+  margin-top: 2.5rem;
+  padding-inline: 22px;
 }
-.arch-actor {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  color: var(--landing-muted);
-  font-size: 0.78rem;
-  text-align: center;
-}
-.arch-actor svg {
-  width: 22px;
-  height: 22px;
-  margin-bottom: 2px;
-}
-.arch-actor b {
-  color: var(--landing-ink);
-  font-size: 0.9375rem;
-}
-.arch-visitor::after,
-.arch-you::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  width: 20px;
-  height: 1px;
-  background: var(--landing-line-strong);
-}
-.arch-visitor::after {
-  right: -20px;
-}
-.arch-you::before {
-  left: -20px;
-}
-.arch-account {
-  padding: 6px 14px 14px;
-  border: 1.5px dashed var(--landing-line-strong);
-  border-radius: 12px;
-  background: var(--landing-soft);
-}
-.arch-account-label {
-  margin: 2px 4px 12px;
-  color: var(--landing-text);
-  font-size: 0.8125rem;
-  font-weight: 700;
-}
-.arch-flow {
-  position: relative;
-}
-.arch-flow-line {
-  position: absolute;
-  z-index: 2;
-  inset: 0 0 auto;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--landing-accent) 45%, transparent),
-    var(--landing-accent-strong)
-  );
-  box-shadow: 0 0 12px 1px
-    color-mix(in oklab, var(--landing-accent) 70%, transparent);
-  transform-origin: left;
-}
-/* The bright head of the flow line. It travels with the line once and fades;
-   without scripting or with reduced motion it is not drawn. */
-.arch-flow-head {
-  position: absolute;
-  z-index: 3;
-  inset: -3px 0 auto;
-  height: 8px;
+.arch-frame {
+  z-index: 0;
+  border: 1px solid var(--landing-line-strong);
+  border-radius: 14px;
   pointer-events: none;
 }
-.arch-flow-head::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow:
-    0 0 8px 2px var(--landing-accent),
-    0 0 24px 6px color-mix(in oklab, var(--landing-accent) 50%, transparent);
+.arch-frame-account {
+  grid-column: 5 / 8;
+  grid-row: 1 / 7;
+  margin: 0 -22px -14px;
+  background: var(--landing-soft);
 }
-.arch-steps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.arch-step {
-  position: relative;
-  padding: 1.5rem 1.375rem;
-}
-.arch-step + .arch-step {
-  border-left: 1px solid var(--landing-line);
-}
-.arch-step-number {
-  color: var(--landing-muted);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-.arch-step-icon {
-  display: block;
-  width: 20px;
-  height: 20px;
-  margin: 12px 0 10px;
-  color: var(--landing-muted);
-}
-.arch-step h3 {
-  margin: 0 0 6px;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.5;
-}
-.arch-step p {
-  margin: 0;
-  color: var(--landing-muted);
-  font-size: 0.84rem;
-}
-.arch-step small {
-  display: block;
-  margin-top: 10px;
-  color: var(--landing-muted);
-  font-size: 0.75rem;
-}
-.arch-step-own :is(.arch-step-number, .arch-step-icon) {
-  color: var(--landing-accent);
-  transition:
-    color 300ms 800ms,
-    filter 300ms 800ms;
-}
-.arch-step-own .arch-step-icon {
-  filter: drop-shadow(
-    0 0 8px color-mix(in oklab, var(--landing-accent) 70%, transparent)
-  );
-}
-/* Before the steps scroll into view, the own-database step waits for the
-   line. Without scripting or with reduced motion, it shows the final state. */
-@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
-  .arch-flow:not([data-in])
-    .arch-step-own
-    :is(.arch-step-number, .arch-step-icon) {
-    color: var(--landing-muted);
-    filter: none;
-  }
-}
-.arch-repo {
-  display: flex;
-  grid-column: 2;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 12px 16px;
-  border: 1px solid var(--landing-line);
+.arch-frame-workers {
+  grid-column: 5;
+  grid-row: 2 / 6;
+  margin: 0 -10px -10px;
   border-radius: 10px;
   background: var(--landing-soft);
+}
+.arch-label {
+  z-index: 1;
+  align-self: center;
+  margin: 0;
   color: var(--landing-muted);
-  font-size: 0.84rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
-.arch-repo svg {
-  flex: none;
-  width: 18px;
-  height: 18px;
+.arch-label-account {
+  grid-column: 5 / 8;
+  grid-row: 1;
+  margin-left: -10px;
 }
-.arch-repo p {
-  margin: 0;
+.arch-label-workers {
+  grid-column: 5;
+  grid-row: 2;
 }
-.arch-repo b {
-  color: var(--landing-ink);
-}
-.cloudflare-note {
+.arch-node {
+  z-index: 1;
+  position: relative;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 0 24px;
-  margin-top: 3.5rem;
-  padding: 2.25rem 0 0;
-  border-top: 1px solid var(--landing-line);
-  scroll-margin-top: 5rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  align-self: center;
+  gap: 4px 8px;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--landing-line-strong);
+  border-radius: 10px;
+  background: #241448;
+  color: var(--landing-text);
 }
-.cloudflare-note h3 {
-  grid-row: 1 / span 4;
-  margin: 0;
-  font-size: 1.1875rem;
-  font-weight: 700;
+.arch-node svg {
+  width: 16px;
+  height: 16px;
+  color: var(--landing-accent);
 }
-.cloudflare-note p {
+.arch-node b {
+  overflow-wrap: normal;
+  color: var(--landing-ink);
+  font-size: 0.9375rem;
+  line-height: 1.3;
+}
+.arch-node em {
+  color: var(--landing-muted);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 600;
+}
+.arch-node span {
+  grid-column: 1 / -1;
+  color: var(--landing-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.arch-node.is-optional {
+  border-color: var(--arch-wire, var(--landing-line-strong));
+  border-style: dashed;
+  background: transparent;
+}
+.arch-visitor {
+  grid-column: 1;
+  grid-row: 3 / 5;
+}
+.arch-waf {
+  grid-column: 3;
+  grid-row: 3 / 5;
+}
+.arch-website {
+  grid-column: 5;
+  grid-row: 3;
+}
+.arch-form {
+  grid-column: 5;
+  grid-row: 4;
+}
+.arch-admin {
+  grid-column: 5;
+  grid-row: 5;
+}
+.arch-d1 {
+  grid-column: 7;
+  grid-row: 4 / 6;
+  align-self: stretch;
+  align-content: center;
+}
+.arch-owner {
+  grid-column: 1;
+  grid-row: 5;
+}
+.arch-access {
+  grid-column: 3;
+  grid-row: 5;
+}
+.arch-github {
+  grid-column: 1;
+  grid-row: 6;
+}
+.arch-builds {
+  grid-column: 5;
+  grid-row: 6;
+  margin-top: 16px;
+}
+.arch-builds::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  height: 30px;
+  border-left: 1px solid var(--landing-line-strong);
+}
+.arch-builds::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 26px);
+  left: calc(50% - 3px);
+  width: 6px;
+  height: 6px;
+  border-top: 1px solid var(--landing-line-strong);
+  border-left: 1px solid var(--landing-line-strong);
+  transform: rotate(45deg);
+}
+.arch-arrow {
+  z-index: 1;
+  position: relative;
+  align-self: center;
+  height: 1px;
+  margin-inline: 4px;
+  background: var(--arch-wire, var(--landing-line-strong));
+}
+.arch-arrow::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-top: 1px solid var(--arch-wire, var(--landing-line-strong));
+  border-right: 1px solid var(--arch-wire, var(--landing-line-strong));
+  transform: rotate(45deg);
+}
+.arch-arrow-visitor-waf {
   grid-column: 2;
-  max-width: 46em;
-  margin: 0 0 10px;
-  font-size: 0.9rem;
-  line-height: 1.85;
+  grid-row: 3 / 5;
 }
-.cloudflare-note p:last-child {
-  margin: 0;
+.arch-arrow-waf-website {
+  grid-column: 4;
+  grid-row: 3;
 }
-.cloudflare-note p:lang(en) {
-  max-width: 70ch;
+.arch-arrow-waf-form {
+  grid-column: 4;
+  grid-row: 4;
+}
+.arch-arrow-form-d1 {
+  grid-column: 6;
+  grid-row: 4;
+}
+.arch-arrow-admin-d1 {
+  grid-column: 6;
+  grid-row: 5;
+}
+.arch-arrow-owner-access {
+  grid-column: 2;
+  grid-row: 5;
+}
+.arch-arrow-access-admin {
+  grid-column: 4;
+  grid-row: 5;
+}
+.arch-arrow-github-builds {
+  grid-column: 2 / 5;
+  grid-row: 6;
+  margin-top: 16px;
 }
 
 /* Admin */
@@ -1223,7 +1123,8 @@ html:has(.landing):not(.dark) {
   letter-spacing: -0.01em;
 }
 .closing-cta p {
-  margin: 0 0 2.25rem;
+  max-width: 34em;
+  margin: 0 auto 2.25rem;
   color: var(--landing-muted);
   font-size: 1rem;
   text-wrap: balance;
@@ -1285,53 +1186,73 @@ html:has(.landing):not(.dark) {
     font-size: 1.875rem;
   }
 }
+@media (max-width: 960px) {
+  .arch {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-inline: 0;
+  }
+  .arch-frame,
+  .arch-arrow,
+  .arch-label-workers,
+  .arch-builds::before,
+  .arch-builds::after {
+    display: none;
+  }
+  .arch-node,
+  .arch-label {
+    margin: 0;
+  }
+  .arch-label-account {
+    order: 6;
+    margin-top: 18px;
+  }
+  .arch-visitor {
+    order: 1;
+  }
+  .arch-waf {
+    order: 2;
+  }
+  .arch-owner {
+    order: 3;
+    margin-top: 12px;
+  }
+  .arch-access {
+    order: 4;
+  }
+  .arch-github {
+    order: 5;
+    margin-top: 12px;
+  }
+  .arch-website {
+    order: 7;
+  }
+  .arch-form {
+    order: 8;
+  }
+  .arch-admin {
+    order: 9;
+  }
+  .arch-d1 {
+    order: 10;
+  }
+  .arch-builds {
+    order: 11;
+  }
+  :is(.arch-website, .arch-form, .arch-admin, .arch-d1, .arch-builds) {
+    margin-left: 14px;
+    border-left: 3px solid var(--arch-wire, var(--landing-line-strong));
+  }
+  .arch-node.is-optional {
+    background: transparent;
+  }
+}
 @media (max-width: 900px) {
   .feature,
   .feature-wide {
     grid-column: 1 / -1;
-  }
-}
-@media (max-width: 980px) {
-  .arch {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-  }
-  .arch-actor {
-    flex-direction: row;
-    justify-content: center;
-    gap: 8px;
-  }
-  .arch-actor svg {
-    margin: 0;
-  }
-  .arch-visitor::after,
-  .arch-you::before {
-    left: 50%;
-    right: auto;
-    top: auto;
-    width: 1px;
-    height: 14px;
-  }
-  .arch-visitor::after {
-    bottom: -14px;
-  }
-  .arch-you::before {
-    top: -14px;
-  }
-  .arch-repo {
-    grid-column: 1;
-    margin-top: 0;
-  }
-  .cloudflare-note {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    padding: 1.5rem 0 0;
-  }
-  .cloudflare-note h3 {
-    grid-row: auto;
-  }
-  .cloudflare-note p {
-    grid-column: 1;
   }
 }
 @media (max-width: 760px) {
@@ -1388,7 +1309,7 @@ html:has(.landing):not(.dark) {
     aspect-ratio: 4 / 3;
   }
   .hero-window-admin img {
-    object-position: 42% 0;
+    object-position: 0 0;
   }
   .hero-window-site img {
     object-position: 0 0;
@@ -1401,30 +1322,15 @@ html:has(.landing):not(.dark) {
   .window-bar span {
     display: none;
   }
-  .hero-label {
-    padding: 3px 8px;
-    font-size: 0.6875rem;
-  }
-  .hero-label-admin {
-    top: -12px;
-    right: 6px;
-  }
-  .hero-label-site {
-    bottom: -12px;
-    left: 6px;
-  }
-  .landing-hero::after {
-    top: 520px;
-    width: 500px;
-  }
   .built-on .landing-wrap {
     gap: 8px;
     padding-block: 1.125rem;
   }
-  .built-on p {
-    width: 100%;
-    margin: 0 0 4px;
-    text-align: center;
+  .built-on-astro img {
+    height: 34px;
+  }
+  .built-on-name {
+    font-size: 1.0625rem;
   }
   .landing-section,
   .landing-section + .landing-section,
@@ -1473,15 +1379,6 @@ html:has(.landing):not(.dark) {
   .feature h3:lang(ja) {
     font-size: 1.125rem;
   }
-  .arch-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .arch-step:nth-child(3) {
-    border-left: 0;
-  }
-  .arch-step:nth-child(n + 3) {
-    border-top: 1px solid var(--landing-line);
-  }
   .admin-showcase {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.75rem;
@@ -1524,39 +1421,6 @@ html:has(.landing):not(.dark) {
     aspect-ratio: 1 / 1;
     object-position: 12% 0;
   }
-  .arch-account {
-    padding: 10px;
-  }
-  .arch-steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .arch-step {
-    display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
-    column-gap: 14px;
-    padding: 1.125rem 1.25rem;
-  }
-  .arch-step + .arch-step,
-  .arch-step:nth-child(3) {
-    border-top: 1px solid var(--landing-line);
-    border-left: 0;
-  }
-  .arch-step-number {
-    position: absolute;
-    top: 18px;
-    right: 20px;
-  }
-  .arch-step-icon {
-    grid-row: 1 / 4;
-    margin: 3px 0 0;
-  }
-  .arch-step :is(h3, p, small) {
-    grid-column: 2;
-    padding-right: 28px;
-  }
-  .arch-step small {
-    margin-top: 6px;
-  }
 }
 
 /* Motion. Every effect runs once. The motion components render their start
@@ -1569,9 +1433,6 @@ html:has(.landing):not(.dark) {
     filter: none !important;
     transform: none !important;
   }
-  .arch-flow-head {
-    display: none;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .blur-fade,
@@ -1580,21 +1441,10 @@ html:has(.landing):not(.dark) {
     filter: none !important;
     transform: none !important;
   }
-  .arch-flow-head {
-    display: none;
-  }
-  .feature,
-  .vignette {
-    transition: none;
-  }
-  .feature:hover .vignette {
-    transform: none;
-  }
   .highlighter-mark path {
     animation: none;
   }
-  .landing a,
-  .arch-step-own :is(.arch-step-number, .arch-step-icon) {
+  .landing a {
     transition: none;
   }
 }

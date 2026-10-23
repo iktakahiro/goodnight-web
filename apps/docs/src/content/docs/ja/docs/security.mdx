@@ -32,6 +32,7 @@ goodnight-web が何をどう守るかと、運用であなたがすることを
 | HTTPS                          | 管理画面、管理 API、セットアップ、ログインは `https://` でだけ動きます。[HTTPS](#https) を参照してください。                                                                                                                                                                                                         |
 | Cloudflare Access              | 任意ですが、強く推奨します。50 ユーザーまで無料です。[Cloudflare Access](#cloudflare-access) を参照してください。                                                                                                                                                                                                    |
 | 最初の管理者                   | `SETUP_TOKEN` と、`ADMIN_EMAILS` にあるメールアドレスが必要です。最初のパスキーを登録するとセットアップは完了し、それ以降は使えません。[最初の管理者の作成](/ja/docs/how-it-works/first-admin/)を参照してください。                                                                                                  |
+| Cloudflare WAF                 | 任意です。設定したルールで、ドメインへのリクエストを制限します。[Cloudflare WAF](#cloudflare-waf) を参照してください。                                                                                                                                                                                               |
 | `workers.dev` とプレビュー URL | Access のポリシーから漏れやすいアドレスです。独自ドメインで動くようになったら無効にしてください。Access がなくても、管理画面にはパスキーでのログインが必要です。                                                                                                                                                     |
 | CSRF                           | `Origin` の確認と `SameSite` の Cookie で防ぎます。                                                                                                                                                                                                                                                                  |
 | ヘッダー                       | Worker の応答に Content Security Policy などのセキュリティヘッダーを付けます。パスを正規化してから決めるので、`/%61dmin`、`//admin`、`/admin/..%2f` にも `/admin` と同じヘッダーが付きます。                                                                                                                         |
@@ -83,6 +84,18 @@ Worker にも Access のトークンを確認させるには、次の 2 つを�
 - 2 つの設定の片方しかないとき、`ACCESS_TEAM_DOMAIN` がホスト名だけの形でないとき、署名の鍵を取得できないときは、これらのパスは 503（`access_unavailable`）を返します。
 - どちらの設定もなければ、Worker はトークンを確認しません。サイトの前の Access はそのまま働きます。Worker が二重に確認しないだけです。
 - Access を使っていても、パスキーでのログインは必要です。
+
+### Cloudflare WAF [#cloudflare-waf]
+
+Cloudflare WAF（Web Application Firewall）は、ドメインへのリクエストを、Worker に届く前にルールで確認します。任意の機能です。goodnight-web は WAF に頼っていません。Turnstile、レート制限、入力の確認は、WAF の有無にかかわらず Worker の中で動きます。
+
+WAF のルールは、Cloudflare アカウントに追加したドメイン（ゾーン）に対して働きます。カスタムルールは、URL のパスや IP アドレスなどでリクエストを判定し、ブロックしたりチャレンジを出したりできます。どのプランでも使えますが、作れるルールの数はプランによって違います。詳しくは Cloudflare のドキュメントを参照してください。
+
+- [Cloudflare WAF](https://developers.cloudflare.com/waf/)
+- [カスタムルール](https://developers.cloudflare.com/waf/custom-rules/)
+- [マネージドルール](https://developers.cloudflare.com/waf/managed-rules/)
+
+ルールは、本番で頼る前に試してください。`/api/contact` をブロックしたりチャレンジを出したりするルールは、実際の訪問者が問い合わせを送れなくなる原因になります。管理画面に入れる人を絞りたいときは、[Cloudflare Access](#cloudflare-access) が向いています。
 
 ### 管理者を外す [#removing-an-admin]
 

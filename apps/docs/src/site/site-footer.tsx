@@ -25,6 +25,10 @@ export function SiteFooter({ japanese }: { japanese: boolean }) {
       text: japanese ? 'セキュリティモデル' : 'Security model',
       url: sitePath(`${prefix}docs/security/`),
     },
+    {
+      text: japanese ? '用語集' : 'Glossary',
+      url: sitePath(`${prefix}docs/glossary/`),
+    },
   ];
 
   return (
@@ -32,7 +36,10 @@ export function SiteFooter({ japanese }: { japanese: boolean }) {
       <div className='landing-wrap'>
         <div className='site-footer-row'>
           <p className='site-footer-meta'>goodnight-web · MIT License</p>
-          <nav className='site-footer-links' aria-label='Footer'>
+          <nav
+            className='site-footer-links'
+            aria-label={japanese ? 'フッター' : 'Footer'}
+          >
             {links.map((link) => (
               <a key={link.url} href={link.url}>
                 {link.text}
