@@ -12,14 +12,14 @@ import '../../styles/landing.css';
 
 const copy = {
   en: {
-    gloss: 'Everything runs in your own Cloudflare® account.',
+    gloss: 'Everything stays in your own Cloudflare® account.',
     docs: 'Read the docs',
     stage: 'Example screens: the website and the admin panel',
     adminAlt: 'Inquiry list in the admin panel',
     siteAlt: 'Example website built with the starter kit',
   },
   ja: {
-    gloss: 'すべて自分の Cloudflare® アカウントで動きます。',
+    gloss: 'ご自身の Cloudflare® アカウントで完結します。',
     docs: 'ドキュメントを読む',
     stage: 'Webサイトと管理画面の表示例',
     adminAlt: '管理画面の問い合わせ一覧',

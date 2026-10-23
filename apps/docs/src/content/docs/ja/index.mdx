@@ -10,14 +10,27 @@ hero:
 
 <BuiltOn />
 
+<LandingSection id='architecture' tone='night'>
+
+## Webサイト運営が、ご自身のCloudflareアカウントで完結
+
+Webサイト、問い合わせフォーム、管理画面、データベースのすべてが、ご自身の Cloudflare アカウントの中で動きます。
+
+<LandingArchitecture />
+
+問い合わせの内容は Cloudflare の外に出ず、Slack 通知を使う場合も送られるのは新着の知らせと管理画面へのリンクだけです。管理画面のログインは Passkey のみに対応し、Cloudflare Access も追加できます。
+
+<FeatureNote>
+  ※ goodnight-web は Webサイト運営の SaaS
+  ではありません。セルフホスティング用のスターターキットと、構築手順のドキュメントを公開しています。
+</FeatureNote>
+
+</LandingSection>
+
 <LandingSection>
 
-## CMSも外部のフォームサービスも使わない
-
-ページは静的なファイルで管理し、問い合わせは自分のデータベースに保存します。必要なサービスは、Cloudflare と GitHub だけです。
-
 <FeatureGrid>
-  <Feature visual='files' wide title='コンテンツは、静的なファイルで管理する'>
+  <Feature visual='files' title='コンテンツは静的なファイルで管理'>
     ページ、お知らせ、ブログは、Markdown などの静的なファイルです。GitHub で管理し、Astro を使ってビルドします。
 
     <FeatureNote>
@@ -25,21 +38,11 @@ hero:
     </FeatureNote>
 
   </Feature>
-  <Feature visual='data' title='個人情報を、外部のフォームサービスに預けない'>
-    問い合わせフォームは実装済みです。届いた内容は自分のデータベースに保存され、管理画面で確認できます。ログインは Passkey だけで、パスワードは使いません。
-
-    <FeatureNote>※ 問い合わせは、自分の Cloudflare アカウント内の D1 データベースに保存します。</FeatureNote>
+  <Feature visual='data' title='外部フォームサービスに依存しない個人情報管理'>
+    問い合わせフォームは実装済みです。届いた内容は、ご自身の Cloudflare アカウント内の D1 データベースに保存され、管理画面で確認できます。
 
   </Feature>
-  <Feature visual='build' title='ビルド済みのファイルを、そのまま配信する'>
-    Webサイトは SSG でビルドし、できあがったファイルをそのまま Cloudflare から配信します。表示のたびにサーバーで組み立てないので、素早く表示されます。
-
-    <FeatureNote>
-      ※ 配信には、Cloudflare Workers の Static Assets を使います。
-    </FeatureNote>
-
-  </Feature>
-  <Feature visual='starter' wide title='一から作らずに始められる'>
+  <Feature visual='starter' title='ゼロからつくらずにはじめられる'>
     ページ、問い合わせフォーム、管理画面、データベースが最初からそろったスターターキットです。
 
     <DeployButton variant="secondary" />
@@ -49,25 +52,14 @@ hero:
 
 </LandingSection>
 
-<LandingSection id='architecture' tone='night'>
-
-## すべて自分のCloudflareアカウントで動く
-
-Webサイト、問い合わせフォーム、管理画面、データベースは、どれも自分のアカウントの中にあります。点線の枠は、必要なときに追加できる Cloudflare の機能です。
-
-<LandingArchitecture />
-
-</LandingSection>
-
 <LandingSection id='admin'>
 
 <AdminShowcase>
 
-## 問い合わせは、ひとつの管理画面で確認できる
+## 管理画面で、問い合わせとフォームを管理
 
-- 未読と既読を分けて管理します
-- スパムの疑いがあるものも、消さずに別に表示します
-- メールアドレスで検索し、CSV でエクスポートできます
+- 既読・未読、スパム疑いの別表示、メールアドレス検索、CSV 書き出しといった、問い合わせ対応の基本機能を備えています
+- フォームの項目は、コードを変えずに編集できます
 
 </AdminShowcase>
 
@@ -75,7 +67,7 @@ Webサイト、問い合わせフォーム、管理画面、データベース�
 
 <ClosingCta>
 
-## 自分のCloudflareアカウントで始める
+## ご自身のCloudflareアカウントで始める
 
 Deploy to Cloudflare ボタンから、すぐに用意できます。手順はドキュメントにまとめています。
 

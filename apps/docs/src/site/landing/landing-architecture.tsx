@@ -36,7 +36,7 @@ const copy = {
     waf: ['Cloudflare WAF', '設定したルールでリクエストを制限'],
     access: ['Cloudflare Access', '管理画面に二段目のログインを追加'],
     optional: '任意',
-    account: '自分の Cloudflare アカウント',
+    account: 'ご自身の Cloudflare アカウント',
     workers: 'Workers',
     website: ['Webサイト', 'Astro で生成した静的ファイル'],
     form: ['問い合わせフォーム API', 'Hono · Turnstile · レート制限'],

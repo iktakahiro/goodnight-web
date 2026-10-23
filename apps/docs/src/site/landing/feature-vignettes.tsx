@@ -39,7 +39,7 @@ const copy = {
       [4, '---'],
       [5, '2026年9月1日から、工房を下記の所在地に移転しました。'],
     ],
-    database: '自分のデータベース',
+    database: 'ご自身のデータベース',
     inquiries: [
       ['山田 花子', 'yamada@example.com', '10-23 09:12'],
       ['Emily Carter', 'emily@example.com', '10-22 17:40'],

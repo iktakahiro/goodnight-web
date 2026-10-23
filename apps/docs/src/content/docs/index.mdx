@@ -10,14 +10,27 @@ hero:
 
 <BuiltOn />
 
+<LandingSection id='architecture' tone='night'>
+
+## Run your whole website in your own Cloudflare account
+
+The website, contact form, admin panel, and database all run in your own Cloudflare account.
+
+<LandingArchitecture />
+
+Inquiry content stays inside Cloudflare, and even with Slack notifications, only a new-inquiry notice and a link to the admin panel are sent. Admin sign-in is passkey only, and you can add Cloudflare Access.
+
+<FeatureNote>
+  \* goodnight-web is not a SaaS for running websites. It is a starter kit for
+  self-hosting, plus documentation for setting it up.
+</FeatureNote>
+
+</LandingSection>
+
 <LandingSection>
 
-## No CMS, no third-party form service
-
-Pages are static files, and inquiries live in your own database. The only services you need are Cloudflare and GitHub.
-
 <FeatureGrid>
-  <Feature visual='files' wide title='Content is managed as static files'>
+  <Feature visual='files' title='Content managed as static files'>
     Pages, news, and the blog are static files such as Markdown. They are managed on GitHub and built with Astro.
 
     <FeatureNote>
@@ -25,23 +38,12 @@ Pages are static files, and inquiries live in your own database. The only servic
     </FeatureNote>
 
   </Feature>
-  <Feature visual='data' title='Keep personal data out of third-party form services'
-  >
-    The contact form is already built. Inquiries are saved to your own database, and you read them in the admin panel. Sign-in uses a passkey only, with no password.
-
-    <FeatureNote>\* Inquiries are stored in a D1 database inside your own Cloudflare account.</FeatureNote>
+  <Feature visual='data' title='Personal data management without external form services'>
+    The contact form is already built. Inquiries are stored in a D1 database in your own Cloudflare account, and you read them in the admin panel.
 
   </Feature>
-  <Feature visual='build' title='Serve the built files as they are'>
-    The website is built with SSG, and the finished files are served directly from Cloudflare. Pages are not assembled on a server for each visit, so they load quickly.
-
-    <FeatureNote>
-      \* Served with Static Assets on Cloudflare Workers.
-    </FeatureNote>
-
-  </Feature>
-  <Feature visual='starter' wide title='Start without building from scratch'>
-    A starter kit with pages, a contact form, an admin panel, and a database in place from day one.
+  <Feature visual='starter' title='Start without building from scratch'>
+    This starter kit includes pages, a contact form, an admin panel, and a database from day one.
 
     <DeployButton variant="secondary" />
 
@@ -50,25 +52,14 @@ Pages are static files, and inquiries live in your own database. The only servic
 
 </LandingSection>
 
-<LandingSection id='architecture' tone='night'>
-
-## Everything runs in your own Cloudflare account
-
-The website, contact form, admin panel, and database all live in your own account. The dashed boxes are optional Cloudflare features you can add when you need them.
-
-<LandingArchitecture />
-
-</LandingSection>
-
 <LandingSection id='admin'>
 
 <AdminShowcase>
 
-## Read every inquiry in one admin panel
+## Read inquiries and edit the form in the admin panel
 
-- Mark as read or unread
-- Keep suspected spam in its own view
-- Search by email, export to CSV
+- The basics of handling inquiries are covered: read/unread, a separate suspected-spam view, search by email, and CSV export
+- Edit form fields without code changes
 
 </AdminShowcase>
 
