@@ -318,21 +318,22 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'header.signedInAs': '{email} でログイン中',
 
   'login.title': '管理画面にログイン',
-  'login.lead': 'このサイトに登録したパスキーでログインしてください。',
-  'login.signingIn': 'パスキーの操作を待っています…',
+  'login.lead': 'このサイトに登録した Passkey でログインしてください。',
+  'login.signingIn': 'Passkey の操作を待っています…',
   'login.autofillLabel': 'アカウント',
   'login.autofillHint':
-    '入力欄を選択すると、保存済みのパスキーが候補に表示されます。下のボタンからでもログインできます。',
+    '入力欄を選択すると、保存済みの Passkey が候補に表示されます。下のボタンからでもログインできます。',
   'login.failed':
-    'ログインできませんでした。操作がキャンセルされたか、このサイトに登録されていないパスキーです。もう一度お試しください。',
+    'ログインできませんでした。操作がキャンセルされたか、このサイトに登録されていない Passkey です。もう一度お試しください。',
   'login.setupOpen': '管理者がまだ登録されていません。',
   'login.setupLink': '最初の管理者を登録',
-  'login.setupNote': 'このサイトにパスキーを登録した人だけがログインできます。',
+  'login.setupNote':
+    'このサイトに Passkey を登録した人だけがログインできます。',
 
   'setup.lead':
-    'シークレット SETUP_TOKEN の値と、ADMIN_EMAILS に含まれるメールアドレスを入力してください。そのあと、この端末にパスキーを登録します。',
+    'シークレット SETUP_TOKEN の値と、ADMIN_EMAILS に含まれるメールアドレスを入力してください。そのあと、この端末に Passkey を登録します。',
   'setup.step1': 'セットアップトークンの確認',
-  'setup.step2': 'パスキーの登録',
+  'setup.step2': 'Passkeyの登録',
   'setup.step3': '完了',
   'setup.stepOf': 'ステップ {current} / {total}',
   'setup.tokenHint': 'Cloudflare に設定したシークレット SETUP_TOKEN の値です。',
@@ -341,19 +342,19 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'setup.continue': '次へ',
   'setup.checking': '確認しています…',
   'setup.passkeyLead':
-    'パスキーはパスワードの代わりになるものです。端末やパスワード管理アプリに保存され、ログインするときは指紋や顔認証、PIN で本人確認をします。',
+    'Passkey はパスワードの代わりになるものです。端末やパスワード管理アプリに保存され、ログインするときは指紋や顔認証、PIN で本人確認をします。',
   'setup.passkeyDomain':
-    'パスキーはこのドメイン（{host}）でしか使えません。管理画面を独自ドメインに移す予定がある場合は、ここでは登録せず、先にそのドメインを設定してください。',
-  'setup.registering': 'パスキーの操作を待っています…',
+    'Passkey はこのドメイン（{host}）でしか使えません。管理画面を独自ドメインに移す予定がある場合は、ここでは登録せず、先にそのドメインを設定してください。',
+  'setup.registering': 'Passkey の操作を待っています…',
   'setup.passkeyFailed':
-    'パスキーを登録できませんでした。操作がキャンセルされたか、お使いのブラウザがパスキーに対応していません。もう一度お試しください。',
+    'Passkey を登録できませんでした。操作がキャンセルされたか、お使いのブラウザが Passkey に対応していません。もう一度お試しください。',
   'setup.doneTitle': 'セットアップが完了しました',
   'setup.doneLead':
-    'ログインしました。次回からは、いま登録したパスキーでログインしてください。セットアップ画面はこれで使えなくなりました。',
+    'ログインしました。次回からは、いま登録した Passkey でログインしてください。セットアップ画面はこれで使えなくなりました。',
   'setup.goToList': 'お問い合わせ一覧を開く',
   'setup.closedTitle': 'セットアップは完了しています',
   'setup.closedLead':
-    '管理者はすでに登録されています。パスキーでログインしてください。',
+    '管理者はすでに登録されています。Passkey でログインしてください。',
   'setup.unavailableTitle': 'セットアップに必要な設定がありません',
   'setup.problemMissing': '{name} が設定されていません。',
   'setup.problemTooShort': '{name} が {min} 文字より短いです。',
@@ -578,7 +579,7 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
 
   'forbidden.title': 'このアカウントでは管理画面を使えません',
   'forbidden.body':
-    'このメールアドレスは ADMIN_EMAILS に含まれていません。サイトの運用担当者に追加を依頼するか、別のパスキーでログインしてください。',
+    'このメールアドレスは ADMIN_EMAILS に含まれていません。サイトの運用担当者に追加を依頼するか、別の Passkey でログインしてください。',
 
   'error.generic': 'エラーが起きました。もう一度お試しください。',
 };

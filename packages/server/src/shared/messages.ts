@@ -110,7 +110,7 @@ const ja: MessageCatalog = {
   'error.not_found': '見つかりません。',
   'error.unauthorized': 'ログインしてください。',
   'error.forbidden': 'このアカウントでは管理画面を使えません。',
-  'error.passkey_required': 'パスキーを登録してください。',
+  'error.passkey_required': 'Passkey を登録してください。',
   'error.auth_unavailable':
     'ログインに必要な設定がありません。このサイトに BETTER_AUTH_SECRET（32 文字以上）を設定してください。',
   'error.setup_unavailable':
@@ -141,13 +141,13 @@ const ja: MessageCatalog = {
 
   'admin.title': 'お問い合わせ',
   'admin.unreadCount': '未読 {count} 件',
-  'admin.signIn': 'パスキーでログイン',
+  'admin.signIn': 'Passkeyでログイン',
   'admin.signOut': 'ログアウト',
   'admin.setup.title': '最初の管理者を登録',
   'admin.setup.token': 'セットアップトークン',
   'admin.setup.email': 'メールアドレス',
   'admin.setup.name': 'お名前',
-  'admin.setup.registerPasskey': 'パスキーを登録',
+  'admin.setup.registerPasskey': 'Passkeyを登録',
   'admin.export': 'CSV をダウンロード',
   'admin.delete': '削除',
   'admin.deleteConfirm':
