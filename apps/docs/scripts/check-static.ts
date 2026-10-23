@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { readPages } from './content';
 import { i18n, localeFromPath } from '../src/site/i18n';
 import { markdownFile } from '../src/site/paths';
+import { openGraphImages, openGraphSize } from '../src/site/open-graph';
 import { defaultSiteUrl } from './site-url';
 
 const root = resolve(import.meta.dirname, '..');
@@ -23,6 +24,7 @@ for await (const file of new Bun.Glob('**/*.html').scan(`${root}/dist`)) {
   let headings = 0;
   let canonical = '';
   const alternates: string[] = [];
+  const meta: Record<string, string> = {};
   const assets: string[] = [];
   await new HTMLRewriter()
     .on('[id]', {
@@ -56,6 +58,13 @@ for await (const file of new Bun.Glob('**/*.html').scan(`${root}/dist`)) {
         canonical = element.getAttribute('href') ?? '';
       },
     })
+    .on('meta[property], meta[name]', {
+      element(element) {
+        const key =
+          element.getAttribute('property') ?? element.getAttribute('name');
+        if (key) meta[key] = element.getAttribute('content') ?? '';
+      },
+    })
     .on('link[rel="alternate"][hreflang]', {
       element(element) {
         alternates.push(element.getAttribute('href') ?? '');
@@ -83,6 +92,31 @@ for await (const file of new Bun.Glob('**/*.html').scan(`${root}/dist`)) {
     );
   if (file !== '404.html' && canonical !== `${origin}${pathname}`)
     errors.push(`${file}: incorrect canonical URL (${canonical})`);
+  if (file !== '404.html') {
+    // Share images: an absolute URL on the configured origin, for X and others.
+    const image = openGraphImages[language === 'ja' ? 'ja' : 'en'];
+    const expected = `${origin}${base}${image.path}`;
+    if (meta['og:image'] !== expected || meta['twitter:image'] !== expected)
+      errors.push(`${file}: og:image and twitter:image must be ${expected}`);
+    if (meta['twitter:card'] !== 'summary_large_image')
+      errors.push(`${file}: twitter:card must be summary_large_image`);
+    for (const key of ['og:title', 'og:description', 'og:type', 'og:url'])
+      if (!meta[key]) errors.push(`${file}: missing ${key}`);
+    if (!meta['og:image:alt'] || !meta['twitter:image:alt'])
+      errors.push(`${file}: missing share image alt text`);
+    const png = Bun.file(`${root}/dist/${image.path}`);
+    if (!(await png.exists())) {
+      errors.push(`${file}: missing share image ${image.path}`);
+    } else {
+      const bytes = new DataView(await png.arrayBuffer());
+      if (
+        bytes.getUint32(16) !== openGraphSize.width ||
+        bytes.getUint32(20) !== openGraphSize.height ||
+        png.size > 1_000_000
+      )
+        errors.push(`${image.path} must be a PNG of 1200 x 630 px under 1 MB`);
+    }
+  }
   if (html.includes('/api/search') || html.includes('/_serverFn/'))
     errors.push(`${file}: runtime API dependency`);
   for (const href of assets) {
