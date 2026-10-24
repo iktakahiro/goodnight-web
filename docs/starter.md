@@ -5,7 +5,7 @@ maintainers. The user-facing rules are in the starter's own `AGENTS.md` and
 `README.md`.
 
 The starter pins `@goodnight-web/server` to an exact version
-(`"@goodnight-web/server": "0.9.1"`). In this repository bun links the
+(`"@goodnight-web/server": "0.9.2"`). In this repository bun links the
 workspace package when the version equals the one in
 `packages/server/package.json`. While a new server version waits to be
 published, the pin stays one release behind and bun installs that published
