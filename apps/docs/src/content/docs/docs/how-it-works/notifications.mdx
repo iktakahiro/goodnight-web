@@ -54,7 +54,7 @@ export default createGoodnightWorker({
 After the row is saved, the contact API starts the notification only for an inquiry that is not suspected spam:
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
-// 7. After the response: notification (never for suspected spam) and
+// 8. After the response: notification (never for suspected spam) and
 //    pruning.
 const webhookUrl = env.SLACK_WEBHOOK_URL;
 if (!suspectedSpam && isSlackWebhookUrl(webhookUrl)) {

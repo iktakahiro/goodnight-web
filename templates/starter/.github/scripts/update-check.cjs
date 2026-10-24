@@ -276,7 +276,30 @@ function clean(text) {
 const FOREIGN_SOURCE =
   /git\+|git:|github:|gitlab:|bitbucket:|file:|link:|http:\/\/|"link"\s*:\s*true/i;
 const ANY_URL = /[a-z][a-z0-9+.-]*:\/\/[^\s"']+/gi;
-const FUNDING_KEYS = ['funding', 'url', 'type'];
+
+/**
+ * For each line of a hunk, whether it lies inside a `"funding": [` or
+ * `"funding": {` block of the new file. Only there may the `url` and `type`
+ * keys carry other hosts: elsewhere they can be the name of a dependency (the
+ * npm packages `url` and `type` exist) whose version is a URL.
+ *
+ * @param {PatchLine[]} hunk
+ * @returns {boolean[]}
+ */
+function fundingFlags(hunk) {
+  let depth = 0;
+  return hunk.map(({ kind, text }) => {
+    if (kind === '-') return false;
+    const line = text.trim();
+    if (depth === 0) {
+      if (/^"funding"\s*:\s*[[{]$/.test(line)) depth = 1;
+      return false;
+    }
+    if (/[[{],?$/.test(line)) depth += 1;
+    else if (/^[}\]]/.test(line)) depth -= 1;
+    return true;
+  });
+}
 
 // One line of a pretty-printed JSON lockfile: a key and a value, a string
 // array element, or only punctuation.
@@ -302,7 +325,9 @@ function lockfileProblems(file) {
   }
   /** @type {string[]} */
   const problems = [];
-  for (const { kind, text } of hunks.flat()) {
+  const flat = hunks.flat();
+  const inFunding = hunks.flatMap(fundingFlags);
+  for (const [index, { kind, text }] of flat.entries()) {
     if (kind === ' ') continue;
     const line = text.trim();
     if (strict && !LOCKFILE_LINE.test(text)) {
@@ -322,8 +347,15 @@ function lockfileProblems(file) {
     const key = entry ? entry[1] : null;
     // Funding links point to other hosts by design, and a bare string is an
     // array element (`os`, `cpu`, `funding`); neither says where a package
-    // is installed from.
-    if (strict && (key === null || FUNDING_KEYS.includes(String(key)))) {
+    // is installed from. The `url` and `type` keys are skipped only inside
+    // a funding block, and `funding` only as a block or an https link.
+    const rawValue = entry ? String(entry[2]) : '';
+    const fundingHeader =
+      key === 'funding' &&
+      (/^[[{]$/.test(rawValue) || /^"https:\/\/[^"]*"$/.test(rawValue));
+    const fundingField =
+      (key === 'url' || key === 'type') && inFunding[index] === true;
+    if (strict && (key === null || fundingHeader || fundingField)) {
       continue;
     }
     if (FOREIGN_SOURCE.test(line)) {

@@ -54,7 +54,7 @@ export default createGoodnightWorker({
 問い合わせ API は、行を保存したあと、スパムの疑いがない問い合わせのときだけ通知を始めます。
 
 ```ts title="packages/server/src/features/contact/contact-routes.ts"
-// 7. After the response: notification (never for suspected spam) and
+// 8. After the response: notification (never for suspected spam) and
 //    pruning.
 const webhookUrl = env.SLACK_WEBHOOK_URL;
 if (!suspectedSpam && isSlackWebhookUrl(webhookUrl)) {

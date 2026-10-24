@@ -264,6 +264,43 @@ describe('classifyUpdate', () => {
     expect(result).toEqual({ official: true, reasons: [] });
   });
 
+  test.each([
+    ['a dependency named url', '"url": "git+https://evil.example/url.git"'],
+    ['a dependency named type', '"type": "github:evil/type"'],
+    [
+      'a dependency named url with a tarball',
+      '"url": "https://evil.example/u.tgz"',
+    ],
+    [
+      'a funding key with a git URL',
+      '"funding": "git+https://evil.example/f.git"',
+    ],
+  ])('a lockfile line with %s is not official', (_name, line) => {
+    const result = classify(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      modified(
+        'package-lock.json',
+        `@@ -500,0 +500,3 @@
++      "dependencies": {
++        ${line}
++      }`,
+      ),
+    ]);
+    expect(result.official).toBe(false);
+  });
+
+  test('a funding link given as a string is official', () => {
+    const result = classify(pullRequest(), [
+      modified('package.json', packageJsonPatch),
+      modified(
+        'package-lock.json',
+        `@@ -500,0 +500,1 @@
++      "funding": "https://github.com/sponsors/someone",`,
+      ),
+    ]);
+    expect(result).toEqual({ official: true, reasons: [] });
+  });
+
   test('a git URL in another lockfile is not official', () => {
     const result = classify(pullRequest(), [
       modified('package.json', packageJsonPatch),

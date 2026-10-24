@@ -3,7 +3,7 @@
 // Do not rename the bindings (DB, CONTACT_RATE_LIMITER, ASSETS) and do not
 // remove the run_worker_first paths: @goodnight-web/server looks them up by
 // name, and the contact form and the admin screen stop working without them.
-// Secrets (SETUP_TOKEN, ADMIN_EMAILS, and so on) are not set here. See
+// Secrets (APP_SECRET, ADMIN_EMAILS, and so on) are not set here. See
 // .dev.vars.example.
 {
   "$schema": "node_modules/wrangler/config-schema.json",

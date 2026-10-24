@@ -49,6 +49,9 @@ const result = await orm
 const verifications = await orm
   .delete(verification)
   .where(lt(verification.expiresAt, new Date(now)));
+const sessions = await orm
+  .delete(session)
+  .where(lt(session.expiresAt, new Date(now)));
 ```
 
 ## Why it is built this way

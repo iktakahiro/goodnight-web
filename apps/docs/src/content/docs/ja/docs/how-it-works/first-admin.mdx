@@ -39,7 +39,7 @@ description: APP_SECRET と ADMIN_EMAILS で最初の管理者を作る手順と
 ほかにも、次の場合はセットアップを使えません。
 
 - **回数制限をかけられないとき。** セットアップの試行回数には制限があります。Rate Limiting binding か、IP アドレスのハッシュに使う鍵がなければ、セットアップは止まります。
-- **設定がないか、シークレットが短いとき。** `APP_SECRET` は 32 文字以上が必要です。`SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` を設定する場合も同じです。必要な設定がないか短い値があると、セットアップ画面にその設定の名前を表示します。
+- **設定がないか、シークレットが短い、またはランダムでないとき。** `APP_SECRET` は 32 文字以上で、明らかにランダムな値（同じ文字の繰り返しなどでない）が必要です。`SETUP_TOKEN`、`BETTER_AUTH_SECRET`、`IP_HASH_SECRET` を設定する場合も同じです。`BETTER_AUTH_TRUSTED_ORIGINS` や `BETTER_AUTH_SECRETS` が設定されていても、セットアップは止まります。必要な設定がないか使えない値があると、セットアップ画面にその設定の名前を表示します。
 
 ## セットアップの完了
 
