@@ -5,6 +5,8 @@
 #   updates are not delayed.
 # - Merge only pull requests that have the "official goodnight-web update"
 #   comment from the Update check workflow. See README.md.
+# - TypeScript major updates are ignored for now. See the comment on the
+#   "ignore" list below.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -20,3 +22,9 @@ updates:
         patterns: ['*']
         exclude-patterns: ['@goodnight-web/*']
         update-types: [minor, patch]
+    # Temporary: this site stays on TypeScript 6 because "astro check"
+    # (@astrojs/check) needs the TypeScript 6 compiler API. Remove this rule
+    # once Astro's tooling supports TypeScript 7.
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']

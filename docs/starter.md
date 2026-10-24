@@ -20,6 +20,10 @@ TypeScript 7.1 or later, is experimental, and replaces `astro check` with
 `tsc`. Moving the starter to TypeScript 7 means changing its `type-check`
 script, not only the `typescript` pin.
 
+For this reason, `templates/starter/.github/dependabot.yml` ignores TypeScript
+major updates. The rule is temporary: remove it when `astro check`
+(`@astrojs/check`) supports TypeScript 7.
+
 ## Layout
 
 | Path                                     | Contents                                                                       |
