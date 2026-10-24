@@ -2,12 +2,19 @@
 // `templates/starter` cannot be used outside this monorepo. The Deploy to
 // Cloudflare button copies `templates/starter` alone as the root of a new
 // repository, so the starter must install `@goodnight-web/server` from npm.
-// Inside this repository, bun links the workspace package because the
-// starter pins the exact version of the workspace. The starter's
-// package-lock.json (used by `npm ci` in Workers Builds) must match its
-// package.json and lock that same version from the npm registry. Part of
-// `bun run validate`
-// and CI (after the build, because the tarball needs the generated files).
+//
+// The starter pins an exact version that is at most the version in
+// packages/server/package.json (docs/releasing.md):
+// - equal: bun links the workspace package, so the starter runs against the
+//   code in this repository. This is the normal state.
+// - older: the release window. A pull request bumped only the server, which is
+//   not on npm yet; the starter keeps the last published version, which bun
+//   installs from npm. After the new version is published, a second pull
+//   request moves the pin and the lockfile up.
+// In both cases the starter's package-lock.json (used by `npm ci` in Workers
+// Builds) must match its package.json and lock the pinned version from the
+// npm registry, so the Deploy button always installs a published version.
+// Part of `bun run validate` and CI.
 //
 //   bun scripts/check-release.ts
 //   bun scripts/check-release.ts --tarball packages/server/goodnight-web-server-0.9.1.tgz
@@ -34,6 +41,45 @@ export interface PackageJson {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
 }
+
+/**
+ * Compares two exact versions (`EXACT_VERSION`) by semver precedence:
+ * negative when `a` is older, 0 when equal, positive when newer. A
+ * pre-release is older than its release; pre-release identifiers compare
+ * numerically when both are numbers, otherwise as text, and a shorter list
+ * of identifiers is older.
+ */
+export const compareVersions = (a: string, b: string): number => {
+  const split = (version: string) => {
+    const dash = version.indexOf('-');
+    const core = dash === -1 ? version : version.slice(0, dash);
+    const pre = dash === -1 ? [] : version.slice(dash + 1).split('.');
+    return { core: core.split('.').map(Number), pre };
+  };
+  const left = split(a);
+  const right = split(b);
+  for (let i = 0; i < 3; i += 1) {
+    const diff = (left.core[i] ?? 0) - (right.core[i] ?? 0);
+    if (diff !== 0) return Math.sign(diff);
+  }
+  if (left.pre.length === 0 || right.pre.length === 0) {
+    return Math.sign(right.pre.length - left.pre.length) || 0;
+  }
+  for (let i = 0; i < Math.max(left.pre.length, right.pre.length); i += 1) {
+    const x = left.pre[i];
+    const y = right.pre[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    if (x === y) continue;
+    const xNum = /^\d+$/.test(x);
+    const yNum = /^\d+$/.test(y);
+    if (xNum && yNum) return Math.sign(Number(x) - Number(y));
+    if (xNum) return -1;
+    if (yNum) return 1;
+    return x < y ? -1 : 1;
+  }
+  return 0;
+};
 
 /** Problems that keep the server package from being published. */
 export const checkServerManifest = (pkg: PackageJson): string[] => {
@@ -75,11 +121,18 @@ export const checkStarterManifest = (
     }
   }
   const pinned = starter.dependencies?.[SERVER];
-  if (pinned !== serverVersion) {
+  if (!pinned || !EXACT_VERSION.test(pinned)) {
     problems.push(
-      `${SERVER} must be pinned to ${serverVersion} (the version in packages/server/package.json), ` +
-        `but the starter has ${pinned ?? 'nothing'}. Bump both together; a different version ` +
-        'makes bun install it from npm instead of linking the workspace.',
+      `${SERVER} must be pinned to an exact version, but the starter has ${pinned ?? 'nothing'}`,
+    );
+  } else if (
+    !serverVersion ||
+    !EXACT_VERSION.test(serverVersion) ||
+    compareVersions(pinned, serverVersion) > 0
+  ) {
+    problems.push(
+      `${SERVER} is pinned to ${pinned}, which is newer than packages/server (${serverVersion ?? 'unknown'}). ` +
+        'The pin must be the server version or an older, published one (docs/releasing.md).',
     );
   }
   return problems;
@@ -87,6 +140,10 @@ export const checkStarterManifest = (
 
 /** The registry that every locked package must come from. */
 export const NPM_REGISTRY = 'https://registry.npmjs.org/';
+
+/** The npm registry URL of the server package's tarball for `version`. */
+export const serverTarballUrl = (version: string): string =>
+  `${NPM_REGISTRY}${SERVER}/-/server-${version}.tgz`;
 
 const sameEntries = (
   a: Record<string, string> | undefined,
@@ -139,11 +196,20 @@ export const checkStarterLockfile = (
     );
   }
   const server = lock.packages[`node_modules/${SERVER}`];
+  const pinned = starter.dependencies?.[SERVER];
   const locked = isRecord(server) ? server.version : undefined;
-  if (locked !== starter.dependencies?.[SERVER] || locked !== serverVersion) {
+  if (locked !== pinned) {
     problems.push(
       `package-lock.json locks ${SERVER} ${String(locked ?? 'nothing')}, but the starter pins ` +
-        `${starter.dependencies?.[SERVER] ?? 'nothing'} and packages/server is ${serverVersion ?? 'unknown'}`,
+        `${pinned ?? 'nothing'}. npm can lock only a published version: bump the starter's pin ` +
+        `and lockfile after packages/server (${serverVersion ?? 'unknown'}) is on npm (docs/releasing.md).`,
+    );
+  } else if (
+    isRecord(server) &&
+    server.resolved !== serverTarballUrl(pinned ?? '')
+  ) {
+    problems.push(
+      `package-lock.json resolves ${SERVER} to ${String(server.resolved ?? 'nothing')}, not ${serverTarballUrl(pinned ?? '')}`,
     );
   }
   for (const [path, entry] of Object.entries(lock.packages)) {
@@ -379,8 +445,12 @@ if (import.meta.main) {
     console.error(problems.map((p) => `- ${p}`).join('\n'));
     process.exit(1);
   }
+  const pinned = starter.dependencies?.[SERVER];
   console.log(
-    `release check: ${SERVER}@${server.version} is publishable, and the starter pins and locks it` +
+    `release check: ${SERVER}@${server.version} is publishable, and the starter ` +
+      (pinned === server.version
+        ? 'pins and locks it'
+        : `pins and locks the published ${pinned} until ${server.version} is on npm`) +
       (tarball ? ` (checked ${tarball})` : ''),
   );
 }

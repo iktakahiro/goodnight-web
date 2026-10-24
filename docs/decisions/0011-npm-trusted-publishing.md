@@ -31,6 +31,12 @@ requests, but only the maintainer can push to `main` or push tags.
 - **Tokens are switched off** on npm ("Require two-factor authentication and
   disallow tokens") once the first workflow publish worked, so a leaked token
   cannot publish.
+- **The starter's pin follows one release behind.** A pull request bumps
+  only the server version; after the tag is published, a second pull
+  request moves the starter's pin and `package-lock.json` to it.
+  `check:release` accepts a pin that is equal to or older than the server
+  version, as long as the lockfile locks the pin from npm, so every commit
+  on `main`, including the tagged one, passes validation.
 - **Publishing by hand stays documented** as the emergency fallback
   ([releasing.md](../releasing.md)).
 
@@ -43,10 +49,14 @@ requests, but only the maintainer can push to `main` or push tags.
   expires if no publish completes within 2 days, and the settings (environment
   name, file name) are part of the trust: renaming `release.yml` or the
   environment means creating a new entry on npm.
-- `bun run validate` includes the starter lockfile check, which needs the
-  version to be on npm already (see [releasing.md](../releasing.md)); a
-  version bump therefore cannot pass the workflow's validation on `main`
-  before it is published. Changing that ordering is a separate decision.
+- A release takes two pull requests ([releasing.md](../releasing.md)).
+  Between them, the starter in this repository installs the previous,
+  published version from npm, so its CI checks run against that version and
+  a starter change that needs the new server code waits for the second pull
+  request. The Deploy button always installs a published, locked version.
+- `bunfig.toml` excludes `@goodnight-web/server` from the 48-hour
+  release-age rule, so the first pull request can install a pinned version
+  that was published less than 48 hours ago.
 - npm staged publishing (`npm stage publish`, approved with two-factor
   authentication) would add a stricter gate than the environment approval.
   It is not used now.

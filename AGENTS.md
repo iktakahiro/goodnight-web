@@ -38,7 +38,8 @@ The planned layout. Some workspaces do not exist yet. See
 - `templates/starter`: the Astro site that users copy and edit, usually with AI
   tools. It pins `@goodnight-web/server` to an exact version: bun links the
   workspace package here, and a copy of the folder installs it from npm. Bump
-  both versions together (`bun run check:release`).
+  the server version first and the pin after it is published
+  (`docs/releasing.md`, `bun run check:release`).
 - `apps/docs`: the user-facing documentation site (Fumadocs and TanStack Start,
   prerendered and served by Workers Static Assets).
 - `brand/`: the logo, favicon, and app icon files. `bun run brand:build`

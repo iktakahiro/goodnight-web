@@ -46,7 +46,8 @@ records a provenance statement for the version, because the repository and the
 package are public. The workflow needs npm 11.5.1 or later (Node 24 ships a
 newer one) and a GitHub-hosted runner; it fails early if npm is older.
 
-To release a version, with `main` at the commit to publish:
+To release a version, first merge the pull request that bumps only the server
+version ("Next versions" below). Then, with `main` at that commit:
 
 ```sh
 git tag -a v0.9.2 -m "v0.9.2"      # the version in packages/server/package.json
@@ -67,14 +68,6 @@ A tag that fails a check (not on `main`, wrong version, failed validation)
 publishes nothing. Delete it, fix the cause, and tag again. An npm version can
 be published only once, so a version that was published is never published
 again: bump the version instead.
-
-The workflow runs the same full validation as the manual steps, which includes
-the starter lockfile check. That check requires
-`templates/starter/package-lock.json` to lock the version the starter pins, and npm can lock only a version that is
-already on npm (see "Next versions"). So a commit that bumps the server to a
-version that is not on npm yet cannot pass the workflow's validation on
-`main`. Until that ordering is settled, a bumped version still goes out with
-"Publish by hand" below.
 
 ### Set up once (maintainer)
 
@@ -125,8 +118,9 @@ repository uses the environment approval instead.
 
 ## Publish by hand (emergency fallback)
 
-Use this when the workflow cannot run, and for a bumped version until the
-ordering above is settled. It needs a maintainer's npm account.
+Use this only when the workflow cannot run. It needs a maintainer's npm
+account. The order of "Next versions" is the same; only steps 2 and 3 are
+replaced by these commands.
 
 From a clean checkout of `main`, after CI is green:
 
@@ -167,24 +161,40 @@ was checked" in [starter.md](starter.md)).
 
 ## Next versions
 
-The starter's `package-lock.json` must lock the version it pins, and npm can
-lock only a version that is already on npm. So the order is: publish, then
-regenerate the lockfile, then merge.
+npm can lock only a version that is already on npm, and the starter's
+`package-lock.json` must lock the version it pins. So the starter's pin
+follows the server one release behind: `bun run check:release` accepts a pin
+that equals the server version or is older than it, as long as the lockfile
+locks that pin from the npm registry. Every commit on `main` therefore passes
+validation, and the Deploy button always installs a published version.
 
-1. On a branch, change `version` in `packages/server/package.json` and the
-   pin in `templates/starter/package.json` to the same number, and run
-   `bun install` (it updates `bun.lock`).
-2. Publish that version from the branch, as above (after
-   `check-release --tarball`). `bun run check:release` keeps failing on the
-   lockfile until step 3.
-3. Regenerate `templates/starter/package-lock.json` against the published
-   version (below) and commit it in the same pull request as the version
-   bump. `bun run check:release` now passes.
-4. Merge. The Deploy button then installs the new version, exactly as
-   locked.
+1. **Bump the server.** A pull request changes only `version` in
+   `packages/server/package.json` (with the code it releases) and runs
+   `bun install`, which updates `bun.lock`. The starter keeps its pin, so
+   bun now installs the pinned, published version from npm for
+   `templates/starter` instead of linking the workspace. The starter's
+   type check, build, and e2e test in CI run against that published
+   version, so a starter change that needs the new server code waits for
+   step 4. Merge it.
+2. **Tag.** Push the tag `v<version>` on that commit of `main` (above).
+3. **Approve.** Approve the **publish** job of the `Release` run. The
+   workflow publishes the version; check it with `npm view`.
+4. **Bump the starter.** A second pull request changes the pin in
+   `templates/starter/package.json` to the new version, runs `bun install`
+   (bun links the workspace again), and regenerates
+   `templates/starter/package-lock.json` against the published version
+   (below). Merge it. The Deploy button then installs the new version,
+   exactly as locked.
 5. Sites that were already copied update through their own Dependabot
    pull requests, which update their own `package-lock.json`, and the
    `update-check` workflow.
+
+Between step 1 and step 4, the starter in this repository runs the previous
+version. The workflow checks only that the tag equals the version in
+`packages/server/package.json`; the starter's pin is not part of it.
+`bunfig.toml` excludes `@goodnight-web/server` from its 48-hour release-age
+rule (`minimumReleaseAgeExcludes`), so step 1 works even when the pinned
+version was published less than 48 hours ago.
 
 ### Regenerate the starter lockfile
 

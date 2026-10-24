@@ -617,8 +617,9 @@ workflow that fails while the repository is public. See
 [starter.md](starter.md).
 
 In this repository the starter pins the exact version of
-`@goodnight-web/server`, and bun links the workspace package because the
-versions match. Its contact form uses `getContactForm()` and
+`@goodnight-web/server`, and bun links the workspace package when the
+versions match (between a server bump and its release, the pin stays on the
+published version; see [releasing.md](releasing.md)). Its contact form uses `getContactForm()` and
 `submitContact()`: it renders the fields of the current form definition and
 gets the Turnstile site key from the same response. When a user copies the
 starter (the Deploy to Cloudflare button copies the `templates/starter`

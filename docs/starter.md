@@ -6,10 +6,12 @@ maintainers. The user-facing rules are in the starter's own `AGENTS.md` and
 
 The starter pins `@goodnight-web/server` to an exact version
 (`"@goodnight-web/server": "0.9.1"`). In this repository bun links the
-workspace package, because the version equals the one in
-`packages/server/package.json`. When the folder is copied out alone, the same
-line installs the package from npm. `bun run check:release` fails if the two
-versions differ. Its `src/worker.ts` calls `createGoodnightWorker()`, and `wrangler.jsonc` has the
+workspace package when the version equals the one in
+`packages/server/package.json`. While a new server version waits to be
+published, the pin stays one release behind and bun installs that published
+version from npm instead ([releasing.md](releasing.md)). When the folder is
+copied out alone, the same line installs the package from npm.
+`bun run check:release` fails if the pin is newer than the server version. Its `src/worker.ts` calls `createGoodnightWorker()`, and `wrangler.jsonc` has the
 bindings the server needs.
 
 ## Layout
@@ -260,9 +262,10 @@ dependencies"). There is no sync workflow and no second repository.
 What makes it work:
 
 - `@goodnight-web/server` is pinned to an exact version that is published on
-  npm ([releasing.md](releasing.md)). Bump the server version and the
-  starter's pin in the same pull request; `bun run check:release` (part of
-  `validate` and CI) checks that the pin equals the server version, that
+  npm ([releasing.md](releasing.md)). Bump the server version first and the
+  starter's pin after the new version is published, in a second pull
+  request; `bun run check:release` (part of `validate` and CI) checks that
+  the pin is an exact version no newer than the server version, that
   neither package uses `workspace:`, `file:`, or `link:`, and that the
   tarball has everything the Worker needs.
 - The server package ships TypeScript source (`exports` point to `src/*.ts`).
@@ -296,12 +299,13 @@ What makes it work:
   `package.json` by hand must run `npm install` and commit both files, or
   `npm ci` fails; the starter README and `AGENTS.md` say so.
 - The lockfile is regenerated after each server release (for example after
-  0.9.1 is published), in the same change that bumps the starter's pin.
+  0.9.1 is published), in the pull request that bumps the starter's pin.
   The new version must be on npm before the lockfile can resolve it.
 - `bun run check:release` checks the lockfile offline: it exists, its root
   `dependencies` and `devDependencies` equal `package.json`, it locks the
-  pinned `@goodnight-web/server` version (which must equal the server
-  package version), and every entry comes from the npm registry with a
+  pinned `@goodnight-web/server` version from its npm tarball URL (the pin
+  may be older than the server package version, never newer), and every
+  entry comes from the npm registry with a
   sha512 integrity. CI also runs `npm ci --dry-run --ignore-scripts` (npm
   10.9.2) on a copy of `package.json` and `package-lock.json`, which fails
   when the two are out of step.
