@@ -268,22 +268,23 @@ const FormEditor = ({
       </div>
 
       <div className='sticky top-16 z-20 -mx-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-border/70 bg-background/90 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border'>
-        <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2'>
+        <div className='flex min-w-0 flex-auto items-center gap-2 sm:flex-1'>
           <Badge tone='outline' className='tabular-nums'>
             {t('form.version', { version: current.version })}
           </Badge>
           <span
             aria-live='polite'
             data-testid='form-dirty'
+            title={dirty ? t('form.unsaved') : t('form.upToDate')}
             className={cn(
-              'text-sm',
+              'truncate text-sm',
               dirty ? 'font-semibold text-foreground' : 'text-muted-foreground',
             )}
           >
             {dirty ? t('form.unsaved') : t('form.upToDate')}
           </span>
         </div>
-        <div className='flex gap-2'>
+        <div className='ml-auto flex max-w-full justify-end gap-2'>
           <Button
             variant='ghost'
             size='sm'
