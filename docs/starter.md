@@ -14,6 +14,12 @@ copied out alone, the same line installs the package from npm.
 `bun run check:release` fails if the pin is newer than the server version. Its `src/worker.ts` calls `createGoodnightWorker()`, and `wrangler.jsonc` has the
 bindings the server needs.
 
+The starter stays on TypeScript 6 because `astro check` needs its compiler
+API. Astro's path to TypeScript 7 is `@astrojs/ts-content-mapper`, which needs
+TypeScript 7.1 or later, is experimental, and replaces `astro check` with
+`tsc`. Moving the starter to TypeScript 7 means changing its `type-check`
+script, not only the `typescript` pin.
+
 ## Layout
 
 | Path                                     | Contents                                                                       |
