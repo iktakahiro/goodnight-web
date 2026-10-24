@@ -38,7 +38,8 @@ The planned layout. Some workspaces do not exist yet. See
 - `templates/starter`: the Astro site that users copy and edit, usually with AI
   tools. It pins `@goodnight-web/server` to an exact version: bun links the
   workspace package here, and a copy of the folder installs it from npm. Bump
-  both versions together (`bun run check:release`).
+  the server version first and the pin after it is published
+  (`docs/releasing.md`, `bun run check:release`).
 - `apps/docs`: the user-facing documentation site (Fumadocs and TanStack Start,
   prerendered and served by Workers Static Assets).
 - `brand/`: the logo, favicon, and app icon files. `bun run brand:build`
@@ -175,5 +176,6 @@ details. Cover the security rules above with tests as the features are built.
 - Use English Conventional Commits and keep commits small and meaningful.
 - Work on a feature branch. Never push to `main`, force-push, or merge a PR
   unless the maintainer asks.
-- Do not publish npm packages, create repositories, or change repository
+- Do not publish npm packages (the `Release` workflow does, after the
+  maintainer approves it), create repositories, or change repository
   visibility.

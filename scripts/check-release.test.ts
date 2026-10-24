@@ -5,6 +5,7 @@ import {
   checkStarterLockfile,
   checkStarterManifest,
   checkTarballFiles,
+  compareVersions,
   parsePackJson,
   parseTarList,
   tarballArgument,
@@ -36,25 +37,44 @@ describe('checkServerManifest', () => {
   });
 });
 
+describe('compareVersions', () => {
+  test.each([
+    ['0.9.1', '0.9.2', -1],
+    ['0.9.10', '0.9.9', 1],
+    ['1.0.0', '0.99.99', 1],
+    ['0.9.1', '0.9.1', 0],
+    ['1.0.0-rc.1', '1.0.0', -1],
+    ['1.0.0-alpha', '1.0.0-alpha.1', -1],
+    ['1.0.0-alpha.2', '1.0.0-alpha.10', -1],
+    ['1.0.0-1', '1.0.0-alpha', -1],
+    ['1.0.0-beta', '1.0.0-alpha', 1],
+  ])('%s vs %s', (a, b, expected) => {
+    expect(compareVersions(a, b)).toBe(expected);
+    expect(compareVersions(b, a)).toBe(-expected || 0);
+  });
+});
+
 describe('checkStarterManifest', () => {
-  test('accepts the exact version of the server package', () => {
-    expect(
-      checkStarterManifest(
-        { dependencies: { '@goodnight-web/server': '0.1.0' } },
-        '0.1.0',
-      ),
-    ).toEqual([]);
+  const pin = (range: string) => ({
+    dependencies: { '@goodnight-web/server': range },
   });
 
-  test('rejects workspace:*, a range, and another version', () => {
-    for (const range of ['workspace:*', '^0.1.0', '0.0.9']) {
-      expect(
-        checkStarterManifest(
-          { dependencies: { '@goodnight-web/server': range } },
-          '0.1.0',
-        ).length,
-      ).toBeGreaterThan(0);
+  test('accepts the exact version of the server package', () => {
+    expect(checkStarterManifest(pin('0.1.0'), '0.1.0')).toEqual([]);
+  });
+
+  test('accepts an older version while the server version is unpublished', () => {
+    expect(checkStarterManifest(pin('0.0.9'), '0.1.0')).toEqual([]);
+    expect(checkStarterManifest(pin('0.1.0-rc.1'), '0.1.0')).toEqual([]);
+  });
+
+  test('rejects workspace:*, a range, a newer version, and no pin', () => {
+    for (const range of ['workspace:*', '^0.1.0', '0.1.1', '0.2.0']) {
+      expect(checkStarterManifest(pin(range), '0.1.0').length).toBeGreaterThan(
+        0,
+      );
     }
+    expect(checkStarterManifest({}, '0.1.0')).toHaveLength(1);
   });
 });
 
@@ -219,7 +239,7 @@ describe('checkStarterLockfile', () => {
     expect(problems.join('\n')).toContain('devDependencies differ');
   });
 
-  test('rejects a locked server version other than the pin and the package', () => {
+  test('rejects a locked server version other than the pin', () => {
     expect(
       checkStarterLockfile(
         lock({
@@ -232,7 +252,26 @@ describe('checkStarterLockfile', () => {
         '0.1.0',
       ).join('\n'),
     ).toContain('locks @goodnight-web/server 0.0.9');
-    expect(checkStarterLockfile(lock(), starter, '0.2.0')).toHaveLength(1);
+  });
+
+  test('accepts the locked pin while a newer server version is unpublished', () => {
+    expect(checkStarterLockfile(lock(), starter, '0.2.0')).toEqual([]);
+  });
+
+  test('rejects a server entry that is not the npm tarball of the pin', () => {
+    expect(
+      checkStarterLockfile(
+        lock({
+          'node_modules/@goodnight-web/server': {
+            ...entry('@goodnight-web/server', '0.1.0'),
+            resolved:
+              'https://registry.npmjs.org/@goodnight-web/server/-/server-0.0.9.tgz',
+          },
+        }),
+        starter,
+        '0.1.0',
+      ).join('\n'),
+    ).toContain('resolves @goodnight-web/server to');
   });
 
   test.each([

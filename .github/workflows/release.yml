@@ -1,0 +1,135 @@
+# Publishes `@goodnight-web/server` to npm with trusted publishing (OIDC), so
+# no npm token is stored anywhere. See docs/releasing.md for the setup the
+# maintainer does once on npmjs.com and in the repository settings.
+#
+# It runs only when a `v*` tag is pushed. It never runs for pull requests,
+# never for forks, and cannot be started by hand. Two jobs:
+#
+#   build    checks the tag, runs the full validation, and packs the tarball.
+#            It has read-only access and no OIDC token, so nothing it installs
+#            or runs can publish.
+#   publish  waits for a reviewer of the `npm-publish` environment, then
+#            uploads that exact tarball. It installs nothing from the
+#            repository or from npm besides the npm CLI that Node ships with.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history of every branch, to check that the tag is on main.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+          # Never use caches in release builds.
+          no-cache: true
+      - name: The tag is a version tag on main
+        env:
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' is not a plain version tag such as v0.9.2."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "::error::Tag $TAG ($SHA) is not a commit on main."
+            exit 1
+          fi
+          version="$(bun -p 'require("./packages/server/package.json").version')"
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::Tag $TAG does not match packages/server/package.json version $version."
+            exit 1
+          fi
+      - name: Install
+        run: bun install --frozen-lockfile
+      # Includes check:release (package contents, starter pin and lockfile).
+      - name: Validate
+        run: bun run validate
+      # `npm publish` of a tarball does not run `prepack`, so make the tarball
+      # with `bun pm pack` (it builds the admin module and replaces
+      # `workspace:*` with the real version).
+      - name: Pack
+        id: pack
+        working-directory: packages/server
+        run: |
+          bun pm pack --destination "$RUNNER_TEMP/pack"
+          files=("$RUNNER_TEMP"/pack/*.tgz)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one tarball, found ${#files[@]}."
+            exit 1
+          fi
+          echo "tarball=$(basename "${files[0]}")" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "${files[0]}" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Check the tarball that will be published
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: bun scripts/check-release.ts --tarball "$RUNNER_TEMP/pack/$TARBALL"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: server-tarball
+          path: ${{ runner.temp }}/pack/${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-26.04
+    # Needs approval from a required reviewer (repository settings,
+    # Environments). The environment name is also part of the trusted
+    # publisher entry on npmjs.com.
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write # the OIDC token that npm exchanges for a publish token
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          # Never use caches in release builds.
+          package-manager-cache: false
+      - name: npm supports trusted publishing
+        run: |
+          npm --version
+          required="11.5.1"
+          current="$(npm --version)"
+          if [ "$(printf '%s\n%s\n' "$required" "$current" | sort -V | head -n 1)" != "$required" ]; then
+            echo "::error::npm $current is older than $required, which trusted publishing needs."
+            exit 1
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: server-tarball
+          path: ${{ runner.temp }}/pack
+      - name: Publish
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+          SHA256: ${{ needs.build.outputs.sha256 }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          file="$RUNNER_TEMP/pack/$TARBALL"
+          echo "$SHA256  $file" | sha256sum --check
+          version="$(tar -xzOf "$file" package/package.json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')"
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::Tag $TAG does not match the tarball version $version."
+            exit 1
+          fi
+          # OIDC supplies the credentials (no NPM_TOKEN), and npm adds the
+          # provenance statement by itself for a public repository.
+          npm publish "$file" --access public
