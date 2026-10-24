@@ -534,7 +534,7 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
           </section>
         </Card>
 
-        <aside className='flex flex-col gap-4'>
+        <aside className='flex flex-col gap-4 lg:sticky lg:top-20 lg:-m-1 lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:overflow-y-auto lg:p-1 lg:[&>*]:shrink-0'>
           <Card className='flex flex-col gap-4 p-5'>
             <ReadControl inquiry={item} onChanged={inquiry.setData} />
             <SpamControl inquiry={item} onChanged={inquiry.setData} />
