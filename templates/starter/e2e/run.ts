@@ -601,6 +601,15 @@ async function acceptedSubmission(browser: Browser): Promise<void> {
     await page.setViewportSize({ width: 1280, height: 800 });
   }
 
+  await form.locator('[type="submit"]').scrollIntoViewIfNeeded();
+  check(
+    'the contact aside heading stays in view when scrolled to submit',
+    await page.locator('#contact-aside-title').evaluate((heading) => {
+      const rect = heading.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= window.innerHeight;
+    }),
+  );
+
   await page.click('[data-contact-form] [type="submit"]');
   const sent = page.locator('[data-contact-sent]');
   await sent.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
