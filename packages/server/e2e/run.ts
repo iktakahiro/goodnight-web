@@ -345,7 +345,13 @@ const main = async () => {
     const sent = await gnw(
       page,
       'submitContact',
-      contactBody('e2e-pass', 'E2E Visitor'),
+      contactBody('e2e-pass', 'E2E Visitor', {
+        f_message:
+          'Hello from the end-to-end test.\nSecond line.\n' +
+          'More inquiry details to read while keeping the actions in view.\n'.repeat(
+            40,
+          ),
+      }),
     );
     check('contact POST succeeds', sent.ok === true, sent);
     const rejected = await gnw(
@@ -720,6 +726,47 @@ const main = async () => {
         .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
         .waitFor();
     });
+    await step(
+      'desktop detail actions stay in view while reading',
+      async () => {
+        const viewport = page.viewportSize();
+        try {
+          await page.setViewportSize({ width: 1280, height: 800 });
+          await page.evaluate(() =>
+            window.scrollTo({ top: 600, behavior: 'instant' }),
+          );
+          if ((await page.evaluate(() => window.scrollY)) < 500) {
+            throw new Error('the long inquiry did not scroll far enough');
+          }
+          const reply = page.getByRole('link', {
+            name: ui('en', 'detail.reply'),
+          });
+          const remove = page.getByRole('button', {
+            name: ui('en', 'admin.delete'),
+            exact: true,
+          });
+          for (const action of [reply, remove]) {
+            const visible = await action.evaluate((element) => {
+              const bounds = element.getBoundingClientRect();
+              const header = document
+                .querySelector('header')
+                ?.getBoundingClientRect();
+              return (
+                bounds.top >= (header?.bottom ?? 0) &&
+                bounds.bottom <= window.innerHeight
+              );
+            });
+            if (!visible)
+              throw new Error('a detail action scrolled out of view');
+          }
+        } finally {
+          await page.evaluate(() =>
+            window.scrollTo({ top: 0, behavior: 'instant' }),
+          );
+          if (viewport) await page.setViewportSize(viewport);
+        }
+      },
+    );
     await step('the detail sets it back to unread', async () => {
       await page.getByTestId('read-toggle').click();
       await page.getByText(ui('en', 'detail.markedUnread')).waitFor();
