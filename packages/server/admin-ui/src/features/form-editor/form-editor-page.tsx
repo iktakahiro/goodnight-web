@@ -479,7 +479,9 @@ const FormEditor = ({
           ) : null}
         </div>
 
-        <aside className='flex min-w-0 flex-col gap-6'>
+        {/* At lg: 4rem header + 3.875rem toolbar (h-9, py-3, borders); top-36 leaves a gap. */}
+        {/* Also reserve 7rem for main padding and the footer, so the grid end cannot push it under the toolbar. */}
+        <aside className='flex min-w-0 flex-col gap-6 lg:sticky lg:top-36 lg:-m-1 lg:max-h-[calc(100dvh-17rem)] lg:self-start lg:overflow-y-auto lg:p-1'>
           <PreviewCard fields={fields} />
           <FormHistory
             history={history}
