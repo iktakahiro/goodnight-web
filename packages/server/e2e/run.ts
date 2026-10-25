@@ -1116,6 +1116,48 @@ const main = async () => {
         .count();
       if (crashed > 0) throw new Error('the editor shows the error screen');
     });
+    await step('desktop form preview stays in view while editing', async () => {
+      const viewport = page.viewportSize();
+      const toggle = page
+        .getByTestId('form-field-card')
+        .first()
+        .locator('button[aria-controls$="-settings"]');
+      try {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await toggle.click();
+        await page.getByLabel(ui('ja', 'form.labelJa')).waitFor();
+        await page.evaluate(() =>
+          window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: 'instant',
+          }),
+        );
+        if ((await page.evaluate(() => window.scrollY)) <= 0) {
+          throw new Error('the form editor did not scroll');
+        }
+        const toolbar = await page
+          .getByTestId('form-save')
+          .locator('../..')
+          .boundingBox();
+        if (!toolbar) throw new Error('the form toolbar is missing');
+        const visible = await page
+          .getByTestId('form-preview-card')
+          .getByRole('heading', { name: ui('ja', 'form.previewHeading') })
+          .evaluate((element, toolbarBottom) => {
+            const bounds = element.getBoundingClientRect();
+            return (
+              bounds.top >= toolbarBottom && bounds.bottom <= window.innerHeight
+            );
+          }, toolbar.y + toolbar.height);
+        if (!visible) throw new Error('the form preview scrolled out of view');
+      } finally {
+        await toggle.click();
+        await page.evaluate(() =>
+          window.scrollTo({ top: 0, behavior: 'instant' }),
+        );
+        if (viewport) await page.setViewportSize(viewport);
+      }
+    });
     await step('discard brings back the saved fields', async () => {
       await page.getByTestId('form-add-field').click();
       await page
