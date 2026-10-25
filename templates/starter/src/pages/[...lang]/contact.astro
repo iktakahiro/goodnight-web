@@ -45,7 +45,10 @@ const text = {
       <ContactForm locale={locale} />
     </Card>
 
-    <aside class='space-y-4 text-sm' aria-labelledby='contact-aside-title'>
+    <aside
+      class='space-y-4 text-sm lg:sticky lg:top-24 lg:-m-2 lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto lg:p-2'
+      aria-labelledby='contact-aside-title'
+    >
       <div class='rounded-card bg-primary-softer p-6'>
         <h2 id='contact-aside-title' class='text-base font-bold'>
           {text.asideTitle}
