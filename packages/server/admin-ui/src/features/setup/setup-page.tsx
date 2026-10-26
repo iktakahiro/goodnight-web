@@ -400,8 +400,12 @@ export const SetupPage = () => {
             <CardTitle>
               {closed ? t('setup.closedTitle') : t('setup.unavailableTitle')}
             </CardTitle>
-            <CardDescription>
-              {closed ? t('setup.closedLead') : t('error.setup_unavailable')}
+            <CardDescription className='text-left'>
+              {closed
+                ? t('setup.closedLead')
+                : step.problems.length > 0
+                  ? t('setup.unavailableLead')
+                  : t('error.setup_unavailable')}
             </CardDescription>
           </CardHeader>
           <CardContent className='flex flex-col items-center gap-4'>

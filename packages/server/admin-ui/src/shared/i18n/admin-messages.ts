@@ -68,6 +68,7 @@ const en = {
   'setup.closedLead':
     'An admin already exists. Sign in with your passkey instead.',
   'setup.unavailableTitle': 'Setup is not configured',
+  'setup.unavailableLead': 'Fix the following settings, then reload this page.',
   'setup.problemMissing': '{name} is not set.',
   'setup.problemTooShort': '{name} is shorter than {min} characters.',
   'setup.problemWeak':
@@ -366,6 +367,8 @@ const ja: Readonly<Record<AdminMessageKey, string>> = {
   'setup.closedLead':
     '管理者はすでに登録されています。Passkey でログインしてください。',
   'setup.unavailableTitle': 'セットアップに必要な設定がありません',
+  'setup.unavailableLead':
+    '以下の設定を修正してから、このページを再読み込みしてください。',
   'setup.problemMissing': '{name} が設定されていません。',
   'setup.problemTooShort': '{name} が {min} 文字より短いです。',
   'setup.problemWeak':

@@ -251,6 +251,7 @@ const checkShortAppSecret = async () => {
         await page
           .getByRole('heading', { name: ui('en', 'setup.unavailableTitle') })
           .waitFor();
+        await page.getByText(ui('en', 'setup.unavailableLead')).waitFor();
         await page
           .getByTestId('setup-problems')
           .getByText(
