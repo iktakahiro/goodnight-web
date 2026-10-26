@@ -38,10 +38,11 @@ import { Spinner } from '../../shared/ui/spinner.tsx';
 import { fetchMe, fetchSetupState } from '../auth/admin-api.ts';
 import { authClient } from '../auth/auth-client.ts';
 import { AuthLayout } from '../layout/auth-layout.tsx';
-import { PageLoading } from '../layout/page-states.tsx';
+import { PageError, PageLoading } from '../layout/page-states.tsx';
 
 type Step =
   | { name: 'loading' }
+  | { name: 'error'; error: ApiError }
   | { name: 'unavailable'; problems: SetupProblem[] }
   | { name: 'closed'; signedIn: boolean }
   | { name: 'token'; tokenName: TokenName }
@@ -322,9 +323,10 @@ export const SetupPage = () => {
   const [step, setStep] = useState<Step>({ name: 'loading' });
 
   useEffect(() => {
+    if (step.name !== 'loading') return;
     let active = true;
     void Promise.all([
-      fetchSetupState().catch(() => null),
+      fetchSetupState(),
       fetchMe().then(
         () => 'signed-in' as const,
         (error: unknown) =>
@@ -332,25 +334,52 @@ export const SetupPage = () => {
             ? ('needs-passkey' as const)
             : ('signed-out' as const),
       ),
-    ]).then(([state, session]) => {
-      if (!active) return;
-      if (!state || !state.configured)
-        setStep({ name: 'unavailable', problems: state?.problems ?? [] });
-      else if (!state.open)
-        setStep({ name: 'closed', signedIn: session === 'signed-in' });
-      else if (session === 'needs-passkey') setStep({ name: 'passkey' });
-      else
-        setStep({ name: 'token', tokenName: state.tokenName ?? 'SETUP_TOKEN' });
-    });
+    ]).then(
+      ([state, session]) => {
+        if (!active) return;
+        if (!state.configured)
+          setStep({ name: 'unavailable', problems: state.problems ?? [] });
+        else if (!state.open)
+          setStep({ name: 'closed', signedIn: session === 'signed-in' });
+        else if (session === 'needs-passkey') setStep({ name: 'passkey' });
+        else
+          setStep({
+            name: 'token',
+            tokenName: state.tokenName ?? 'SETUP_TOKEN',
+          });
+      },
+      (error: unknown) => {
+        if (!active) return;
+        setStep({
+          name: 'error',
+          error:
+            error instanceof ApiError
+              ? error
+              : new ApiError(0, 'server_error', 'unexpected error'),
+        });
+      },
+    );
     return () => {
       active = false;
     };
-  }, []);
+    // Runs on mount and again when a retry sets the step back to loading.
+  }, [step.name]);
 
   if (step.name === 'loading') {
     return (
       <AuthLayout>
         <PageLoading />
+      </AuthLayout>
+    );
+  }
+
+  if (step.name === 'error') {
+    return (
+      <AuthLayout>
+        <PageError
+          message={errorMessage(t, step.error)}
+          onRetry={() => setStep({ name: 'loading' })}
+        />
       </AuthLayout>
     );
   }
@@ -371,8 +400,12 @@ export const SetupPage = () => {
             <CardTitle>
               {closed ? t('setup.closedTitle') : t('setup.unavailableTitle')}
             </CardTitle>
-            <CardDescription>
-              {closed ? t('setup.closedLead') : t('error.setup_unavailable')}
+            <CardDescription className='text-left'>
+              {closed
+                ? t('setup.closedLead')
+                : step.problems.length > 0
+                  ? t('setup.unavailableLead')
+                  : t('error.setup_unavailable')}
             </CardDescription>
           </CardHeader>
           <CardContent className='flex flex-col items-center gap-4'>

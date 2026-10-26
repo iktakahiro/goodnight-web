@@ -22,7 +22,10 @@ export const PageLoading = () => {
   );
 };
 
-/** A friendly message card with an icon, for errors and empty screens. */
+/**
+ * A friendly message card with an icon, for errors and empty screens. The card
+ * and the title are centered; the body text is left-aligned.
+ */
 export const MessageCard = ({
   icon,
   title,
@@ -38,14 +41,16 @@ export const MessageCard = ({
 }) => (
   <Card
     role={role}
-    className='mx-auto flex max-w-lg flex-col items-center gap-3 px-6 py-10 text-center sm:px-10'
+    className='mx-auto flex max-w-lg flex-col items-center gap-3 px-6 py-10 sm:px-10'
   >
     <div className='mb-1 flex size-14 items-center justify-center rounded-full bg-accent text-primary [&_svg]:size-6'>
       {icon}
     </div>
-    <h1 className='text-lg font-semibold'>{title}</h1>
+    <h1 className='text-center text-lg font-semibold'>{title}</h1>
     {children ? (
-      <div className='text-[0.95rem] text-muted-foreground'>{children}</div>
+      <div className='text-left text-[0.95rem] text-muted-foreground'>
+        {children}
+      </div>
     ) : null}
     {action ? <div className='mt-3'>{action}</div> : null}
   </Card>

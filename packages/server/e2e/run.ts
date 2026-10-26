@@ -251,6 +251,7 @@ const checkShortAppSecret = async () => {
         await page
           .getByRole('heading', { name: ui('en', 'setup.unavailableTitle') })
           .waitFor();
+        await page.getByText(ui('en', 'setup.unavailableLead')).waitFor();
         await page
           .getByTestId('setup-problems')
           .getByText(
@@ -438,6 +439,40 @@ const main = async () => {
     check('admin list is 401 before sign-in', before.status === 401, before);
 
     // Setup through the admin UI.
+    await step(
+      'a failed setup request shows an error and a retry',
+      async () => {
+        // Answer the first GET /api/setup with the API's error shape.
+        await page.route(
+          '**/api/setup',
+          (route) =>
+            route.fulfill({
+              status: 500,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                error: {
+                  code: 'server_error',
+                  message: ui('en', 'error.server_error'),
+                },
+              }),
+            }),
+          { times: 1 },
+        );
+        await page.goto(`${base}/admin/setup`);
+        await page
+          .getByRole('heading', { name: ui('en', 'app.errorTitle') })
+          .waitFor();
+        check(
+          'a failed setup request is not reported as not configured',
+          (await page.getByText(ui('en', 'setup.unavailableTitle')).count()) ===
+            0,
+        );
+        await page.getByRole('button', { name: ui('en', 'app.retry') }).click();
+        await page
+          .getByRole('heading', { name: ui('en', 'admin.setup.title') })
+          .waitFor();
+      },
+    );
     await step('/admin sends a new site to setup', async () => {
       await page.goto(`${base}/admin`);
       await page.waitForURL(`${base}/admin/setup`);
