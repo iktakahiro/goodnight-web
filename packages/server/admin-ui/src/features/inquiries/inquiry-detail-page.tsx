@@ -46,6 +46,7 @@ import {
 } from '../auth/admin-session.tsx';
 import { MessageCard, PageError } from '../layout/page-states.tsx';
 import { SetupNotices } from '../layout/setup-notices.tsx';
+import { CopyEmailButton } from './copy-email-button.tsx';
 import { fieldValueText, labelText } from './field-value.ts';
 import {
   deleteInquiry,
@@ -490,13 +491,16 @@ export const InquiryDetailPage = ({ id }: { id: string }) => {
                 icon={<Envelope aria-hidden='true' />}
                 label={t('field.email')}
               >
-                <a
-                  href={`mailto:${item.email}`}
-                  data-testid='inquiry-email'
-                  className='rounded-sm break-all text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
-                >
-                  {item.email}
-                </a>
+                <span className='flex items-start gap-1'>
+                  <a
+                    href={`mailto:${item.email}`}
+                    data-testid='inquiry-email'
+                    className='min-w-0 rounded-sm break-all text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring'
+                  >
+                    {item.email}
+                  </a>
+                  <CopyEmailButton email={item.email} />
+                </span>
               </InfoRow>
               <InfoRow
                 icon={<ListCheck aria-hidden='true' />}
