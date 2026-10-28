@@ -112,7 +112,9 @@ export const LoginPage = () => {
             <span className='sr-only'>{t('app.name')} </span>
             {t('login.title')}
           </CardTitle>
-          <CardDescription>{t('login.lead')}</CardDescription>
+          <CardDescription className='text-left'>
+            {t('login.lead')}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -178,7 +180,7 @@ export const LoginPage = () => {
                 </p>
               </Notice>
             ) : (
-              <p className='text-center text-[0.8125rem] leading-relaxed text-muted-foreground'>
+              <p className='text-left text-[0.8125rem] leading-relaxed text-muted-foreground'>
                 {t('login.setupNote')}
               </p>
             )}
