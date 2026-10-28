@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { createGoodnightWorker } from '../../app.ts';
+import {
+  deriveAppSecretKey,
+  APP_SECRET_LABELS,
+} from '../../shared/app-secret.ts';
 import { hmacSha256Hex } from '../../shared/crypto.ts';
 import { insertFormVersion } from '../contact-form/form-store.ts';
 import { captureConsole } from '../../testing/console-capture.ts';
@@ -10,6 +15,7 @@ import {
   TURNSTILE_OK,
 } from '../../testing/external-fetch.ts';
 import {
+  APP_SECRET,
   CLIENT_IP,
   createTestWorker,
   dumpDatabase,
@@ -121,6 +127,77 @@ describe('POST /api/contact', () => {
     expect(rows(worker)[0]?.ip_hash).toBe(expected);
     expect(dumpDatabase(worker.sqlite)).not.toContain(CLIENT_IP);
     expect(worker.rateLimitKeys).toEqual([expected]);
+  });
+
+  test('uses the derived IP key unless an explicit key is set, without logging the address', async () => {
+    const derivedKey = await deriveAppSecretKey(
+      APP_SECRET,
+      APP_SECRET_LABELS.IP_HASH_SECRET,
+    );
+    for (const explicit of [undefined, SECRETS.IP_HASH_SECRET]) {
+      const worker = createTestWorker({
+        secrets: 'app-secret',
+        env: { IP_HASH_SECRET: explicit },
+      });
+      const logs = captureConsole();
+      try {
+        expect(
+          (await post(worker, validBody({ gnw_hp_x: 'filled' }))).status,
+        ).toBe(200);
+        const expected = await hmacSha256Hex(explicit ?? derivedKey, CLIENT_IP);
+        expect(rows(worker)[0]?.ip_hash).toBe(expected);
+        expect(worker.rateLimitKeys).toEqual([expected]);
+        expect(dumpDatabase(worker.sqlite)).not.toContain(CLIENT_IP);
+        expect(logs.text()).not.toContain(CLIENT_IP);
+      } finally {
+        logs.restore();
+      }
+    }
+  });
+
+  test('waits for the insert but responds while cleanup is still pending', async () => {
+    const worker = createTestWorker();
+    const insert = worker.pauseAt(/insert into "submissions"/i);
+    const cleanup = worker.pauseAt(/insert into "settings"/i);
+    const tasks: Promise<unknown>[] = [];
+    const app = createGoodnightWorker();
+    const request = new Request(`${ORIGIN}/api/contact`, {
+      method: 'POST',
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/json',
+        'cf-connecting-ip': CLIENT_IP,
+      },
+      body: JSON.stringify(validBody()),
+    });
+    let responded = false;
+    const response = Promise.resolve(
+      app.fetch(request, worker.env, {
+        waitUntil: (task: Promise<unknown>) => {
+          tasks.push(task);
+        },
+        passThroughOnException: () => {},
+        props: {},
+      }),
+    ).then((result) => {
+      responded = true;
+      return result;
+    });
+    try {
+      await insert.reached;
+      expect(responded).toBe(false);
+      expect(rows(worker)).toHaveLength(0);
+      expect(tasks).toHaveLength(0);
+      insert.release();
+      await cleanup.reached;
+      expect((await response).status).toBe(200);
+      expect(rows(worker)).toHaveLength(1);
+      expect(tasks).toHaveLength(1);
+    } finally {
+      insert.release();
+      cleanup.release();
+      await Promise.all(tasks);
+    }
   });
 
   test('a filled honeypot is stored as suspected spam without Slack', async () => {
@@ -429,6 +506,20 @@ describe('POST /api/contact', () => {
     expect(rows(worker)).toHaveLength(0);
   });
 
+  test('rejects foreign origins and oversized malformed bodies before JSON parsing', async () => {
+    const worker = createTestWorker();
+    const foreign = await post(worker, '{', {
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(foreign.status).toBe(403);
+    expect((await foreign.json()).error.code).toBe('forbidden_origin');
+    const oversized = await post(worker, '{' + 'x'.repeat(33_000));
+    expect(oversized.status).toBe(413);
+    expect((await oversized.json()).error.code).toBe('payload_too_large');
+    expect(external.calls).toHaveLength(0);
+    expect(rows(worker)).toHaveLength(0);
+  });
+
   test('rejects a non-JSON content type with 415 and bad JSON with 400', async () => {
     const worker = createTestWorker();
     const form = await post(worker, 'name=x', {
@@ -573,6 +664,45 @@ describe('POST /api/contact', () => {
     expect((await send('あ'.repeat(5000))).status).toBe(200);
     expect((await send('a'.repeat(10_000))).status).toBe(200);
     expect(rows(worker).map((row) => row.form_version)).toEqual([2, 2]);
+  });
+
+  test('validates against the latest saved form even after the previous version was used', async () => {
+    const worker = createTestWorker();
+    expect((await post(worker, validBody())).status).toBe(200);
+    await insertFormVersion(worker.env.DB, {
+      baseVersion: 1,
+      createdBy: 'admin@example.com',
+      definition: {
+        fields: [
+          {
+            id: 'f_new',
+            type: 'text',
+            label: { ja: '新規', en: 'New' },
+            required: true,
+            maxLength: 5,
+            showInList: false,
+          },
+        ],
+        archived: [],
+      },
+    });
+    const oldFields = await post(worker, validBody({ formVersion: 2 }));
+    expect(oldFields.status).toBe(400);
+    expect(rows(worker)).toHaveLength(1);
+    const tooLong = await post(worker, {
+      ...validBody({ formVersion: 2 }),
+      fields: { f_new: '123456' },
+    });
+    expect(tooLong.status).toBe(400);
+    const valid = await post(worker, {
+      ...validBody({ formVersion: 2 }),
+      fields: { f_new: 'hello' },
+    });
+    expect(valid.status).toBe(200);
+    expect(rows(worker)[1]).toMatchObject({
+      form_version: 2,
+      fields: '{"f_new":"hello"}',
+    });
   });
 
   test('a stale formVersion returns 409 and stores nothing', async () => {
