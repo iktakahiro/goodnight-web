@@ -775,7 +775,7 @@ export const InquiryListPage = () => {
                         : t(`list.empty.${query.view}`)}
                   </p>
                   {query.view === 'all' ? (
-                    <p className='max-w-sm text-sm text-muted-foreground'>
+                    <p className='max-w-sm text-left text-sm text-muted-foreground'>
                       {t('list.emptyHint')}
                     </p>
                   ) : null}

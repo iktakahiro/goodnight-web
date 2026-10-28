@@ -40,7 +40,7 @@ const others = siteConfig.locales.filter((l) => l !== locale);
           ) : (
             <h2 class='text-xl font-bold sm:text-2xl'>{text[l].title}</h2>
           )}
-          <p class='text-muted'>{text[l].body}</p>
+          <p class='mx-auto max-w-md text-left text-muted'>{text[l].body}</p>
           <p>
             <a
               href={localizePath(l, '/')}
