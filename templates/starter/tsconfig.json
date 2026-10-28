@@ -5,5 +5,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "node_modules", ".github"]
+  "exclude": ["dist", "node_modules", ".github", "**/*.test.ts"]
 }

@@ -16,6 +16,9 @@ export const ui = {
   noPosts: { ja: 'まだ記事はありません。', en: 'No posts yet.' },
   published: { ja: '公開日', en: 'Published' },
   updated: { ja: '更新日', en: 'Updated' },
+  postNavigation: { ja: '前後の記事', en: 'Post navigation' },
+  newerPost: { ja: '新しい記事', en: 'Newer post' },
+  olderPost: { ja: '古い記事', en: 'Older post' },
   backToNews: { ja: 'お知らせ一覧へ戻る', en: 'Back to news' },
   backToBlog: { ja: 'ブログ一覧へ戻る', en: 'Back to blog' },
 } satisfies Record<string, Localized>;
