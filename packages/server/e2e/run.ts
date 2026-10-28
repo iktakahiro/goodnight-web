@@ -761,6 +761,24 @@ const main = async () => {
         .getByText(ui('en', 'admin.unreadCount', { count: 0 }))
         .waitFor();
     });
+    await step('the detail copies the email address', async () => {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+        origin: base,
+      });
+      const copy = page.getByRole('button', {
+        name: ui('en', 'detail.copyEmail'),
+      });
+      await copy.click();
+      await page.getByText(ui('en', 'detail.emailCopied')).waitFor();
+      const email = await page.getByTestId('inquiry-email').innerText();
+      const copied = await page.evaluate(() => navigator.clipboard.readText());
+      if (copied !== email || email === '') {
+        throw new Error(`copied ${copied}, expected ${email}`);
+      }
+      // The mail link next to the button still works.
+      const href = await page.getByTestId('inquiry-email').getAttribute('href');
+      if (href !== `mailto:${email}`) throw new Error(`mailto was ${href}`);
+    });
     await step(
       'desktop detail actions stay in view while reading',
       async () => {
