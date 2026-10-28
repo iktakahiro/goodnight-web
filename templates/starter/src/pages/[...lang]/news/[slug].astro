@@ -7,7 +7,7 @@ export function getStaticPaths() {
   return postStaticPaths('news', localeParam);
 }
 
-const { post, locale, slug, locales } = Astro.props;
+const { post, locale, slug, locales, neighbors } = Astro.props;
 ---
 
 <PostArticle
@@ -16,4 +16,5 @@ const { post, locale, slug, locales } = Astro.props;
   locale={locale}
   slug={slug}
   locales={locales}
+  neighbors={neighbors}
 />

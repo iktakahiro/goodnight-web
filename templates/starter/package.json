@@ -11,6 +11,7 @@
     "preview": "astro build && wrangler d1 migrations apply DB --local && wrangler dev",
     "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
     "deploy:check": "wrangler deploy --dry-run",
+    "test": "bun test ./src",
     "test:e2e": "node e2e/run.ts"
   },
   "dependencies": {

@@ -5,7 +5,7 @@ import Badge from '../../components/ui/badge.astro';
 import BaseLayout from '../../layouts/base-layout.astro';
 import { formatDate, localizePath } from '../../i18n/locales';
 import { ui } from '../../i18n/ui';
-import type { Post, PostCollection } from './posts';
+import { parsePostId, type Post, type PostCollection } from './posts';
 import type { Locale } from '../../../site.config';
 
 interface Props {
@@ -15,9 +15,10 @@ interface Props {
   slug: string;
   /** Languages that have a post with the same slug. */
   locales: Locale[];
+  neighbors: { newer?: Post; older?: Post };
 }
 
-const { collection, post, locale, slug, locales } = Astro.props;
+const { collection, post, locale, slug, locales, neighbors } = Astro.props;
 const { Content } = await render(post);
 const path = `/${collection}/${slug}/`;
 const listPath = `/${collection}/`;
@@ -76,5 +77,30 @@ const isoDate = (date: Date) => date.toISOString().slice(0, 10);
     <div class='prose-content mt-8'>
       <Content />
     </div>
+    {
+      (neighbors.newer || neighbors.older) && (
+        <nav aria-label={ui.postNavigation[locale]} class='mt-12 grid gap-4 border-t border-border pt-8 sm:grid-cols-2'>
+          {(['newer', 'older'] as const).map((direction) => {
+            const neighbor = neighbors[direction];
+            return neighbor && (
+              <a
+                href={localizePath(locale, `/${collection}/${parsePostId(neighbor.id).slug}/`)}
+                class:list={[
+                  'min-w-0 min-h-11 rounded-card border border-border bg-card p-5 no-underline transition-colors hover:bg-primary-softer',
+                  direction === 'older' && 'sm:col-start-2 sm:text-right',
+                ]}
+              >
+                <span class='block text-sm font-bold text-primary-strong'>
+                  {direction === 'newer' && <span aria-hidden='true'>← </span>}
+                  {direction === 'newer' ? ui.newerPost[locale] : ui.olderPost[locale]}
+                  {direction === 'older' && <span aria-hidden='true'> →</span>}
+                </span>
+                <span class='mt-1 block leading-relaxed font-bold break-words'>{neighbor.data.title}</span>
+              </a>
+            );
+          })}
+        </nav>
+      )
+    }
   </article>
 </BaseLayout>

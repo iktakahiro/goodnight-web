@@ -1,5 +1,6 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { siteConfig, type Locale } from '../../../site.config';
+import { postNeighbors } from './post-neighbors';
 
 /** A collection that holds dated posts. */
 export type PostCollection = 'news' | 'blog';
@@ -46,10 +47,19 @@ export async function postStaticPaths(
 ) {
   const entries = await getCollection(collection, (entry) => !entry.data.draft);
   const parsed = entries.map((entry) => ({ entry, ...parsePostId(entry.id) }));
+  const postsByLocale = await Promise.all(
+    siteConfig.locales.map(
+      async (locale) => [locale, await getPosts(collection, locale)] as const,
+    ),
+  );
   return parsed.map(({ entry, locale, slug }) => ({
     params: { lang: localeParam(locale), slug },
     props: {
       post: entry,
+      neighbors: postNeighbors(
+        postsByLocale.find(([l]) => l === locale)?.[1] ?? [],
+        entry.id,
+      ),
       locale,
       slug,
       locales: parsed.filter((p) => p.slug === slug).map((p) => p.locale),
