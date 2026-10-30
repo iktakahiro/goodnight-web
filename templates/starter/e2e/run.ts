@@ -41,7 +41,7 @@
 // their labels from GET /api/contact/form (edited in the admin screen), so
 // wording changes do not break the test.
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import adminMessages from '@goodnight-web/server/admin-messages.json' with { type: 'json' };
@@ -886,6 +886,72 @@ async function adminFlow(browser: Browser): Promise<void> {
   await context.close();
 }
 
+async function checkSitemap(browser: Browser): Promise<void> {
+  const dist = join(siteDir, 'dist');
+  const files = (await readdir(dist, { recursive: true })).filter((file) =>
+    file.endsWith('.html'),
+  );
+  const html = await Promise.all(
+    files.map((file) => readFile(join(dist, file), 'utf8')),
+  );
+  const xml = await readFile(join(dist, 'sitemap.xml'), 'utf8');
+  const page = await browser.newPage();
+  try {
+    const result = await page.evaluate(
+      ({ html, xml }) => {
+        const parser = new DOMParser();
+        const sorted = (pairs: string[]) => pairs.sort().join('\n');
+        const pages = html
+          .map((text) => parser.parseFromString(text, 'text/html'))
+          .filter(
+            (doc) =>
+              !doc.querySelector('meta[name="robots"][content="noindex"]'),
+          )
+          .map((doc) => {
+            const canonical = doc
+              .querySelector('link[rel="canonical"]')
+              ?.getAttribute('href');
+            const alternates = [
+              ...doc.querySelectorAll('link[rel="alternate"][hreflang]'),
+            ].map(
+              (link) =>
+                `${link.getAttribute('hreflang')} ${link.getAttribute('href')}`,
+            );
+            return `${canonical}\n${sorted(alternates)}`;
+          });
+        const sitemap = parser.parseFromString(xml, 'application/xml');
+        if (sitemap.querySelector('parsererror')) return false;
+        const entries = [
+          ...sitemap.getElementsByTagNameNS(
+            'http://www.sitemaps.org/schemas/sitemap/0.9',
+            'url',
+          ),
+        ].map((entry) => {
+          const loc = entry.getElementsByTagNameNS(
+            'http://www.sitemaps.org/schemas/sitemap/0.9',
+            'loc',
+          )[0]?.textContent;
+          const alternates = [
+            ...entry.getElementsByTagNameNS(
+              'http://www.w3.org/1999/xhtml',
+              'link',
+            ),
+          ].map(
+            (link) =>
+              `${link.getAttribute('hreflang')} ${link.getAttribute('href')}`,
+          );
+          return `${loc}\n${sorted(alternates)}`;
+        });
+        return sorted(pages) === sorted(entries);
+      },
+      { html, xml },
+    );
+    check('sitemap locations and alternates match built HTML', result);
+  } finally {
+    await page.close();
+  }
+}
+
 async function main(): Promise<void> {
   if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
   if (debugDir) await mkdir(debugDir, { recursive: true });
@@ -903,6 +969,7 @@ async function main(): Promise<void> {
 
   const browser = await chromium.launch({ headless: true });
   try {
+    await checkSitemap(browser);
     let dev = await startDev({ ...baseVars, ...noTurnstile });
     try {
       await withoutTurnstile(browser);
