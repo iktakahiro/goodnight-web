@@ -119,6 +119,7 @@ production database and secrets at a public address.
   [Change the site colors](#change-the-site-colors).
 - Fonts: `src/styles/global.css`. See [Fonts](#fonts).
 - Pages: `src/pages/`
+- Search engines: `sitemap.xml` lists published pages and `robots.txt` points to it.
 - News and blog posts: `src/content/news/` and `src/content/blog/`
 - Privacy policy: `src/content/pages/`. It is a template, not legal advice.
   Have it reviewed before you publish.
