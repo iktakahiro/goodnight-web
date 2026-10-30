@@ -1,7 +1,11 @@
 import type { APIRoute } from 'astro';
 import { siteConfig } from '../../site.config';
 import { postStaticPaths, type PostCollection } from '../features/posts/posts';
-import { renderSitemap } from '../features/seo/sitemap';
+import {
+  renderSitemap,
+  routeFilePath,
+  sitemapPosts,
+} from '../features/seo/sitemap';
 import { localeParam, localeTags, localizePath } from '../i18n/locales';
 
 export const GET: APIRoute = async () => {
@@ -10,12 +14,7 @@ export const GET: APIRoute = async () => {
     await Promise.all(
       collections.map(async (collection) => {
         const paths = await postStaticPaths(collection, localeParam);
-        return paths.map(({ props }) => ({
-          path: `/${collection}/${props.slug}/`,
-          locale: props.locale,
-          locales: props.locales,
-          lastmod: props.post.data.updated ?? props.post.data.date,
-        }));
+        return sitemapPosts(collection, paths);
       }),
     )
   ).flat();
@@ -25,6 +24,9 @@ export const GET: APIRoute = async () => {
       locales: siteConfig.locales,
       localeTags,
       localizePath,
+      pages: Object.keys(import.meta.glob('/src/pages/[[]...lang]/**/*.astro'))
+        .map(routeFilePath)
+        .filter((path): path is string => path !== undefined),
       posts,
     }),
     { headers: { 'Content-Type': 'application/xml; charset=utf-8' } },

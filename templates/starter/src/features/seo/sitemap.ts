@@ -14,18 +14,40 @@ export interface SitemapOptions {
   locales: readonly Locale[];
   localeTags: Record<Locale, string>;
   localizePath: (locale: Locale, path: string) => string;
+  pages: string[];
   posts: SitemapPost[];
 }
 
-const pages = [
-  '/',
-  '/about/',
-  '/services/',
-  '/blog/',
-  '/news/',
-  '/contact/',
-  '/privacy/',
-];
+/** Maps a localized Astro route file to its URL path, excluding dynamic routes. */
+export function routeFilePath(file: string): string | undefined {
+  const prefix = '/src/pages/[...lang]/';
+  if (!file.startsWith(prefix) || !file.endsWith('.astro')) return undefined;
+  const route = file.slice(prefix.length, -'.astro'.length);
+  if (route.includes('[') || route.includes(']')) return undefined;
+  const parts = route.split('/');
+  if (parts.at(-1) === 'index') parts.pop();
+  return parts.length ? `/${parts.join('/')}/` : '/';
+}
+
+/** Maps published post route entries to sitemap entries. */
+export function sitemapPosts(
+  collection: 'blog' | 'news',
+  entries: readonly {
+    props: {
+      slug: string;
+      locale: Locale;
+      locales: Locale[];
+      post: { data: { date: Date; updated?: Date } };
+    };
+  }[],
+): SitemapPost[] {
+  return entries.map(({ props }) => ({
+    path: `/${collection}/${props.slug}/`,
+    locale: props.locale,
+    locales: props.locales,
+    lastmod: props.post.data.updated ?? props.post.data.date,
+  }));
+}
 
 function escapeXml(value: string): string {
   return value
@@ -38,7 +60,7 @@ function escapeXml(value: string): string {
 
 /** Renders the indexable pages and their available language versions as XML. */
 export function renderSitemap(options: SitemapOptions): string {
-  const { url, locales, localeTags, localizePath, posts } = options;
+  const { url, locales, localeTags, localizePath, pages, posts } = options;
   const entries = [
     ...pages.flatMap((path) =>
       locales.map((locale) => ({ path, locale, locales, lastmod: undefined })),
