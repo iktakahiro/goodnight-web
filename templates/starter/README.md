@@ -127,6 +127,12 @@ production database and secrets at a public address.
 Keep the Japanese and English versions in step. If you edit with an AI tool,
 it reads [AGENTS.md](AGENTS.md) for the rules.
 
+### Share image
+
+To include an image when a page is shared, set `shareImage` in
+`site.config.ts` to a path such as `/share.jpg` (place the file in `public/`)
+or an absolute URL. Leave it unset to use a summary card without an image.
+
 ### Change the site colors
 
 The sample site uses a green theme. To use your own colors, change the three

@@ -8,6 +8,7 @@ import SiteFooter from '../components/site/site-footer.astro';
 import SiteHeader from '../components/site/site-header.astro';
 import { localeTags, localizePath } from '../i18n/locales';
 import { ui } from '../i18n/ui';
+import { ogLocale } from '../features/seo/social';
 import { siteConfig, type Locale } from '../../site.config';
 
 interface Props {
@@ -26,9 +27,13 @@ interface Props {
   path: string;
   /** Ask search engines not to index the page, for example the 404 page. */
   noindex?: boolean;
+  /** Open Graph content type. */
+  ogType?: 'website' | 'article';
+  /** Publication date for an article. */
+  publishedTime?: Date;
 }
 
-const { locale, title, description, path, noindex = false } = Astro.props;
+const { locale, title, description, path, noindex = false, ogType = 'website', publishedTime } = Astro.props;
 const alternates: Partial<Record<Locale, string>> =
   Astro.props.alternates ??
   Object.fromEntries(siteConfig.locales.map((l) => [l, path]));
@@ -37,6 +42,9 @@ const companyName = siteConfig.company.name[locale];
 const fullTitle = title ? `${title} | ${companyName}` : companyName;
 const pageDescription = description ?? siteConfig.company.description[locale];
 const canonical = new URL(localizePath(locale, path), siteConfig.url).href;
+const shareImage = siteConfig.shareImage
+  ? new URL(siteConfig.shareImage, siteConfig.url).href
+  : undefined;
 const themeStyle = [
   `--site-primary: ${siteConfig.theme.primary}`,
   `--site-background: ${siteConfig.theme.background}`,
@@ -67,12 +75,18 @@ const themeStyle = [
     }
     <link rel='icon' href='/favicon.svg' type='image/svg+xml' />
     <meta name='theme-color' content={siteConfig.theme.background} />
-    <meta property='og:type' content='website' />
+    <meta property='og:type' content={ogType} />
     <meta property='og:title' content={fullTitle} />
-    <meta property='og:description' content={pageDescription} />
-    <meta property='og:url' content={canonical} />
+    {pageDescription && <meta property='og:description' content={pageDescription} />}
+    {!noindex && <meta property='og:url' content={canonical} />}
     <meta property='og:site_name' content={companyName} />
-    <meta property='og:locale' content={localeTags[locale].replace('-', '_')} />
+    <meta property='og:locale' content={ogLocale(localeTags[locale])} />
+    {siteConfig.locales.filter((l) => l !== locale && alternates[l]).map((l) => (
+      <meta property='og:locale:alternate' content={ogLocale(localeTags[l])} />
+    ))}
+    {ogType === 'article' && publishedTime && <meta property='article:published_time' content={publishedTime.toISOString()} />}
+    {shareImage && <meta property='og:image' content={shareImage} />}
+    <meta name='twitter:card' content={shareImage ? 'summary_large_image' : 'summary'} />
   </head>
   <body class='flex flex-col'>
     <a
