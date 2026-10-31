@@ -127,6 +127,13 @@ production database and secrets at a public address.
 Keep the Japanese and English versions in step. If you edit with an AI tool,
 it reads [AGENTS.md](AGENTS.md) for the rules.
 
+### Set the share image
+
+To show a preview image when a page is shared on social media or in chat apps,
+set `shareImage` in `site.config.ts` to a path such as `/share.jpg` (place the
+file at `public/share.jpg`) or an absolute URL. If you leave it unset, shared
+links appear without a preview image.
+
 ### Change the site colors
 
 The sample site uses a green theme. To use your own colors, change the three

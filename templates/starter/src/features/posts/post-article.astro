@@ -35,6 +35,8 @@ const isoDate = (date: Date) => date.toISOString().slice(0, 10);
   description={post.data.description}
   path={path}
   alternates={alternates}
+  ogType='article'
+  publishedTime={post.data.date}
 >
   <article class='mx-auto max-w-3xl px-5 pt-12 sm:px-8 sm:pt-16'>
     <a

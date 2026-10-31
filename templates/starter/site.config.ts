@@ -52,6 +52,8 @@ export interface ThemeColors {
 export interface SiteConfig {
   /** The public URL of the site, without a trailing slash. Used for links in page metadata. */
   url: string;
+  /** Optional share image path under public/ or an absolute URL. */
+  shareImage?: string;
   /** Languages the site is published in. */
   locales: readonly Locale[];
   /**
