@@ -16,16 +16,16 @@
   },
   "dependencies": {
     "@goodnight-web/server": "0.9.2",
-    "astro": "7.4.2"
+    "astro": "7.4.5"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
-    "@tailwindcss/vite": "4.3.3",
-    "@types/node": "26.6.5",
+    "@tailwindcss/vite": "4.3.4",
+    "@types/node": "26.6.6",
     "playwright": "1.64.1",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "4.3.4",
     "typescript": "6.0.3",
-    "wrangler": "4.152.0"
+    "wrangler": "4.157.0"
   },
   "cloudflare": {
     "bindings": {
