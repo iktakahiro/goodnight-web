@@ -1,4 +1,4 @@
-import { uiTranslations, type Translations } from 'fumadocs-ui/i18n';
+import { defineI18nUI, type Translations } from 'fumadocs-ui/i18n';
 import { i18n } from './i18n';
 
 /** Japanese labels for the Fumadocs controls used by this site. */
@@ -31,10 +31,7 @@ export const japaneseLabels = {
 } satisfies Partial<Translations>;
 
 /** Fumadocs language navigation and UI labels for both site locales. */
-export const translations = i18n
-  .translations()
-  .extend(uiTranslations())
-  .add({
-    en: { displayName: 'English' },
-    ja: { displayName: '日本語', ...japaneseLabels },
-  });
+export const translations = defineI18nUI(i18n, {
+  en: { displayName: 'English' },
+  ja: { displayName: '日本語', ...japaneseLabels },
+});
