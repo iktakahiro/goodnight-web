@@ -120,7 +120,7 @@ production database and secrets at a public address.
 - Fonts: `src/styles/global.css`. See [Fonts](#fonts).
 - Pages: `src/pages/`
 - Search engines: `src/pages/sitemap.xml.ts` and `src/pages/robots.txt.ts`. `sitemap.xml` lists published pages and `robots.txt` points to it.
-- RSS feeds: `src/pages/[...lang]/blog/rss.xml.ts` and `src/pages/[...lang]/news/rss.xml.ts`. They publish one feed per language and collection (`/blog/rss.xml`, `/en/blog/rss.xml`, `/news/rss.xml`, `/en/news/rss.xml`) with the published posts, newest first. Each page links to its feed in the `<head>`, and the blog and news lists show an "RSS feed" link.
+- RSS feeds: `src/pages/[...lang]/blog/rss.xml.ts` and `src/pages/[...lang]/news/rss.xml.ts`. They publish one feed per language and collection (`/blog/rss.xml`, `/en/blog/rss.xml`, `/news/rss.xml`, `/en/news/rss.xml`) with the published posts, newest first. Each matching page links to its feed in `<head>`, and the blog and news lists show an "RSS feed" link.
 - News and blog posts: `src/content/news/` and `src/content/blog/`
 - Privacy policy: `src/content/pages/`. It is a template, not legal advice.
   Have it reviewed before you publish.

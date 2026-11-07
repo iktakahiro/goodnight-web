@@ -124,7 +124,7 @@ Passkey は登録したドメインでしか使えません。独自ドメイン
 - フォント: `src/styles/global.css`。[フォント](#フォント)を参照してください。
 - ページ: `src/pages/`
 - 検索エンジン: `src/pages/sitemap.xml.ts` と `src/pages/robots.txt.ts`。`sitemap.xml` が公開ページを一覧にし、`robots.txt` がその場所を示します。
-- RSSフィード: `src/pages/[...lang]/blog/rss.xml.ts` と `src/pages/[...lang]/news/rss.xml.ts`。言語とコレクションごとに1つ（`/blog/rss.xml`、`/en/blog/rss.xml`、`/news/rss.xml`、`/en/news/rss.xml`）、公開済みの記事を新しい順に配信します。各ページは `<head>` で対応するフィードを示し、ブログとお知らせの一覧には「RSSフィード」のリンクがあります。
+- RSSフィード: `src/pages/[...lang]/blog/rss.xml.ts` と `src/pages/[...lang]/news/rss.xml.ts`。言語とコレクションごとに1つのフィード（`/blog/rss.xml`、`/en/blog/rss.xml`、`/news/rss.xml`、`/en/news/rss.xml`）を生成し、公開済みの記事を新しい順に配信します。対応する各ページは `<head>` でフィードを示し、ブログとお知らせの一覧には「RSSフィード」のリンクを表示します。
 - お知らせとブログ: `src/content/news/` と `src/content/blog/`
 - プライバシーポリシー: `src/content/pages/`。これはひな形で、法的な助言
   ではありません。公開する前に専門家に確認してもらってください。
