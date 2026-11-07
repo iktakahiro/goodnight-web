@@ -1,4 +1,5 @@
 import type { Locale } from '../../../site.config';
+import { escapeXml } from './xml';
 
 /** A published post and the languages in which its slug exists. */
 export interface SitemapPost {
@@ -47,15 +48,6 @@ export function sitemapPosts(
     locales: props.locales,
     lastmod: props.post.data.updated ?? props.post.data.date,
   }));
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
 }
 
 /** Renders the indexable pages and their available language versions as XML. */

@@ -38,6 +38,7 @@ major updates. The rule is temporary: remove it when `astro check`
 | `src/content/{news,blog,pages}/<ja,en>/` | Markdown content, one folder per locale                                        |
 | `src/features/contact/`                  | Contact form markup and its browser script                                     |
 | `src/features/posts/`                    | News and blog lists, detail page, and collection helpers                       |
+| `src/features/seo/`                      | Sitemap, RSS feed rendering (pure functions, with tests), and social metadata  |
 | `src/components/ui/`                     | Small shadcn-style components written as `.astro` files                        |
 | `src/components/site/`                   | Header, footer, language switcher, page header                                 |
 | `src/i18n/`                              | Locale helpers and shared UI strings                                           |

@@ -8,6 +8,8 @@ import SiteFooter from '../components/site/site-footer.astro';
 import SiteHeader from '../components/site/site-header.astro';
 import { localeTags, localizePath } from '../i18n/locales';
 import { ui } from '../i18n/ui';
+import { postFeedPath, postFeedTitle } from '../features/posts/post-feed';
+import type { PostCollection } from '../features/posts/posts';
 import { ogLocale } from '../features/seo/social';
 import { siteConfig, type Locale } from '../../site.config';
 
@@ -31,9 +33,11 @@ interface Props {
   ogType?: 'website' | 'article';
   /** Publication date for an article. */
   publishedTime?: Date;
+  /** Advertise the RSS feed of this collection in the page's language. */
+  feed?: PostCollection;
 }
 
-const { locale, title, description, path, noindex = false, ogType = 'website', publishedTime } = Astro.props;
+const { locale, title, description, path, noindex = false, ogType = 'website', publishedTime, feed } = Astro.props;
 const alternates: Partial<Record<Locale, string>> =
   Astro.props.alternates ??
   Object.fromEntries(siteConfig.locales.map((l) => [l, path]));
@@ -73,6 +77,14 @@ const themeStyle = [
         ) : null;
       })
     }
+    {feed && (
+      <link
+        rel='alternate'
+        type='application/rss+xml'
+        title={postFeedTitle(locale, feed)}
+        href={new URL(postFeedPath(locale, feed), siteConfig.url).href}
+      />
+    )}
     <link rel='icon' href='/favicon.svg' type='image/svg+xml' />
     <meta name='theme-color' content={siteConfig.theme.background} />
     <meta property='og:type' content={ogType} />
