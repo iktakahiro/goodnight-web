@@ -1220,18 +1220,6 @@ html:has(.landing):not(.dark) {
 .site-footer-meta {
   margin: 0;
 }
-.site-footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1.25rem;
-}
-.site-footer-links a {
-  color: var(--landing-text);
-  text-decoration: none;
-}
-.site-footer-links a:hover {
-  color: var(--landing-accent);
-}
 .site-footer-trademarks {
   padding-bottom: 1.5rem;
   font-size: 0.72rem;
@@ -1468,9 +1456,6 @@ html:has(.landing):not(.dark) {
     justify-content: center;
     padding-block: 1.125rem;
     text-align: center;
-  }
-  .site-footer-links {
-    justify-content: center;
   }
   .site-footer-trademarks {
     text-align: center;

@@ -140,7 +140,7 @@ export function LandingHero({ page }: { page: PageMetadata }) {
             <Window className='hero-window-site' address='example.com'>
               <img
                 className='hero-site-image'
-                src={sitePath('images/site.webp')}
+                src={sitePath(`images/site${japanese ? '' : '-en'}.webp`)}
                 alt={text.siteAlt}
                 width={1600}
                 height={1000}
