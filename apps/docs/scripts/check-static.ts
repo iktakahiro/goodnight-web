@@ -26,6 +26,11 @@ for await (const file of new Bun.Glob('**/*.html').scan(`${root}/dist`)) {
   const alternates: string[] = [];
   const meta: Record<string, string> = {};
   const assets: string[] = [];
+  let heroSiteImage = '';
+  let footerCount = 0;
+  let footerLinkCount = 0;
+  let footerMeta = '';
+  let footerTrademarks = 0;
   await new HTMLRewriter()
     .on('[id]', {
       element(element) {
@@ -36,6 +41,31 @@ for await (const file of new Bun.Glob('**/*.html').scan(`${root}/dist`)) {
     .on('a[href]', {
       element(element) {
         links.push(element.getAttribute('href') ?? '');
+      },
+    })
+    .on('img.hero-site-image', {
+      element(element) {
+        heroSiteImage = element.getAttribute('src') ?? '';
+      },
+    })
+    .on('footer.site-footer', {
+      element() {
+        footerCount++;
+      },
+    })
+    .on('footer.site-footer a, footer.site-footer nav', {
+      element() {
+        footerLinkCount++;
+      },
+    })
+    .on('footer.site-footer .site-footer-meta', {
+      text(chunk) {
+        footerMeta += chunk.text;
+      },
+    })
+    .on('footer.site-footer .site-footer-trademarks p', {
+      element() {
+        footerTrademarks++;
       },
     })
     .on('html', {
@@ -90,6 +120,22 @@ for await (const file of new Bun.Glob('**/*.html').scan(`${root}/dist`)) {
     errors.push(
       `${file}: missing title or expected one rendered h1, got ${headings}`,
     );
+  // The landing pages show the starter's front-site screenshot in their own
+  // language, and a quiet footer: the license and the trademark notice only.
+  if (file === 'index.html' || file === 'ja/index.html') {
+    const expected = file === 'index.html' ? 'site-en.webp' : 'site.webp';
+    if (!heroSiteImage.endsWith(`/images/${expected}`))
+      errors.push(
+        `${file}: hero site screenshot must be images/${expected}, got ${heroSiteImage}`,
+      );
+    if (footerCount !== 1) errors.push(`${file}: expected one site footer`);
+    if (footerLinkCount > 0)
+      errors.push(`${file}: the site footer must not have links or a nav`);
+    if (!footerMeta.includes('MIT License'))
+      errors.push(`${file}: the site footer must keep the MIT License line`);
+    if (footerTrademarks !== (file === 'index.html' ? 1 : 2))
+      errors.push(`${file}: the site footer must keep the trademark notice`);
+  }
   if (file !== '404.html' && canonical !== `${origin}${pathname}`)
     errors.push(`${file}: incorrect canonical URL (${canonical})`);
   if (file !== '404.html') {
