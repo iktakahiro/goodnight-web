@@ -1,13 +1,16 @@
 ---
 import PageHeader from '../../../components/site/page-header.astro';
 import PostList from '../../../features/posts/post-list.astro';
+import { postFeedPath } from '../../../features/posts/post-feed';
 import { getPosts } from '../../../features/posts/posts';
 import BaseLayout from '../../../layouts/base-layout.astro';
+import { ui } from '../../../i18n/ui';
 import { localeFromParam, localeStaticPaths } from '../../../i18n/locales';
 
 export const getStaticPaths = localeStaticPaths;
 
 const locale = localeFromParam(Astro.params.lang);
+const feedHref = postFeedPath(locale, 'news');
 const posts = await getPosts('news', locale);
 
 const text = {
@@ -24,9 +27,12 @@ const text = {
 }[locale];
 ---
 
-<BaseLayout locale={locale} title={text.title} description={text.lead} path='/news/'>
+<BaseLayout locale={locale} title={text.title} description={text.lead} path='/news/' feed='news'>
   <PageHeader eyebrow={text.eyebrow} title={text.title} lead={text.lead} />
   <div class='mx-auto max-w-4xl px-5 pt-12 sm:px-8'>
+    <p class='mb-4 text-right text-sm'>
+      <a href={feedHref} class='font-bold text-primary-strong'>{ui.rssFeed[locale]}</a>
+    </p>
     <PostList locale={locale} collection='news' posts={posts} showDescription={false} />
   </div>
 </BaseLayout>
