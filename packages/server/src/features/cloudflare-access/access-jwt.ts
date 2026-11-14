@@ -126,6 +126,9 @@ const signingKey = async (
 };
 
 const decodePart = (part: string): Uint8Array<ArrayBuffer> => {
+  if (!/^[A-Za-z0-9_-]*$/.test(part) || part.length % 4 === 1) {
+    throw new Error('invalid base64url');
+  }
   const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
   const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='));
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
@@ -144,14 +147,14 @@ const decodeJson = (part: string): Record<string, unknown> | null => {
   }
 };
 
-// Allowed clock difference for `nbf`, in seconds.
+// Allowed clock difference for `nbf` and `iat`, in seconds.
 const CLOCK_SKEW_S = 60;
 
 /**
  * Verifies a Cloudflare Access token (`Cf-Access-Jwt-Assertion`): an RS256
  * signature by a key from the team's `/cdn-cgi/access/certs`, the issuer
  * (the team origin), an audience in `config.audiences`, and `exp` (and
- * `nbf` when present). Keys are cached per isolate for
+ * `nbf` and `iat` when present). Keys are cached per isolate for
  * {@link ACCESS_KEYS_TTL_MS}.
  *
  * @param token - The header value, or `null` when the header is missing.
@@ -214,7 +217,10 @@ export const verifyAccessJwt = async (
   if (typeof payload.exp !== 'number' || payload.exp <= nowS) {
     return denied('expired');
   }
-  if (typeof payload.nbf === 'number' && payload.nbf > nowS + CLOCK_SKEW_S) {
+  if (
+    (typeof payload.nbf === 'number' && payload.nbf > nowS + CLOCK_SKEW_S) ||
+    (typeof payload.iat === 'number' && payload.iat > nowS + CLOCK_SKEW_S)
+  ) {
     return denied('not yet valid');
   }
   return { ok: true };
