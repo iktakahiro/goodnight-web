@@ -170,6 +170,30 @@ describe('verifyAccessJwt', () => {
     }
   });
 
+  test('rejects non-base64url and invalid-length signatures', async () => {
+    let token = await sign({});
+    for (
+      let nonce = 0;
+      !/[-_]/.test(token.split('.')[2] ?? '') && nonce < 20;
+      nonce++
+    ) {
+      token = await sign({ nonce });
+    }
+    const [header, payload, signature = ''] = token.split('.');
+    expect(await verifyAccessJwt(config, token)).toEqual({ ok: true });
+    expect(signature).toMatch(/[-_]/);
+    const standardBase64 = signature.replace(/-/g, '+').replace(/_/g, '/');
+
+    for (const invalidSignature of [`${signature}==`, standardBase64, 'A']) {
+      expect(
+        await verifyAccessJwt(
+          config,
+          `${header}.${payload}.${invalidSignature}`,
+        ),
+      ).toEqual({ ok: false, reason: 'denied', detail: 'malformed signature' });
+    }
+  });
+
   test.each([
     null,
     {},
