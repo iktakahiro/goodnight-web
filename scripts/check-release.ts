@@ -40,6 +40,7 @@ export interface PackageJson {
   scripts?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  exports?: unknown;
 }
 
 /**
@@ -259,6 +260,36 @@ export const REQUIRED_TARBALL_FILES: readonly RegExp[] = [
   /^package\/migrations\/0000_[^/]+\.sql$/,
 ];
 
+/** Problems with the server's public entry points in the packed file list. */
+export const checkTarballExports = (
+  files: readonly string[],
+  packageExports: unknown,
+): string[] => {
+  if (!isRecord(packageExports)) return ['package.json has no exports map'];
+  const problems: string[] = [];
+  for (const name of [
+    '.',
+    './client',
+    './contact',
+    './messages',
+    './admin-messages.json',
+  ]) {
+    if (!Object.hasOwn(packageExports, name)) {
+      problems.push(`package.json is missing public export "${name}"`);
+    }
+  }
+  for (const [name, target] of Object.entries(packageExports)) {
+    if (typeof target !== 'string' || !target.startsWith('./')) {
+      problems.push(`export "${name}" must point to a file inside the package`);
+    } else if (!files.includes(`package/${target.slice(2)}`)) {
+      problems.push(
+        `export "${name}" points to ${target}, which is missing from the tarball`,
+      );
+    }
+  }
+  return problems;
+};
+
 /** Problems in the list of files that `npm pack` would put in the tarball. */
 export const checkTarballFiles = (
   files: readonly string[],
@@ -422,6 +453,7 @@ if (import.meta.main) {
 
   const tarball = tarballArgument(process.argv.slice(2), process.env);
   const packed = tarball ? readTarball(resolve(tarball)) : undefined;
+  const files = packed?.files ?? listTarball(serverDir);
 
   const problems = [
     ...checkServerManifest(server).map((p) => `packages/server: ${p}`),
@@ -431,10 +463,12 @@ if (import.meta.main) {
     ...checkStarterLockfile(lock, starter, server.version).map(
       (p) => `templates/starter: ${p}`,
     ),
-    ...checkTarballFiles(
-      packed?.files ?? listTarball(serverDir),
-      migrations,
-    ).map((p) => `packages/server tarball: ${p}`),
+    ...checkTarballFiles(files, migrations).map(
+      (p) => `packages/server tarball: ${p}`,
+    ),
+    ...checkTarballExports(files, (packed?.manifest ?? server).exports).map(
+      (p) => `packages/server tarball: ${p}`,
+    ),
     ...(packed
       ? checkPackedManifest(packed.manifest, server.version).map(
           (p) => `${tarball}: ${p}`,

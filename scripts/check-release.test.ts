@@ -4,6 +4,7 @@ import {
   checkServerManifest,
   checkStarterLockfile,
   checkStarterManifest,
+  checkTarballExports,
   checkTarballFiles,
   compareVersions,
   parsePackJson,
@@ -103,6 +104,46 @@ describe('checkTarballFiles', () => {
       ['0000_initial.sql', '0001_next.sql'],
     );
     expect(problems).toHaveLength(3);
+  });
+});
+
+describe('checkTarballExports', () => {
+  const entries = {
+    '.': './src/index.ts',
+    './client': './src/client.ts',
+    './contact': './src/contact.ts',
+    './messages': './src/messages.ts',
+    './admin-messages.json': './src/features/admin-ui/admin-messages.gen.json',
+  };
+  const files = Object.values(entries).map(
+    (path) => `package/${path.slice(2)}`,
+  );
+
+  test('accepts all public exports when their files ship', () => {
+    expect(checkTarballExports(files, entries)).toEqual([]);
+  });
+
+  test('requires the public names even if the files are present', () => {
+    const { './client': _, ...withoutClient } = entries;
+    expect(checkTarballExports(files, undefined)).toEqual([
+      'package.json has no exports map',
+    ]);
+    expect(checkTarballExports(files, withoutClient)).toEqual([
+      'package.json is missing public export "./client"',
+    ]);
+  });
+
+  test('checks renamed and new targets against the actual file list', () => {
+    expect(
+      checkTarballExports(files, {
+        ...entries,
+        './contact': './src/form.ts',
+        './extra': './src/extra.ts',
+      }),
+    ).toEqual([
+      'export "./contact" points to ./src/form.ts, which is missing from the tarball',
+      'export "./extra" points to ./src/extra.ts, which is missing from the tarball',
+    ]);
   });
 });
 
