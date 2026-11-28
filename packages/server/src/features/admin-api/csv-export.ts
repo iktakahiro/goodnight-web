@@ -8,6 +8,7 @@ import type { FormVersion } from '../contact-form/form-store.ts';
 import type { Submission } from '../submissions/submission-store.ts';
 import type { Locale } from '../../shared/messages.ts';
 import { toAdminValue } from './admin-view.ts';
+import { csvCell } from './csv.ts';
 
 const FIXED_HEADER = [
   'id',
@@ -38,29 +39,37 @@ export interface CsvLayout {
  *
  * Headers are labels in `locale` from the latest definition. An archived
  * field's header ends with ` (vN)`, N being the last version that had it. If
- * two headers are still equal, the field id is added in brackets.
+ * two CSV cells would still be equal, the field id is added in brackets.
  */
 export const csvLayout = (
   current: FormDefinition,
   locale: Locale,
 ): CsvLayout => {
   const fields = allKnownFields(current);
-  const labels = fields.map((field) => {
-    const label = localizedText(field.label, locale) || field.id;
-    return 'lastVersion' in field ? `${label} (v${field.lastVersion})` : label;
+  const reserved = new Set(FIXED_HEADER.map(csvCell));
+  const duplicates = new Set<string>();
+  const columns = fields.map((field) => {
+    const text = localizedText(field.label, locale) || field.id;
+    const label =
+      'lastVersion' in field ? `${text} (v${field.lastVersion})` : text;
+    const cell = csvCell(label);
+    if (reserved.has(cell)) duplicates.add(cell);
+    reserved.add(cell);
+    return { label, cell, id: field.id };
   });
-  const counts = new Map<string, number>();
-  for (const label of [...FIXED_HEADER, ...labels]) {
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  }
   return {
     header: [
       ...FIXED_HEADER,
-      ...labels.map((label, index) =>
-        (counts.get(label) ?? 0) > 1
-          ? `${label} [${fields[index]?.id}]`
-          : label,
-      ),
+      ...columns.map(({ label, cell, id }) => {
+        if (!duplicates.has(cell)) return label;
+        const base = `${label} [${id}]`;
+        let candidate = base;
+        for (let n = 2; reserved.has(csvCell(candidate)); n++) {
+          candidate = `${base} (${n})`;
+        }
+        reserved.add(csvCell(candidate));
+        return candidate;
+      }),
     ],
     fields,
   };
