@@ -102,6 +102,38 @@ describe('csvLayout', () => {
     );
     expect(layout.header.slice(FIXED)).toEqual(['名前', 'f_b']);
   });
+
+  test('reserves literal labels before assigning disambiguated headers', () => {
+    const { header } = csvLayout(
+      {
+        fields: [
+          field('f_a', 'email'),
+          field('f_b', 'email [f_a]'),
+          field('f_c', 'email [f_a] (2)'),
+        ],
+        archived: [],
+      },
+      'en',
+    );
+    expect(header.slice(FIXED)).toEqual([
+      'email [f_a] (3)',
+      'email [f_a]',
+      'email [f_a] (2)',
+    ]);
+  });
+
+  test('keeps headers distinct after the spreadsheet formula guard runs', () => {
+    const { header } = csvLayout(
+      {
+        fields: [field('f_a', '=price'), field('f_b', "'=price")],
+        archived: [],
+      },
+      'en',
+    );
+    expect(csvLine(header.slice(FIXED))).toBe(
+      `"'=price [f_a]","'=price [f_b]"\r\n`,
+    );
+  });
 });
 
 describe('csvRow', () => {
